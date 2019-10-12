@@ -14,3 +14,4 @@ members = [
 
 [dependencies]
 libc = "*"
+linux-io-uring = { path = "linux-io-uring" }

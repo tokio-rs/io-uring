@@ -13,6 +13,7 @@ fn main() {
     bindgen::Builder::default()
         .header_contents("include-file.h", INCLUDE)
         .ctypes_prefix("libc")
+        .generate_comments(true)
         .use_core()
         .whitelist_type("io_uring_.*|io_.qring_.*")
         .whitelist_var("__NR_io_uring.*|IOSQE_.*|IORING_.*")

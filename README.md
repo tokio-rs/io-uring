@@ -2,4 +2,4 @@
 
 * io uring
 * iocp
-* poll-based
+* thread/poll-based
