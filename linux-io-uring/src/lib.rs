@@ -1,7 +1,14 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+mod mmap;
+
+use std::sync::atomic::AtomicU32;
+use linux_io_uring_sys as sys;
+use mmap::Mmap;
+
+
+pub struct SubmitQueue {
+    //
+}
+
+pub struct CompleteQueue {
+    //
 }
