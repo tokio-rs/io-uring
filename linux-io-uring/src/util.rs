@@ -1,4 +1,4 @@
-use std::{ fs, io, ptr, mem };
+use std::{ io, ptr, mem };
 use std::convert::TryFrom;
 use std::os::unix::io::{ AsRawFd, IntoRawFd, FromRawFd, RawFd };
 
@@ -19,7 +19,7 @@ impl Mmap {
                 fd.as_raw_fd(),
                 offset
             ) {
-                libc::MAP_FAILED => return Err(io::Error::last_os_error()),
+                libc::MAP_FAILED => Err(io::Error::last_os_error()),
                 addr => Ok(Mmap { addr, len })
             }
         }

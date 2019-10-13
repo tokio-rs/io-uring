@@ -1,5 +1,4 @@
 use std::{ io, mem };
-use std::convert::TryInto;
 use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 use crate::util::{ Mmap, Fd };
@@ -28,7 +27,7 @@ pub struct SubmissionQueue {
     dropped: *const u32,
     array: *const u32,
 
-    sqentries: *const sys::io_uring_sqe
+    sqes: *const sys::io_uring_sqe
 }
 
 pub struct CompletionQueue {
@@ -40,7 +39,7 @@ pub struct CompletionQueue {
     ring_entries: *const u32,
     overflow: *const u32,
 
-    cqentries: *const sys::io_uring_cqe
+    cqes: *const sys::io_uring_cqe
 }
 
 impl SubmissionQueue {
@@ -65,7 +64,7 @@ impl SubmissionQueue {
             let dropped         = sq_mmap + p.sq_off.dropped        => u32;
             let array           = sq_mmap + p.sq_off.array          => u32;
 
-            let sqentries       = sqe_mmap + 0                      => sys::io_uring_sqe;
+            let sqes            = sqe_mmap + 0                      => sys::io_uring_sqe;
         }
 
         Ok(SubmissionQueue {
@@ -76,7 +75,7 @@ impl SubmissionQueue {
             flags,
             dropped,
             array,
-            sqentries
+            sqes
         })
     }
 }
@@ -95,7 +94,7 @@ impl CompletionQueue {
             let ring_mask       = cq_mmap + p.cq_off.ring_mask      => u32;
             let ring_entries    = cq_mmap + p.cq_off.ring_entries   => u32;
             let overflow        = cq_mmap + p.cq_off.overflow       => u32;
-            let cqentries       = cq_mmap + p.cq_off.cqes           => sys::io_uring_cqe;
+            let cqes            = cq_mmap + p.cq_off.cqes           => sys::io_uring_cqe;
         }
 
         Ok(CompletionQueue {
@@ -103,7 +102,7 @@ impl CompletionQueue {
             head, tail,
             ring_mask, ring_entries,
             overflow,
-            cqentries
+            cqes
         })
     }
 }
