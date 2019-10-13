@@ -41,7 +41,7 @@ impl IoUring {
     pub unsafe fn register(&self, target: reg::Target<'_, '_>) -> io::Result<()> {
         let (opcode, arg, len) = target.export();
 
-         if 0 >= sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
+         if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
             Ok(())
          } else {
             Err(io::Error::last_os_error())
@@ -52,7 +52,7 @@ impl IoUring {
         let opcode = target.opcode();
 
         unsafe {
-             if 0 >= sys::io_uring_register(self.fd.as_raw_fd(), opcode, ptr::null(), 0) {
+             if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, ptr::null(), 0) {
                 Ok(())
              } else {
                 Err(io::Error::last_os_error())
