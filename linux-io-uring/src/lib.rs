@@ -27,7 +27,8 @@ impl IoUring {
 
         let fd: Fd = unsafe {
             sys::io_uring_setup(entries, p.as_mut_ptr())
-                .try_into()?
+                .try_into()
+                .map_err(|_| io::Error::last_os_error())?
         };
 
         let p = unsafe { p.assume_init() };

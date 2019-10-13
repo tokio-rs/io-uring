@@ -8,7 +8,7 @@ macro_rules! mmap_offset {
     ( $mmap:ident + $offset:expr => $ty:ty ) => {
         $mmap.as_mut_ptr().add($offset as _) as *const $ty
     };
-    ( $( let $val:ident = $mmap:ident + $offset:expr => $ty:ty );+ $(;)? ) => {
+    ( unsafe $( let $val:ident = $mmap:ident + $offset:expr => $ty:ty );+ $(;)? ) => {
         $(
             let $val = unsafe { mmap_offset!($mmap + $offset => $ty) };
         )*
@@ -55,7 +55,7 @@ impl SubmissionQueue {
             p.sq_entries as usize * mem::size_of::<sys::io_uring_sqe>()
         )?;
 
-        mmap_offset!{
+        mmap_offset!{ unsafe
             let head            = sq_mmap + p.sq_off.head           => u32;
             let tail            = sq_mmap + p.sq_off.tail           => u32;
             let ring_mask       = sq_mmap + p.sq_off.ring_mask      => u32;
@@ -88,7 +88,7 @@ impl CompletionQueue {
             p.cq_off.cqes as usize + p.cq_entries as usize * mem::size_of::<sys::io_uring_cqe>()
         )?;
 
-        mmap_offset!{
+        mmap_offset!{ unsafe
             let head            = cq_mmap + p.cq_off.head           => u32;
             let tail            = cq_mmap + p.cq_off.tail           => u32;
             let ring_mask       = cq_mmap + p.cq_off.ring_mask      => u32;

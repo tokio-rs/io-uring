@@ -43,13 +43,13 @@ impl Drop for Mmap {
 pub struct Fd(RawFd);
 
 impl TryFrom<RawFd> for Fd {
-    type Error = io::Error;
+    type Error = ();
 
-    fn try_from(value: RawFd) -> io::Result<Fd> {
-        if value < 0 {
-            Err(io::Error::last_os_error())
-        } else {
+    fn try_from(value: RawFd) -> Result<Fd, Self::Error> {
+        if value >= 0 {
             Ok(Fd(value))
+        } else {
+            Err(())
         }
     }
 }
