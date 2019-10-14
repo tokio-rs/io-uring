@@ -1,6 +1,7 @@
 mod util;
-mod queue;
 mod register;
+pub mod squeue;
+pub mod cqueue;
 
 use std::ptr;
 use std::convert::TryInto;
@@ -9,7 +10,8 @@ use std::io::{ self, IoSlice };
 use std::mem::{ MaybeUninit, ManuallyDrop };
 use linux_io_uring_sys as sys;
 use util::Fd;
-use queue::{ SubmissionQueue, CompletionQueue };
+use squeue::SubmissionQueue;
+use cqueue::CompletionQueue;
 use register::{ register as reg, unregister as unreg };
 
 
@@ -39,14 +41,16 @@ impl IoUring {
         Ok(IoUring { fd, sq, cq })
     }
 
-    pub unsafe fn register(&self, target: reg::Target<'_, '_>) -> io::Result<()> {
+    pub fn register(&self, target: reg::Target<'_, '_>) -> io::Result<()> {
         let (opcode, arg, len) = target.export();
 
-         if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
-            Ok(())
-         } else {
-            Err(io::Error::last_os_error())
-         }
+        unsafe {
+            if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
+               Ok(())
+            } else {
+               Err(io::Error::last_os_error())
+            }
+        }
     }
 
     pub fn unregister(&self, target: unreg::Target) -> io::Result<()> {
@@ -59,6 +63,10 @@ impl IoUring {
                 Err(io::Error::last_os_error())
              }
         }
+    }
+
+    pub fn submission() {
+        unimplemented!()
     }
 }
 

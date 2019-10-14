@@ -1,19 +1,9 @@
-use std::{ io, mem };
+use std::{ io, mem, ptr };
 use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 use crate::util::{ Mmap, Fd };
+use crate::mmap_offset;
 
-
-macro_rules! mmap_offset {
-    ( $mmap:ident + $offset:expr => $ty:ty ) => {
-        $mmap.as_mut_ptr().add($offset as _) as *const $ty
-    };
-    ( unsafe $( let $val:ident = $mmap:ident + $offset:expr => $ty:ty );+ $(;)? ) => {
-        $(
-            let $val = unsafe { mmap_offset!($mmap + $offset => $ty) };
-        )*
-    }
-}
 
 pub struct SubmissionQueue {
     _sq_mmap: Mmap,
@@ -30,17 +20,7 @@ pub struct SubmissionQueue {
     sqes: *const sys::io_uring_sqe
 }
 
-pub struct CompletionQueue {
-    _cq_mmap: Mmap,
-
-    head: *const u32,
-    tail: *const u32,
-    ring_mask: *const u32,
-    ring_entries: *const u32,
-    overflow: *const u32,
-
-    cqes: *const sys::io_uring_cqe
-}
+pub struct Entry(sys::io_uring_sqe);
 
 impl SubmissionQueue {
     pub fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<SubmissionQueue> {
@@ -78,31 +58,27 @@ impl SubmissionQueue {
             sqes
         })
     }
-}
 
-impl CompletionQueue {
-    pub fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<CompletionQueue> {
-        let cq_mmap = Mmap::new(
-            &fd,
-            sys::IORING_OFF_CQ_RING as _,
-            p.cq_off.cqes as usize + p.cq_entries as usize * mem::size_of::<sys::io_uring_cqe>()
-        )?;
+    fn last(&self) -> Option<*mut sys::io_uring_sqe> {
+        unimplemented!()
+    }
 
-        mmap_offset!{ unsafe
-            let head            = cq_mmap + p.cq_off.head           => u32;
-            let tail            = cq_mmap + p.cq_off.tail           => u32;
-            let ring_mask       = cq_mmap + p.cq_off.ring_mask      => u32;
-            let ring_entries    = cq_mmap + p.cq_off.ring_entries   => u32;
-            let overflow        = cq_mmap + p.cq_off.overflow       => u32;
-            let cqes            = cq_mmap + p.cq_off.cqes           => sys::io_uring_cqe;
+    pub fn is_empty(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn is_full(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn push(&self, Entry(entry): Entry) -> Result<(), Entry> {
+        if let Some(p) = self.last() {
+            unsafe {
+                ptr::write(p, entry);
+                Ok(())
+            }
+        } else {
+            Err(Entry(entry))
         }
-
-        Ok(CompletionQueue {
-            _cq_mmap: cq_mmap,
-            head, tail,
-            ring_mask, ring_entries,
-            overflow,
-            cqes
-        })
     }
 }

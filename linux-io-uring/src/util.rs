@@ -3,6 +3,19 @@ use std::convert::TryFrom;
 use std::os::unix::io::{ AsRawFd, IntoRawFd, FromRawFd, RawFd };
 
 
+#[macro_export]
+macro_rules! mmap_offset {
+    ( $mmap:ident + $offset:expr => $ty:ty ) => {
+        $mmap.as_mut_ptr().add($offset as _) as *const $ty
+    };
+    ( unsafe $( let $val:ident = $mmap:ident + $offset:expr => $ty:ty );+ $(;)? ) => {
+        $(
+            let $val = unsafe { mmap_offset!($mmap + $offset => $ty) };
+        )*
+    }
+}
+
+
 pub struct Mmap {
     addr: *mut libc::c_void,
     len: usize
