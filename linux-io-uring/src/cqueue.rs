@@ -26,12 +26,12 @@ impl CompletionQueue {
         )?;
 
         mmap_offset!{ unsafe
-            let head            = cq_mmap + p.cq_off.head           => u32;
-            let tail            = cq_mmap + p.cq_off.tail           => u32;
-            let ring_mask       = cq_mmap + p.cq_off.ring_mask      => u32;
-            let ring_entries    = cq_mmap + p.cq_off.ring_entries   => u32;
-            let overflow        = cq_mmap + p.cq_off.overflow       => u32;
-            let cqes            = cq_mmap + p.cq_off.cqes           => sys::io_uring_cqe;
+            let head            = cq_mmap + p.cq_off.head           => *const u32;
+            let tail            = cq_mmap + p.cq_off.tail           => *const u32;
+            let ring_mask       = cq_mmap + p.cq_off.ring_mask      => *const u32;
+            let ring_entries    = cq_mmap + p.cq_off.ring_entries   => *const u32;
+            let overflow        = cq_mmap + p.cq_off.overflow       => *const u32;
+            let cqes            = cq_mmap + p.cq_off.cqes           => *const sys::io_uring_cqe;
         }
 
         Ok(CompletionQueue {
