@@ -1,6 +1,8 @@
 use std::{ io, mem, ptr };
+use std::cell::Cell;
 use std::sync::atomic;
 use std::os::unix::io::RawFd;
+use std::marker::PhantomData;
 use linux_io_uring_sys as sys;
 use crate::util::{ Mmap, Fd, AtomicU32Ref };
 use crate::mmap_offset;
@@ -19,6 +21,14 @@ pub struct SubmissionQueue {
     array: *const u32,
 
     sqes: *mut sys::io_uring_sqe
+}
+
+pub struct AvailableQueue<'a> {
+    head: Cell<u32>,
+    tail: u32,
+    ring_mask: u32,
+    ring_entries: u32,
+    queue: &'a mut SubmissionQueue
 }
 
 pub struct Entry(sys::io_uring_sqe);
@@ -61,39 +71,55 @@ impl SubmissionQueue {
         })
     }
 
-    fn alloc(&self) -> Option<*mut sys::io_uring_sqe> {
-        unsafe {
-            if self.is_full() {
-                None
-            } else {
-                let tail = self.tail.unsync_load();
-                let ring_mask = *self.ring_mask;
-                Some(self.sqes.add(tail as usize & ring_mask as usize))
-            }
-        }
-    }
-
     pub fn is_full(&self) -> bool {
         unsafe {
             let head = self.head.load(atomic::Ordering::Acquire);
             let tail = self.tail.unsync_load();
             let ring_entries = *self.ring_entries;
 
-            tail.wrapping_sub(head) == ring_entries
+            tail.wrapping_sub(head) >= ring_entries
         }
     }
 
-    pub fn push(&self, Entry(entry): Entry) -> Result<(), Entry> {
-        if let Some(p) = self.alloc() {
-            unsafe {
-                *p = entry;
-                let tail = self.tail.unsync_load();
-                self.tail.store(tail.wrapping_add(1), atomic::Ordering::Release);
+    pub fn available<'a>(&'a mut self) -> AvailableQueue<'a> {
+        unsafe {
+            AvailableQueue {
+                head: Cell::new(self.head.load(atomic::Ordering::Acquire)),
+                tail: self.tail.unsync_load(),
+                ring_mask: *self.ring_mask,
+                ring_entries: *self.ring_entries,
+                queue: self
             }
-
-            Ok(())
-        } else {
-            Err(Entry(entry))
         }
+    }
+}
+
+impl<'a> AvailableQueue<'a> {
+    pub fn is_full(&self) -> bool {
+        self.tail.wrapping_sub(self.head.get()) >= self.ring_entries
+            && {
+                let head = self.queue.head.load(atomic::Ordering::Acquire);
+                self.head.set(head);
+                self.tail.wrapping_sub(head) >= self.ring_entries
+            }
+    }
+
+    pub fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
+        if self.is_full() {
+            Err(Entry(entry))
+        } else {
+            unsafe {
+                *self.queue.sqes.add(self.tail as usize & self.ring_mask as usize)
+                    = entry;
+                self.tail += 1;
+            }
+            Ok(())
+        }
+    }
+}
+
+impl<'a> Drop for AvailableQueue<'a> {
+    fn drop(&mut self) {
+        self.queue.tail.store(self.tail, atomic::Ordering::Release);
     }
 }

@@ -97,6 +97,7 @@ impl Drop for Fd {
     }
 }
 
+#[derive(Clone)]
 pub struct AtomicU32Ref(*const u32);
 
 impl AtomicU32Ref {
