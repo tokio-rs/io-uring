@@ -33,6 +33,20 @@ pub struct AvailableQueue<'a> {
 
 pub struct Entry(sys::io_uring_sqe);
 
+pub mod opcode {
+    pub struct Nop;
+    pub struct Readv();
+    pub struct Writev();
+    pub struct Fsync();
+    pub struct ReadFixed();
+    pub struct WriteFixed();
+    pub struct PollAdd();
+    pub struct PollRemove();
+    pub struct SyncFileRange();
+    pub struct SendMsg();
+    pub struct RecvMsg();
+}
+
 impl SubmissionQueue {
     pub fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<SubmissionQueue> {
         let sq_mmap = Mmap::new(
@@ -104,15 +118,16 @@ impl<'a> AvailableQueue<'a> {
             }
     }
 
-    pub fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
+    pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
         if self.is_full() {
             Err(Entry(entry))
         } else {
             unsafe {
                 *self.queue.sqes.add(self.tail as usize & self.ring_mask as usize)
                     = entry;
-                self.tail += 1;
             }
+
+            self.tail += 1;
             Ok(())
         }
     }
@@ -121,5 +136,13 @@ impl<'a> AvailableQueue<'a> {
 impl<'a> Drop for AvailableQueue<'a> {
     fn drop(&mut self) {
         self.queue.tail.store(self.tail, atomic::Ordering::Release);
+    }
+}
+
+impl From<opcode::Nop> for Entry {
+    fn from(op: opcode::Nop) -> Entry {
+        let mut sqe = sys::io_uring_sqe::default();
+        sqe.opcode = sys::IORING_OP_NOP as _;
+        Entry(sqe)
     }
 }

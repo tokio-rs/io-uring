@@ -23,17 +23,15 @@ pub struct IoUring {
 
 impl IoUring {
     pub fn new(entries: u32) -> io::Result<IoUring> {
-        let mut p = MaybeUninit::<sys::io_uring_params>::zeroed();
+        let mut p = sys::io_uring_params::default();
 
         // TODO flags
 
         let fd: Fd = unsafe {
-            sys::io_uring_setup(entries, p.as_mut_ptr())
+            sys::io_uring_setup(entries, &mut p)
                 .try_into()
                 .map_err(|_| io::Error::last_os_error())?
         };
-
-        let p = unsafe { p.assume_init() };
 
         let sq = ManuallyDrop::new(SubmissionQueue::new(&fd, &p)?);
         let cq = ManuallyDrop::new(CompletionQueue::new(&fd, &p)?);
@@ -41,7 +39,7 @@ impl IoUring {
         Ok(IoUring { fd, sq, cq })
     }
 
-    pub fn register(&self, target: reg::Target<'_, '_>) -> io::Result<()> {
+    pub unsafe fn register(&self, target: reg::Target<'_, '_>) -> io::Result<()> {
         let (opcode, arg, len) = target.export();
 
         unsafe {
