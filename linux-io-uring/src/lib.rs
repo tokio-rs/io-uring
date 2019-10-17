@@ -64,8 +64,12 @@ impl IoUring {
         }
     }
 
-    pub fn submission() {
+    pub fn enter(&self, to_submit: usize, min_complete: usize, flag: u32, sig: Option<&libc::sigset_t>) -> io::Result<()> {
         unimplemented!()
+    }
+
+    pub fn submission(&mut self) -> &mut SubmissionQueue {
+        &mut self.sq
     }
 }
 

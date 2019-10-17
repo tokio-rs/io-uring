@@ -18,7 +18,7 @@ pub struct CompletionQueue {
 }
 
 impl CompletionQueue {
-    pub fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<CompletionQueue> {
+    pub(crate) fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<CompletionQueue> {
         let cq_mmap = Mmap::new(
             &fd,
             sys::IORING_OFF_CQ_RING as _,

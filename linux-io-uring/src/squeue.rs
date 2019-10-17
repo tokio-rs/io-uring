@@ -1,5 +1,4 @@
 use std::{ io, mem, ptr };
-use std::cell::Cell;
 use std::sync::atomic;
 use std::os::unix::io::RawFd;
 use std::marker::PhantomData;
@@ -18,13 +17,13 @@ pub struct SubmissionQueue {
     ring_entries: *const u32,
     flags: *const u32,
     dropped: *const u32,
-    array: *const u32,
+    array: *mut u32,
 
     sqes: *mut sys::io_uring_sqe
 }
 
 pub struct AvailableQueue<'a> {
-    head: Cell<u32>,
+    head: u32,
     tail: u32,
     ring_mask: u32,
     ring_entries: u32,
@@ -34,7 +33,7 @@ pub struct AvailableQueue<'a> {
 pub struct Entry(pub sys::io_uring_sqe);
 
 impl SubmissionQueue {
-    pub fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<SubmissionQueue> {
+    pub(crate) fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<SubmissionQueue> {
         let sq_mmap = Mmap::new(
             &fd,
             sys::IORING_OFF_SQ_RING as _,
@@ -53,9 +52,16 @@ impl SubmissionQueue {
             let ring_entries    = sq_mmap + p.sq_off.ring_entries   => *const u32;
             let flags           = sq_mmap + p.sq_off.flags          => *const u32;
             let dropped         = sq_mmap + p.sq_off.dropped        => *const u32;
-            let array           = sq_mmap + p.sq_off.array          => *const u32;
+            let array           = sq_mmap + p.sq_off.array          => *mut u32;
 
             let sqes            = sqe_mmap + 0                      => *mut sys::io_uring_sqe;
+        }
+
+        unsafe {
+            // To keep it simple, map it directly to `sqes`.
+            for i in 0..*ring_entries {
+                *array.add(i as usize) = i;
+            }
         }
 
         Ok(SubmissionQueue {
@@ -71,6 +77,15 @@ impl SubmissionQueue {
         })
     }
 
+    pub fn len(&self) -> usize {
+        unsafe {
+            let head = self.head.load(atomic::Ordering::Acquire);
+            let tail = self.tail.unsync_load();
+
+            (tail - head) as usize
+        }
+    }
+
     pub fn is_full(&self) -> bool {
         unsafe {
             let head = self.head.load(atomic::Ordering::Acquire);
@@ -84,7 +99,7 @@ impl SubmissionQueue {
     pub fn available<'a>(&'a mut self) -> AvailableQueue<'a> {
         unsafe {
             AvailableQueue {
-                head: Cell::new(self.head.load(atomic::Ordering::Acquire)),
+                head: self.head.load(atomic::Ordering::Acquire),
                 tail: self.tail.unsync_load(),
                 ring_mask: *self.ring_mask,
                 ring_entries: *self.ring_entries,
@@ -95,13 +110,12 @@ impl SubmissionQueue {
 }
 
 impl<'a> AvailableQueue<'a> {
+    pub fn len(&self) -> usize {
+        (self.tail - self.head) as usize
+    }
+
     pub fn is_full(&self) -> bool {
-        self.tail.wrapping_sub(self.head.get()) >= self.ring_entries
-            && {
-                let head = self.queue.head.load(atomic::Ordering::Acquire);
-                self.head.set(head);
-                self.tail.wrapping_sub(head) >= self.ring_entries
-            }
+        self.tail.wrapping_sub(self.head) >= self.ring_entries
     }
 
     pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
