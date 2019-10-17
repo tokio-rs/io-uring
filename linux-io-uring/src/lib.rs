@@ -2,6 +2,7 @@ mod util;
 mod register;
 pub mod squeue;
 pub mod cqueue;
+pub mod opcode;
 
 use std::ptr;
 use std::convert::TryInto;

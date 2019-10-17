@@ -31,21 +31,7 @@ pub struct AvailableQueue<'a> {
     queue: &'a mut SubmissionQueue
 }
 
-pub struct Entry(sys::io_uring_sqe);
-
-pub mod opcode {
-    pub struct Nop;
-    pub struct Readv();
-    pub struct Writev();
-    pub struct Fsync();
-    pub struct ReadFixed();
-    pub struct WriteFixed();
-    pub struct PollAdd();
-    pub struct PollRemove();
-    pub struct SyncFileRange();
-    pub struct SendMsg();
-    pub struct RecvMsg();
-}
+pub struct Entry(pub sys::io_uring_sqe);
 
 impl SubmissionQueue {
     pub fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<SubmissionQueue> {
@@ -136,13 +122,5 @@ impl<'a> AvailableQueue<'a> {
 impl<'a> Drop for AvailableQueue<'a> {
     fn drop(&mut self) {
         self.queue.tail.store(self.tail, atomic::Ordering::Release);
-    }
-}
-
-impl From<opcode::Nop> for Entry {
-    fn from(op: opcode::Nop) -> Entry {
-        let mut sqe = sys::io_uring_sqe::default();
-        sqe.opcode = sys::IORING_OP_NOP as _;
-        Entry(sqe)
     }
 }
