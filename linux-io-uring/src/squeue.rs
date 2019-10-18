@@ -1,7 +1,5 @@
-use std::{ io, mem, ptr };
+use std::{ io, mem };
 use std::sync::atomic;
-use std::os::unix::io::RawFd;
-use std::marker::PhantomData;
 use bitflags::bitflags;
 use linux_io_uring_sys as sys;
 use crate::util::{ Mmap, Fd, AtomicU32Ref };
@@ -16,8 +14,8 @@ pub struct SubmissionQueue {
     tail: AtomicU32Ref,
     ring_mask: *const u32,
     ring_entries: *const u32,
-    flags: *const u32,
-    dropped: *const u32,
+    flags: *const atomic::AtomicU32,
+    dropped: *const atomic::AtomicU32,
     array: *mut u32,
 
     sqes: *mut sys::io_uring_sqe
@@ -59,8 +57,8 @@ impl SubmissionQueue {
             let tail            = sq_mmap + p.sq_off.tail           => *const u32;
             let ring_mask       = sq_mmap + p.sq_off.ring_mask      => *const u32;
             let ring_entries    = sq_mmap + p.sq_off.ring_entries   => *const u32;
-            let flags           = sq_mmap + p.sq_off.flags          => *const u32;
-            let dropped         = sq_mmap + p.sq_off.dropped        => *const u32;
+            let flags           = sq_mmap + p.sq_off.flags          => *const atomic::AtomicU32;
+            let dropped         = sq_mmap + p.sq_off.dropped        => *const atomic::AtomicU32;
             let array           = sq_mmap + p.sq_off.array          => *mut u32;
 
             let sqes            = sqe_mmap + 0                      => *mut sys::io_uring_sqe;
@@ -73,17 +71,31 @@ impl SubmissionQueue {
             }
         }
 
-        Ok(SubmissionQueue {
-            _sq_mmap: sq_mmap,
-            _sqe_mmap: sqe_mmap,
-            head: unsafe { AtomicU32Ref::new(head) },
-            tail: unsafe { AtomicU32Ref::new(tail) },
-            ring_mask, ring_entries,
-            flags,
-            dropped,
-            array,
-            sqes
-        })
+        unsafe {
+            Ok(SubmissionQueue {
+                _sq_mmap: sq_mmap,
+                _sqe_mmap: sqe_mmap,
+                head: AtomicU32Ref::new(head),
+                tail: AtomicU32Ref::new(tail),
+                ring_mask, ring_entries,
+                flags, dropped,
+                array,
+                sqes
+            })
+        }
+    }
+
+    pub fn need_wakeup(&self) -> bool {
+        unsafe {
+            (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP
+                == 0
+        }
+    }
+
+    pub fn dropped(&self) -> u32 {
+        unsafe {
+            (*self.dropped).load(atomic::Ordering::Acquire)
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -127,10 +139,8 @@ impl<'a> AvailableQueue<'a> {
         if self.is_full() {
             Err(Entry(entry))
         } else {
-            unsafe {
-                *self.queue.sqes.add(self.tail as usize & self.ring_mask as usize)
-                    = entry;
-            }
+            *self.queue.sqes.add(self.tail as usize & self.ring_mask as usize)
+                = entry;
 
             self.tail += 1;
             Ok(())
