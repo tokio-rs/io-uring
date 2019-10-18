@@ -1,5 +1,3 @@
-# Proactor Model
+# Linux * IO Uring
 
-* io uring
-* iocp
-* thread/poll-based
+The `io_uring` library for Rust.

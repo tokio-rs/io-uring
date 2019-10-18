@@ -1,19 +1,15 @@
 [package]
-name = "ritsu"
+name = "linux-io-uring"
 version = "0.1.0"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = [
-	"linux-io-uring-sys",
-	"linux-io-uring"
-]
 
 [dependencies]
-libc = "*"
-
-[target.'cfg(target_os = "linux")'.dependencies]
-linux-io-uring = { path = "linux-io-uring" }
+libc = "0.2"
+bitflags = "1"
+linux-io-uring-sys = { path = "linux-io-uring-sys" }
