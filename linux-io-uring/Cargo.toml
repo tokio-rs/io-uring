@@ -7,5 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libc = "*"
+libc = "0.2"
+bitflags = "1"
 linux-io-uring-sys = { path = "../linux-io-uring-sys" }

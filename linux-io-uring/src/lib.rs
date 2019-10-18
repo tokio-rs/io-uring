@@ -8,7 +8,7 @@ use std::ptr;
 use std::convert::TryInto;
 use std::os::unix::io::AsRawFd;
 use std::io::{ self, IoSlice };
-use std::mem::{ MaybeUninit, ManuallyDrop };
+use std::mem::ManuallyDrop;
 use linux_io_uring_sys as sys;
 use util::Fd;
 use squeue::SubmissionQueue;
@@ -64,7 +64,18 @@ impl IoUring {
         }
     }
 
-    pub fn enter(&self, to_submit: usize, min_complete: usize, flag: u32, sig: Option<&libc::sigset_t>) -> io::Result<()> {
+    fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>) -> io::Result<()> {
+        unsafe {
+            let sig = sig.map(|sig| sig as *const _).unwrap_or_else(ptr::null);
+            if 0 == sys::io_uring_enter(self.fd.as_raw_fd(), to_submit, min_complete, flag, sig) {
+                Ok(())
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        }
+    }
+
+    pub fn submit(&self) -> io::Result<()> {
         unimplemented!()
     }
 
