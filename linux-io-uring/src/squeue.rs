@@ -10,7 +10,7 @@ pub struct SubmissionQueue {
     _sq_mmap: Mmap,
     _sqe_mmap: Mmap,
 
-    head: AtomicU32Ref,
+    head: *const atomic::AtomicU32,
     tail: AtomicU32Ref,
     ring_mask: *const u32,
     ring_entries: *const u32,
@@ -53,7 +53,7 @@ impl SubmissionQueue {
         )?;
 
         mmap_offset!{ unsafe
-            let head            = sq_mmap + p.sq_off.head           => *const u32;
+            let head            = sq_mmap + p.sq_off.head           => *const atomic::AtomicU32;
             let tail            = sq_mmap + p.sq_off.tail           => *const u32;
             let ring_mask       = sq_mmap + p.sq_off.ring_mask      => *const u32;
             let ring_entries    = sq_mmap + p.sq_off.ring_entries   => *const u32;
@@ -71,18 +71,16 @@ impl SubmissionQueue {
             }
         }
 
-        unsafe {
-            Ok(SubmissionQueue {
-                _sq_mmap: sq_mmap,
-                _sqe_mmap: sqe_mmap,
-                head: AtomicU32Ref::new(head),
-                tail: AtomicU32Ref::new(tail),
-                ring_mask, ring_entries,
-                flags, dropped,
-                array,
-                sqes
-            })
-        }
+        Ok(SubmissionQueue {
+            _sq_mmap: sq_mmap,
+            _sqe_mmap: sqe_mmap,
+            head,
+            tail: unsafe { AtomicU32Ref::new(tail) },
+            ring_mask, ring_entries,
+            flags, dropped,
+            array,
+            sqes
+        })
     }
 
     pub fn need_wakeup(&self) -> bool {
@@ -99,14 +97,14 @@ impl SubmissionQueue {
     }
 
     pub fn len(&self) -> usize {
-        let head = self.head.load(atomic::Ordering::Acquire);
+        let head = unsafe { (*self.head).load(atomic::Ordering::Acquire) };
         let tail = self.tail.unsync_load();
 
         (tail - head) as usize
     }
 
     pub fn is_full(&self) -> bool {
-        let head = self.head.load(atomic::Ordering::Acquire);
+        let head = unsafe { (*self.head).load(atomic::Ordering::Acquire) };
         let tail = self.tail.unsync_load();
         let ring_entries = unsafe { *self.ring_entries };
 
@@ -116,7 +114,7 @@ impl SubmissionQueue {
     pub fn available<'a>(&'a mut self) -> AvailableQueue<'a> {
         unsafe {
             AvailableQueue {
-                head: self.head.load(atomic::Ordering::Acquire),
+                head: (*self.head).load(atomic::Ordering::Acquire),
                 tail: self.tail.unsync_load(),
                 ring_mask: *self.ring_mask,
                 ring_entries: *self.ring_entries,

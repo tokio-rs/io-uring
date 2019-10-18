@@ -109,12 +109,14 @@ impl IoUring {
         let want = cmp::min(len, want);
 
         let flags = match want {
-            0 if self.flags.contains(SetupFlags::SQPOLL) && self.sq.need_wakeup()
-                => sys::IORING_ENTER_SQ_WAKEUP,
-
-            // fast poll
-            0 => return Ok(len),
-
+            0 if self.flags.contains(SetupFlags::SQPOLL) =>
+                if self.sq.need_wakeup() {
+                    sys::IORING_ENTER_SQ_WAKEUP
+                } else {
+                    // fast poll
+                    return Ok(len)
+                },
+            0 => 0,
             _ => sys::IORING_ENTER_GETEVENTS,
         };
 
