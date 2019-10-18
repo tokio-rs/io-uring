@@ -4,7 +4,7 @@ pub mod squeue;
 pub mod cqueue;
 pub mod opcode;
 
-use std::ptr;
+use std::{ ptr, cmp };
 use std::convert::TryInto;
 use std::os::unix::io::AsRawFd;
 use std::io::{ self, IoSlice };
@@ -64,19 +64,30 @@ impl IoUring {
         }
     }
 
-    fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>) -> io::Result<()> {
-        unsafe {
-            let sig = sig.map(|sig| sig as *const _).unwrap_or_else(ptr::null);
-            if 0 == sys::io_uring_enter(self.fd.as_raw_fd(), to_submit, min_complete, flag, sig) {
-                Ok(())
-            } else {
-                Err(io::Error::last_os_error())
-            }
+    pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
+        -> io::Result<()>
+    {
+        let sig = sig.map(|sig| sig as *const _).unwrap_or_else(ptr::null);
+        if 0 == sys::io_uring_enter(self.fd.as_raw_fd(), to_submit, min_complete, flag, sig) {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
         }
     }
 
-    pub fn submit(&self) -> io::Result<()> {
-        unimplemented!()
+    pub fn submit(&self) -> io::Result<usize> {
+        self.submit_and_wait(0)
+    }
+
+    pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
+        let len = self.sq.len();
+        let want = cmp::min(len, want);
+
+        unsafe {
+            self.enter(len as _, want as _, 0, None)?;
+        }
+
+        Ok(len)
     }
 
     pub fn submission(&mut self) -> &mut SubmissionQueue {
