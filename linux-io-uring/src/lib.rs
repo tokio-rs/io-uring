@@ -4,11 +4,11 @@ pub mod squeue;
 pub mod cqueue;
 pub mod opcode;
 
-use std::{ ptr, cmp };
+use std::{ io, ptr, cmp };
 use std::convert::TryInto;
 use std::os::unix::io::AsRawFd;
-use std::io::{ self, IoSlice };
 use std::mem::ManuallyDrop;
+use bitflags::bitflags;
 use linux_io_uring_sys as sys;
 use util::Fd;
 use squeue::SubmissionQueue;
@@ -18,15 +18,38 @@ use register::{ register as reg, unregister as unreg };
 
 pub struct IoUring {
     fd: Fd,
+    flags: SetupFlags,
     sq: ManuallyDrop<SubmissionQueue>,
     cq: ManuallyDrop<CompletionQueue>
 }
 
-impl IoUring {
-    pub fn new(entries: u32) -> io::Result<IoUring> {
-        let mut p = sys::io_uring_params::default();
+bitflags!{
+    pub struct SetupFlags: u32 {
+        const IOPOLL = sys::IORING_SETUP_IOPOLL;
+        const SQPOLL = sys::IORING_SETUP_SQPOLL;
+        const SQ_AFF = sys::IORING_SETUP_SQ_AFF;
+    }
+}
 
-        // TODO flags
+#[derive(Clone)]
+pub struct Builder {
+    entries: u32,
+    params: sys::io_uring_params
+}
+
+impl IoUring {
+    #[inline]
+    pub fn new(entries: u32) -> io::Result<IoUring> {
+        IoUring::with_params(entries, sys::io_uring_params::default())
+    }
+
+    pub fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<IoUring> {
+        #[inline]
+        fn setup_queue(fd: &Fd, p: &sys::io_uring_params)
+            -> io::Result<(SubmissionQueue, CompletionQueue)>
+        {
+            Ok((SubmissionQueue::new(fd, p)?, CompletionQueue::new(fd, p)?))
+        }
 
         let fd: Fd = unsafe {
             sys::io_uring_setup(entries, &mut p)
@@ -34,21 +57,23 @@ impl IoUring {
                 .map_err(|_| io::Error::last_os_error())?
         };
 
-        let sq = ManuallyDrop::new(SubmissionQueue::new(&fd, &p)?);
-        let cq = ManuallyDrop::new(CompletionQueue::new(&fd, &p)?);
+        let flags = SetupFlags::from_bits_truncate(p.flags);
+        let (sq, cq) = setup_queue(&fd, &p)?;
 
-        Ok(IoUring { fd, sq, cq })
+        Ok(IoUring {
+            fd, flags,
+            sq: ManuallyDrop::new(sq),
+            cq: ManuallyDrop::new(cq)
+        })
     }
 
     pub unsafe fn register(&self, target: reg::Target<'_, '_>) -> io::Result<()> {
         let (opcode, arg, len) = target.export();
 
-        unsafe {
-            if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
-               Ok(())
-            } else {
-               Err(io::Error::last_os_error())
-            }
+        if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
+           Ok(())
+        } else {
+           Err(io::Error::last_os_error())
         }
     }
 
@@ -83,8 +108,18 @@ impl IoUring {
         let len = self.sq.len();
         let want = cmp::min(len, want);
 
+        let flags = match want {
+            0 if self.flags.contains(SetupFlags::SQPOLL) && self.sq.need_wakeup()
+                => sys::IORING_ENTER_SQ_WAKEUP,
+
+            // fast poll
+            0 => return Ok(len),
+
+            _ => sys::IORING_ENTER_GETEVENTS,
+        };
+
         unsafe {
-            self.enter(len as _, want as _, 0, None)?;
+            self.enter(len as _, want as _, flags, None)?;
         }
 
         Ok(len)
@@ -101,5 +136,33 @@ impl Drop for IoUring {
             ManuallyDrop::drop(&mut self.sq);
             ManuallyDrop::drop(&mut self.cq);
         }
+    }
+}
+
+impl Builder {
+    pub fn new(entries: u32) -> Self {
+        Builder {
+            entries,
+            params: sys::io_uring_params::default()
+        }
+    }
+
+    pub fn setup_flags(&mut self, flags: SetupFlags) -> &mut Self {
+        self.params.flags = flags.bits();
+        self
+    }
+
+    pub fn thread_cpu(&mut self, n: u32) -> &mut Self {
+        self.params.sq_thread_cpu = n;
+        self
+    }
+
+    pub fn thread_idle(&mut self, n: u32) -> &mut Self {
+        self.params.sq_thread_idle = n;
+        self
+    }
+
+    pub fn build(self) -> io::Result<IoUring> {
+        IoUring::with_params(self.entries, self.params)
     }
 }

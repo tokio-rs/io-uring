@@ -1,7 +1,6 @@
 use std::ptr;
 use std::marker::PhantomData;
 use std::os::unix::io::RawFd;
-use bitflags::bitflags;
 use linux_io_uring_sys as sys;
 use crate::squeue::Entry;
 
@@ -223,6 +222,8 @@ macro_rules! assign_fd {
 
 impl From<Nop> for Entry {
     fn from(op: Nop) -> Entry {
+        let Nop = op;
+
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_NOP as _;
         Entry(sqe)
