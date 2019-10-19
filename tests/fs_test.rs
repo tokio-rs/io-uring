@@ -68,7 +68,7 @@ fn test_fs() -> io::Result<()> {
         .expect("queue is empty");
     assert_eq!(entry.user_data(), 0x43);
 
-    assert_nq!(buf2, TEXT);
+    assert_eq!(buf2, TEXT);
 
     Ok(())
 }

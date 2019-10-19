@@ -126,6 +126,12 @@ impl IoUring {
         }
     }
 
+    pub fn submission_and_completion(&mut self)
+        -> (&mut SubmissionQueue, &mut CompletionQueue)
+    {
+        (&mut self.sq, &mut self.cq)
+    }
+
     pub fn submission(&mut self) -> &mut SubmissionQueue {
         &mut self.sq
     }
