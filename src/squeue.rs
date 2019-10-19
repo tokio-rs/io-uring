@@ -128,7 +128,7 @@ impl SubmissionQueue {
 
 impl<'a> AvailableQueue<'a> {
     pub fn len(&self) -> usize {
-        (self.tail - self.head) as usize
+        self.tail.wrapping_sub(self.head) as usize
     }
 
     pub fn is_full(&self) -> bool {
@@ -141,8 +141,7 @@ impl<'a> AvailableQueue<'a> {
         } else {
             *self.queue.sqes.add((self.tail & self.ring_mask) as usize)
                 = entry;
-
-            self.tail += 1;
+            self.tail = self.tail.wrapping_add(1);
             Ok(())
         }
     }

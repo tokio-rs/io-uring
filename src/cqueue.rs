@@ -78,7 +78,7 @@ impl CompletionQueue {
 
 impl ExactSizeIterator for AvailableQueue<'_> {
     fn len(&self) -> usize {
-        (self.tail - self.head) as usize
+        self.tail.wrapping_sub(self.head) as usize
     }
 
     fn is_empty(&self) -> bool {
@@ -93,6 +93,7 @@ impl Iterator for AvailableQueue<'_> {
         if self.head != self.tail {
             unsafe {
                 let entry = self.queue.cqes.add((self.head & self.ring_mask) as usize);
+                self.head = self.head.wrapping_add(1);
                 Some(Entry((*entry).clone()))
             }
         } else {
