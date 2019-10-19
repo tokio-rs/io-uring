@@ -3,7 +3,12 @@ name = "linux-io-uring"
 version = "0.0.1"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
-license = "MIT"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/quininer/linux-io-uring"
+homepage = "https://github.com/quininer/linux-io-uring"
+documentation = "https://docs.rs/linux-io-uring"
+description = "The `io_uring` library for Rust."
+categories = [ "asynchronous", "network-programming", "filesystem" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
