@@ -1,6 +1,6 @@
 [package]
 name = "linux-io-uring-sys"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
 license = "MIT"
@@ -11,4 +11,4 @@ license = "MIT"
 libc = "0.2"
 
 [build-dependencies]
-bindgen = "*"
+bindgen = "0.51"

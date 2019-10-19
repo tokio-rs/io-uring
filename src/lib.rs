@@ -9,12 +9,11 @@ use std::convert::TryInto;
 use std::os::unix::io::AsRawFd;
 use std::mem::ManuallyDrop;
 use bitflags::bitflags;
-use linux_io_uring_sys as sys;
 use util::Fd;
 use squeue::SubmissionQueue;
 use cqueue::CompletionQueue;
-use register::{ register as reg, unregister as unreg };
-
+pub use register::{ register as reg, unregister as unreg };
+pub use linux_io_uring_sys as sys;
 
 pub struct IoUring {
     fd: Fd,
@@ -90,11 +89,12 @@ impl IoUring {
     }
 
     pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
-        -> io::Result<()>
+        -> io::Result<usize>
     {
         let sig = sig.map(|sig| sig as *const _).unwrap_or_else(ptr::null);
-        if 0 == sys::io_uring_enter(self.fd.as_raw_fd(), to_submit, min_complete, flag, sig) {
-            Ok(())
+        let result = sys::io_uring_enter(self.fd.as_raw_fd(), to_submit, min_complete, flag, sig);
+        if result >= 0 {
+            Ok(result as _)
         } else {
             Err(io::Error::last_os_error())
         }
@@ -121,14 +121,16 @@ impl IoUring {
         };
 
         unsafe {
-            self.enter(len as _, want as _, flags, None)?;
+            self.enter(len as _, want as _, flags, None)
         }
-
-        Ok(len)
     }
 
     pub fn submission(&mut self) -> &mut SubmissionQueue {
         &mut self.sq
+    }
+
+    pub fn completion(&mut self) -> &mut CompletionQueue {
+        &mut self.cq
     }
 }
 
