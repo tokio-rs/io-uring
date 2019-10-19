@@ -3,6 +3,7 @@ use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 
 
+#[allow(clippy::module_inception)]
 pub mod register {
     use super::*;
 

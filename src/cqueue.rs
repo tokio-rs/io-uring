@@ -64,7 +64,7 @@ impl CompletionQueue {
         }
     }
 
-    pub fn available<'a>(&'a mut self) -> AvailableQueue<'a> {
+    pub fn available(&mut self) -> AvailableQueue<'_> {
         unsafe {
             AvailableQueue {
                 head: self.head.unsync_load(),
@@ -80,13 +80,9 @@ impl ExactSizeIterator for AvailableQueue<'_> {
     fn len(&self) -> usize {
         self.tail.wrapping_sub(self.head) as usize
     }
-
-    fn is_empty(&self) -> bool {
-        self.head == self.tail
-    }
 }
 
-impl Iterator for AvailableQueue<'_> {
+impl<'a> Iterator for AvailableQueue<'a> {
     type Item = Entry;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -94,7 +90,7 @@ impl Iterator for AvailableQueue<'_> {
             unsafe {
                 let entry = self.queue.cqes.add((self.head & self.ring_mask) as usize);
                 self.head = self.head.wrapping_add(1);
-                Some(Entry((*entry).clone()))
+                Some(Entry(*entry))
             }
         } else {
             None
@@ -102,7 +98,7 @@ impl Iterator for AvailableQueue<'_> {
     }
 }
 
-impl Drop for AvailableQueue<'_> {
+impl<'a> Drop for AvailableQueue<'a> {
     fn drop(&mut self) {
         self.queue.head.store(self.head, atomic::Ordering::Release);
     }
