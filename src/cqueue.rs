@@ -82,7 +82,7 @@ impl ExactSizeIterator for AvailableQueue<'_> {
     }
 }
 
-impl<'a> Iterator for AvailableQueue<'a> {
+impl Iterator for AvailableQueue<'_> {
     type Item = Entry;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -98,7 +98,7 @@ impl<'a> Iterator for AvailableQueue<'a> {
     }
 }
 
-impl<'a> Drop for AvailableQueue<'a> {
+impl Drop for AvailableQueue<'_> {
     fn drop(&mut self) {
         self.queue.head.store(self.head, atomic::Ordering::Release);
     }

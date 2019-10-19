@@ -1,14 +1,24 @@
 use std::env;
 use std::path::PathBuf;
 
-const INCLUDE: &str = r#"
+
+#[cfg(not(feature = "bindgen"))]
+fn main() {}
+
+#[cfg(feature = "bindgen")]
+fn main() {
+    const INCLUDE: &str = r#"
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <linux/io_uring.h>
-"#;
+    "#;
 
-fn main() {
+    #[cfg(not(feature = "overwrite"))]
     let outdir = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+    #[cfg(feature = "overwrite")]
+    let outdir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+        .join("src");
 
     bindgen::Builder::default()
         .header_contents("include-file.h", INCLUDE)

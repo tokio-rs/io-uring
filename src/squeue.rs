@@ -133,7 +133,7 @@ impl SubmissionQueue {
     }
 }
 
-impl<'a> AvailableQueue<'a> {
+impl AvailableQueue<'_> {
     pub fn len(&self) -> usize {
         self.tail.wrapping_sub(self.head) as usize
     }
@@ -158,7 +158,7 @@ impl<'a> AvailableQueue<'a> {
     }
 }
 
-impl<'a> Drop for AvailableQueue<'a> {
+impl Drop for AvailableQueue<'_> {
     fn drop(&mut self) {
         self.queue.tail.store(self.tail, atomic::Ordering::Release);
     }

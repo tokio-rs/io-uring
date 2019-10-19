@@ -14,6 +14,10 @@ categories = [ "asynchronous", "network-programming", "filesystem" ]
 
 [workspace]
 
+[features]
+bindgen = [ "linux-io-uring-sys/bindgen" ]
+overwrite = [ "linux-io-uring-sys/overwrite" ]
+
 [dependencies]
 libc = "0.2"
 bitflags = "1"

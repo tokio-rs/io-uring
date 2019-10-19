@@ -1,8 +1,16 @@
 #![allow(non_camel_case_types, non_upper_case_globals)]
+#![allow(clippy::unreadable_literal)]
 
 use libc::*;
 
+#[cfg(all(feature = "bindgen", not(feature = "overwrite")))]
 include!(concat!(env!("OUT_DIR"), "/sys.rs"));
+
+#[cfg(any(
+    not(feature = "bindgen"),
+    all(feature = "bindgen", feature = "overwrite")
+))]
+include!("sys.rs");
 
 pub unsafe fn io_uring_register(fd: c_int, opcode: c_uint, arg: *const c_void, nr_args: c_uint)
     -> c_int

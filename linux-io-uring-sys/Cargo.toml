@@ -12,8 +12,11 @@ categories = [ "asynchronous", "network-programming", "filesystem" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+overwrite = [ "bindgen" ]
+
 [dependencies]
 libc = "0.2"
 
 [build-dependencies]
-bindgen = "0.51"
+bindgen = { version = "0.51", optional = true }
