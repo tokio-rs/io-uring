@@ -149,17 +149,17 @@ impl Builder {
         }
     }
 
-    pub fn setup_flags(&mut self, flags: SetupFlags) -> &mut Self {
+    pub fn setup_flags(mut self, flags: SetupFlags) -> Self {
         self.params.flags = flags.bits();
         self
     }
 
-    pub fn thread_cpu(&mut self, n: u32) -> &mut Self {
+    pub fn thread_cpu(mut self, n: u32) -> Self {
         self.params.sq_thread_cpu = n;
         self
     }
 
-    pub fn thread_idle(&mut self, n: u32) -> &mut Self {
+    pub fn thread_idle(mut self, n: u32) -> Self {
         self.params.sq_thread_idle = n;
         self
     }

@@ -16,6 +16,8 @@ pub struct SubmissionQueue {
     ring_entries: *const u32,
     flags: *const atomic::AtomicU32,
     dropped: *const atomic::AtomicU32,
+
+    #[allow(dead_code)]
     array: *mut u32,
 
     sqes: *mut sys::io_uring_sqe
@@ -108,7 +110,7 @@ impl SubmissionQueue {
         let tail = self.tail.unsync_load();
         let ring_entries = unsafe { *self.ring_entries };
 
-        tail.wrapping_sub(head) >= ring_entries
+        tail.wrapping_sub(head) == ring_entries
     }
 
     pub fn available<'a>(&'a mut self) -> AvailableQueue<'a> {
@@ -130,14 +132,14 @@ impl<'a> AvailableQueue<'a> {
     }
 
     pub fn is_full(&self) -> bool {
-        self.tail.wrapping_sub(self.head) >= self.ring_entries
+        self.tail.wrapping_sub(self.head) == self.ring_entries
     }
 
     pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
         if self.is_full() {
             Err(Entry(entry))
         } else {
-            *self.queue.sqes.add(self.tail as usize & self.ring_mask as usize)
+            *self.queue.sqes.add((self.tail & self.ring_mask) as usize)
                 = entry;
 
             self.tail += 1;
