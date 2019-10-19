@@ -15,6 +15,7 @@ use cqueue::CompletionQueue;
 pub use register::{ register as reg, unregister as unreg };
 pub use linux_io_uring_sys as sys;
 
+
 pub struct IoUring {
     fd: Fd,
     flags: SetupFlags,
@@ -133,6 +134,9 @@ impl IoUring {
         &mut self.cq
     }
 }
+
+unsafe impl Send for IoUring {}
+unsafe impl Sync for IoUring {}
 
 impl Drop for IoUring {
     fn drop(&mut self) {
