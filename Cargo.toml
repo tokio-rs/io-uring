@@ -1,6 +1,6 @@
 [package]
 name = "linux-io-uring"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -20,7 +20,7 @@ sys-bindgen = [ "linux-io-uring-sys/bindgen" ]
 [dependencies]
 libc = "0.2"
 bitflags = "1"
-linux-io-uring-sys = { version = "0.0.1", path = "linux-io-uring-sys" }
+linux-io-uring-sys = { version = "0.0.2", path = "linux-io-uring-sys" }
 
 [dev-dependencies]
 tempfile = "3"

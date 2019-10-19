@@ -1,12 +1,11 @@
-use std::env;
-use std::path::PathBuf;
-
-
 #[cfg(not(feature = "bindgen"))]
 fn main() {}
 
 #[cfg(feature = "bindgen")]
 fn main() {
+    use std::env;
+    use std::path::PathBuf;
+
     const INCLUDE: &str = r#"
 #include <unistd.h>
 #include <sys/syscall.h>
