@@ -21,7 +21,7 @@ pub struct CompletionQueue {
 }
 
 #[derive(Clone)]
-pub struct Entry(sys::io_uring_cqe);
+pub struct Entry(pub(crate) sys::io_uring_cqe);
 
 pub struct AvailableQueue<'a> {
     head: u32,

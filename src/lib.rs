@@ -9,11 +9,11 @@ use std::convert::TryInto;
 use std::os::unix::io::AsRawFd;
 use std::mem::ManuallyDrop;
 use bitflags::bitflags;
+use linux_io_uring_sys as sys;
 use util::Fd;
 use squeue::SubmissionQueue;
 use cqueue::CompletionQueue;
 pub use register::{ register as reg, unregister as unreg };
-pub use linux_io_uring_sys as sys;
 
 
 pub struct IoUring {

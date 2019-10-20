@@ -31,7 +31,8 @@ pub struct AvailableQueue<'a> {
     queue: &'a mut SubmissionQueue
 }
 
-pub struct Entry(pub sys::io_uring_sqe);
+#[derive(Clone)]
+pub struct Entry(pub(crate) sys::io_uring_sqe);
 
 bitflags!{
     pub struct Flags: u8 {
