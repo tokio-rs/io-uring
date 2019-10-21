@@ -12,7 +12,17 @@ pub struct IoUring {
     mark: atomic::AtomicU32,
 }
 
+unsafe impl Send for IoUring {}
+unsafe impl Sync for IoUring {}
+
 impl IoUring {
+    pub fn new(ring: crate::IoUring) -> IoUring {
+        IoUring {
+            ring,
+            mark: atomic::AtomicU32::new(0)
+        }
+    }
+
     pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
         -> io::Result<usize>
     {

@@ -140,6 +140,10 @@ impl IoUring {
     pub fn completion(&mut self) -> &mut CompletionQueue {
         &mut self.cq
     }
+
+    pub fn concurrent(self) -> concurrent::IoUring {
+        concurrent::IoUring::new(self)
+    }
 }
 
 unsafe impl Send for IoUring {}
