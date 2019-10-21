@@ -113,11 +113,9 @@ impl SubmissionQueue {
     }
 
     pub fn is_full(&self) -> bool {
-        let head = unsafe { (*self.head).load(atomic::Ordering::Acquire) };
-        let tail = unsafe { unsync_load(self.tail) };
         let ring_entries = unsafe { *self.ring_entries };
 
-        tail.wrapping_sub(head) == ring_entries
+        self.len() == ring_entries as usize
     }
 
     pub fn available(&mut self) -> AvailableQueue<'_> {

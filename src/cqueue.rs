@@ -11,9 +11,7 @@ pub struct CompletionQueue {
     pub(crate) head: *const atomic::AtomicU32,
     pub(crate) tail: *const atomic::AtomicU32,
     pub(crate) ring_mask: *const u32,
-
-    #[allow(dead_code)]
-    ring_entries: *const u32,
+    pub(crate) ring_entries: *const u32,
 
     overflow: *const atomic::AtomicU32,
 
@@ -27,6 +25,7 @@ pub struct AvailableQueue<'a> {
     head: u32,
     tail: u32,
     ring_mask: u32,
+    ring_entries: u32,
 
     queue: &'a mut CompletionQueue
 }
@@ -63,15 +62,42 @@ impl CompletionQueue {
         }
     }
 
+    pub fn len(&self) -> usize {
+        let head = unsafe { unsync_load(self.head) };
+        let tail = unsafe { (*self.tail).load(atomic::Ordering::Acquire) };
+
+        tail.wrapping_sub(head) as usize
+    }
+
+    pub fn is_empty(&self) -> bool {
+        let head = unsafe { unsync_load(self.head) };
+        let tail = unsafe { (*self.tail).load(atomic::Ordering::Acquire) };
+
+        head == tail
+    }
+
+    pub fn is_full(&self) -> bool {
+        let ring_entries = unsafe { *self.ring_entries };
+
+        self.len() == ring_entries as usize
+    }
+
     pub fn available(&mut self) -> AvailableQueue<'_> {
         unsafe {
             AvailableQueue {
                 head: unsync_load(self.head),
                 tail: (*self.tail).load(atomic::Ordering::Acquire),
                 ring_mask: *self.ring_mask,
+                ring_entries: *self.ring_entries,
                 queue: self
             }
         }
+    }
+}
+
+impl AvailableQueue<'_> {
+    pub fn is_full(&self) -> bool {
+        self.len() == self.ring_entries as usize
     }
 }
 

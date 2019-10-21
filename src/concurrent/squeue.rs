@@ -21,6 +21,24 @@ impl SubmissionQueue<'_> {
         self.queue.dropped()
     }
 
+    pub fn len(&self) -> usize {
+        let head = unsafe { (*self.queue.head).load(atomic::Ordering::Acquire) };
+        let mark = self.mark.load(atomic::Ordering::Acquire);
+
+        mark.wrapping_sub(head) as usize
+    }
+
+    pub fn is_empty(&self) -> bool {
+        let head = unsafe { (*self.queue.head).load(atomic::Ordering::Acquire) };
+        let tail = unsafe { (*self.queue.tail).load(atomic::Ordering::Acquire) };
+
+        head == tail
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.len() == self.ring_entries as usize
+    }
+
     pub unsafe fn push(&self, Entry(entry): Entry) -> Result<(), Entry> {
         let mark = loop {
             let head = (*self.queue.head).load(atomic::Ordering::Acquire);

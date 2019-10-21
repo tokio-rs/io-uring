@@ -39,7 +39,8 @@ impl IoUring {
     pub fn completion(&self) -> CompletionQueue<'_> {
         CompletionQueue {
             queue: &self.ring.cq,
-            ring_mask: unsafe { *self.ring.cq.ring_mask }
+            ring_mask: unsafe { *self.ring.cq.ring_mask },
+            ring_entries: unsafe { *self.ring.cq.ring_entries }
         }
     }
 }
