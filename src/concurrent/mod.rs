@@ -34,7 +34,9 @@ impl IoUring {
     }
 
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
-        self.ring.submit_and_wait(want)
+        let len = self.ring.sq.len();
+
+        self.ring.inner_enter(len, want)
     }
 
     pub fn submission(&self) -> SubmissionQueue<'_> {
