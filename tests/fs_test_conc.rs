@@ -10,7 +10,7 @@ use linux_io_uring::{ squeue, opcode, IoUring };
 fn test_fs() -> io::Result<()> {
     const TEXT: &[u8] = b"hello world!";
 
-    let io_uring = Arc::new(IoUring::new(1)?.concurrent());
+    let io_uring = Arc::new(IoUring::new(2)?.concurrent());
     let io_uring2 = io_uring.clone();
     let io_uring3 = io_uring.clone();
 
@@ -81,6 +81,39 @@ fn test_fs() -> io::Result<()> {
 
     j.join().unwrap();
     j2.join().unwrap();
+
+    Ok(())
+}
+
+#[test]
+fn push_then_conc() -> io::Result<()> {
+    let mut io_uring = IoUring::new(2)?;
+
+    unsafe {
+        io_uring
+            .submission()
+            .available()
+            .push(opcode::Nop.into())
+            .map_err(drop)
+            .expect("queue is full");
+    }
+
+    assert_eq!(io_uring.submission().len(), 1);
+
+
+    let io_uring = io_uring.concurrent();
+
+    assert_eq!(io_uring.submission().len(), 1);
+
+    unsafe {
+        io_uring
+            .submission()
+            .push(opcode::Nop.into())
+            .map_err(drop)
+            .expect("queue is full");
+    }
+
+    assert_eq!(io_uring.submission().len(), 2);
 
     Ok(())
 }

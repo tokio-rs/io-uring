@@ -5,6 +5,7 @@ use std::io;
 use std::sync::atomic;
 use squeue::SubmissionQueue;
 use cqueue::CompletionQueue;
+use crate::util::unsync_load;
 
 
 pub struct IoUring {
@@ -17,9 +18,11 @@ unsafe impl Sync for IoUring {}
 
 impl IoUring {
     pub fn new(ring: crate::IoUring) -> IoUring {
+        let mark = unsafe { unsync_load(ring.sq.tail) };
+
         IoUring {
             ring,
-            mark: atomic::AtomicU32::new(0)
+            mark: atomic::AtomicU32::new(mark)
         }
     }
 
