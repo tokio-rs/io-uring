@@ -21,6 +21,7 @@ sys-bindgen = [ "linux-io-uring-sys/bindgen" ]
 libc = "0.2"
 bitflags = "1"
 linux-io-uring-sys = { version = "0.0.2", path = "linux-io-uring-sys" }
+crossbeam-utils = "0.6"
 
 [dev-dependencies]
 tempfile = "3"

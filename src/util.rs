@@ -1,10 +1,10 @@
 use std::{ io, ptr, mem };
-use std::ops::Deref;
 use std::sync::atomic;
 use std::convert::TryFrom;
 use std::os::unix::io::{ AsRawFd, IntoRawFd, FromRawFd, RawFd };
 
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! mmap_offset {
     ( $mmap:ident + $offset:expr => $ty:ty ) => {
@@ -97,23 +97,6 @@ impl Drop for Fd {
     }
 }
 
-#[derive(Clone)]
-pub struct AtomicU32Ref(*const u32);
-
-impl AtomicU32Ref {
-    pub unsafe fn new(v: *const u32) -> AtomicU32Ref {
-        AtomicU32Ref(v)
-    }
-
-    pub fn unsync_load(&self) -> u32 {
-        unsafe { *self.0 }
-    }
-}
-
-impl Deref for AtomicU32Ref {
-    type Target = atomic::AtomicU32;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*(self.0 as *const atomic::AtomicU32) }
-    }
+pub unsafe fn unsync_load(u: *const atomic::AtomicU32) -> u32 {
+    *(u as *const u32)
 }

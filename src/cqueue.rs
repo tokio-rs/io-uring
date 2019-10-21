@@ -1,23 +1,23 @@
 use std::{ io, mem };
 use std::sync::atomic;
 use linux_io_uring_sys as sys;
-use crate::util::{ Mmap, Fd, AtomicU32Ref };
+use crate::util::{ Mmap, Fd, unsync_load };
 use crate::mmap_offset;
 
 
 pub struct CompletionQueue {
     _cq_mmap: Mmap,
 
-    head: AtomicU32Ref,
-    tail: *const atomic::AtomicU32,
-    ring_mask: *const u32,
+    pub(crate) head: *const atomic::AtomicU32,
+    pub(crate) tail: *const atomic::AtomicU32,
+    pub(crate) ring_mask: *const u32,
 
     #[allow(dead_code)]
     ring_entries: *const u32,
 
     overflow: *const atomic::AtomicU32,
 
-    cqes: *const sys::io_uring_cqe
+    pub(crate) cqes: *const sys::io_uring_cqe
 }
 
 #[derive(Clone)]
@@ -40,7 +40,7 @@ impl CompletionQueue {
         )?;
 
         mmap_offset!{ unsafe
-            let head            = cq_mmap + p.cq_off.head           => *const u32;
+            let head            = cq_mmap + p.cq_off.head           => *const atomic::AtomicU32;
             let tail            = cq_mmap + p.cq_off.tail           => *const atomic::AtomicU32;
             let ring_mask       = cq_mmap + p.cq_off.ring_mask      => *const u32;
             let ring_entries    = cq_mmap + p.cq_off.ring_entries   => *const u32;
@@ -50,8 +50,7 @@ impl CompletionQueue {
 
         Ok(CompletionQueue {
             _cq_mmap: cq_mmap,
-            head: unsafe { AtomicU32Ref::new(head) },
-            tail,
+            head, tail,
             ring_mask, ring_entries,
             overflow,
             cqes
@@ -67,7 +66,7 @@ impl CompletionQueue {
     pub fn available(&mut self) -> AvailableQueue<'_> {
         unsafe {
             AvailableQueue {
-                head: self.head.unsync_load(),
+                head: unsync_load(self.head),
                 tail: (*self.tail).load(atomic::Ordering::Acquire),
                 ring_mask: *self.ring_mask,
                 queue: self
@@ -100,7 +99,9 @@ impl Iterator for AvailableQueue<'_> {
 
 impl Drop for AvailableQueue<'_> {
     fn drop(&mut self) {
-        self.queue.head.store(self.head, atomic::Ordering::Release);
+        unsafe {
+            (*self.queue.head).store(self.head, atomic::Ordering::Release);
+        }
     }
 }
 

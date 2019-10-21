@@ -2,7 +2,7 @@ use std::{ io, mem };
 use std::sync::atomic;
 use bitflags::bitflags;
 use linux_io_uring_sys as sys;
-use crate::util::{ Mmap, Fd, AtomicU32Ref };
+use crate::util::{ Mmap, Fd, unsync_load };
 use crate::mmap_offset;
 
 
@@ -10,17 +10,17 @@ pub struct SubmissionQueue {
     _sq_mmap: Mmap,
     _sqe_mmap: Mmap,
 
-    head: *const atomic::AtomicU32,
-    tail: AtomicU32Ref,
-    ring_mask: *const u32,
-    ring_entries: *const u32,
+    pub(crate) head: *const atomic::AtomicU32,
+    pub(crate) tail: *const atomic::AtomicU32,
+    pub(crate) ring_mask: *const u32,
+    pub(crate) ring_entries: *const u32,
     flags: *const atomic::AtomicU32,
     dropped: *const atomic::AtomicU32,
 
     #[allow(dead_code)]
     array: *mut u32,
 
-    sqes: *mut sys::io_uring_sqe
+    pub(crate) sqes: *mut sys::io_uring_sqe
 }
 
 pub struct AvailableQueue<'a> {
@@ -57,7 +57,7 @@ impl SubmissionQueue {
 
         mmap_offset!{ unsafe
             let head            = sq_mmap + p.sq_off.head           => *const atomic::AtomicU32;
-            let tail            = sq_mmap + p.sq_off.tail           => *const u32;
+            let tail            = sq_mmap + p.sq_off.tail           => *const atomic::AtomicU32;
             let ring_mask       = sq_mmap + p.sq_off.ring_mask      => *const u32;
             let ring_entries    = sq_mmap + p.sq_off.ring_entries   => *const u32;
             let flags           = sq_mmap + p.sq_off.flags          => *const atomic::AtomicU32;
@@ -77,8 +77,7 @@ impl SubmissionQueue {
         Ok(SubmissionQueue {
             _sq_mmap: sq_mmap,
             _sqe_mmap: sqe_mmap,
-            head,
-            tail: unsafe { AtomicU32Ref::new(tail) },
+            head, tail,
             ring_mask, ring_entries,
             flags, dropped,
             array,
@@ -101,21 +100,21 @@ impl SubmissionQueue {
 
     pub fn len(&self) -> usize {
         let head = unsafe { (*self.head).load(atomic::Ordering::Acquire) };
-        let tail = self.tail.unsync_load();
+        let tail = unsafe { unsync_load(self.tail) };
 
         tail.wrapping_sub(head) as usize
     }
 
     pub fn is_empty(&self) -> bool {
         let head = unsafe { (*self.head).load(atomic::Ordering::Acquire) };
-        let tail = self.tail.unsync_load();
+        let tail = unsafe { unsync_load(self.tail) };
 
         head == tail
     }
 
     pub fn is_full(&self) -> bool {
         let head = unsafe { (*self.head).load(atomic::Ordering::Acquire) };
-        let tail = self.tail.unsync_load();
+        let tail = unsafe { unsync_load(self.tail) };
         let ring_entries = unsafe { *self.ring_entries };
 
         tail.wrapping_sub(head) == ring_entries
@@ -125,7 +124,7 @@ impl SubmissionQueue {
         unsafe {
             AvailableQueue {
                 head: (*self.head).load(atomic::Ordering::Acquire),
-                tail: self.tail.unsync_load(),
+                tail: unsync_load(self.tail),
                 ring_mask: *self.ring_mask,
                 ring_entries: *self.ring_entries,
                 queue: self
@@ -161,7 +160,9 @@ impl AvailableQueue<'_> {
 
 impl Drop for AvailableQueue<'_> {
     fn drop(&mut self) {
-        self.queue.tail.store(self.tail, atomic::Ordering::Release);
+        unsafe {
+            (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
+        }
     }
 }
 

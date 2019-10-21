@@ -3,6 +3,7 @@ mod register;
 pub mod squeue;
 pub mod cqueue;
 pub mod opcode;
+pub mod concurrent;
 
 use std::{ io, ptr, cmp };
 use std::convert::TryInto;
