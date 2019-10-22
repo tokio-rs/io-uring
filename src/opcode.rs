@@ -39,15 +39,8 @@ macro_rules! opcode {
             }
 
             $(
-                pub fn $field(mut self, $field: $tname) -> Self {
-                    self.$field = $field;
-                    self
-                }
-            )*
-
-            $(
-                pub fn $opt_field(mut self, $opt_field: $opt_tname) -> Self {
-                    self.$opt_field = $opt_field;
+                pub fn $opt_field<T: Into<$opt_tname>>(mut self, $opt_field: T) -> Self {
+                    self.$opt_field = $opt_field.into();
                     self
                 }
             )*

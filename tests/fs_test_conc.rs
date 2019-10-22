@@ -43,7 +43,7 @@ fn test_fs() -> io::Result<()> {
             [io::IoSlice::new(TEXT)].as_ptr() as *const _,
             1
         );
-        let entry = entry.offset(TEXT.len() as _);
+        let entry = entry.offset(TEXT.len() as i64);
 
         unsafe {
             io_uring3
