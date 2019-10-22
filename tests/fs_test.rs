@@ -13,10 +13,11 @@ fn test_fs() -> io::Result<()> {
     let mut fd = tempfile()?;
 
     // writev submit
-    let mut entry = opcode::Writev::default();
-    entry.fd = opcode::Target::Fd(fd.as_raw_fd());
-    entry.iovec = [io::IoSlice::new(TEXT)].as_ptr() as *const _;
-    entry.len = 1;
+    let entry = opcode::Writev::new(
+        opcode::Target::Fd(fd.as_raw_fd()),
+        [io::IoSlice::new(TEXT)].as_ptr() as *const _,
+        1
+    );
 
     unsafe {
         io_uring
@@ -44,10 +45,11 @@ fn test_fs() -> io::Result<()> {
     // readv submit
     let mut buf2 = vec![0; TEXT.len()];
 
-    let mut entry = opcode::Readv::default();
-    entry.fd = opcode::Target::Fd(fd.as_raw_fd());
-    entry.iovec = [io::IoSliceMut::new(&mut buf2)].as_mut_ptr() as *mut _;
-    entry.len = 1;
+    let entry = opcode::Readv::new(
+        opcode::Target::Fd(fd.as_raw_fd()),
+        [io::IoSliceMut::new(&mut buf2)].as_mut_ptr() as *mut _,
+        1
+    );
 
     unsafe {
         io_uring

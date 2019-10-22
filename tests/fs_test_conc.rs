@@ -19,11 +19,11 @@ fn test_fs() -> io::Result<()> {
 
     let j = thread::spawn(move || {
         // writev submit
-        let mut entry = opcode::Writev::default();
-        entry.fd = opcode::Target::Fd(raw_fd);
-        entry.iovec = [io::IoSlice::new(TEXT)].as_ptr() as *const _;
-        entry.offset = TEXT.len() as _;
-        entry.len = 1;
+        let entry = opcode::Writev::new(
+            opcode::Target::Fd(raw_fd),
+            [io::IoSlice::new(TEXT)].as_ptr() as *const _,
+            1
+        );
 
         unsafe {
             io_uring2
@@ -38,10 +38,12 @@ fn test_fs() -> io::Result<()> {
 
     let j2 = thread::spawn(move || {
         // writev submit
-        let mut entry = opcode::Writev::default();
-        entry.fd = opcode::Target::Fd(raw_fd);
-        entry.iovec = [io::IoSlice::new(TEXT)].as_ptr() as *const _;
-        entry.len = 1;
+        let entry = opcode::Writev::new(
+            opcode::Target::Fd(raw_fd),
+            [io::IoSlice::new(TEXT)].as_ptr() as *const _,
+            1
+        );
+        let entry = entry.offset(TEXT.len() as _);
 
         unsafe {
             io_uring3
@@ -93,7 +95,7 @@ fn push_then_conc() -> io::Result<()> {
         io_uring
             .submission()
             .available()
-            .push(opcode::Nop.into())
+            .push(opcode::Nop::new().into())
             .map_err(drop)
             .expect("queue is full");
     }
@@ -108,7 +110,7 @@ fn push_then_conc() -> io::Result<()> {
     unsafe {
         io_uring
             .submission()
-            .push(opcode::Nop.into())
+            .push(opcode::Nop::new().into())
             .map_err(drop)
             .expect("queue is full");
     }

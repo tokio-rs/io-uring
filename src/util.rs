@@ -4,8 +4,7 @@ use std::convert::TryFrom;
 use std::os::unix::io::{ AsRawFd, IntoRawFd, FromRawFd, RawFd };
 
 
-#[doc(hidden)]
-#[macro_export]
+#[macro_export(local_inner_macros)]
 macro_rules! mmap_offset {
     ( $mmap:ident + $offset:expr => $ty:ty ) => {
         $mmap.as_mut_ptr().add($offset as _) as $ty
