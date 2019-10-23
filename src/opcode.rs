@@ -62,10 +62,15 @@ pub enum Target {
 }
 
 opcode!(
+    /// Do not perform any I/O.
+    /// This is useful for testing the performance of the io_uring implementation itself.
+    #[derive(Debug)]
     pub struct Nop { ;; }
 );
 
 opcode!(
+    /// Vectored read operations, similar to `preadv2 (2)`.
+    #[derive(Debug)]
     pub struct Readv {
         fd: Target,
         iovec: *mut libc::iovec,
@@ -73,11 +78,15 @@ opcode!(
         ;;
         ioprio: u16 = 0,
         offset: i64 = 0,
+        /// specified for read operations, contains a bitwise OR of per-I/O flags,
+        /// as described in the `preadv2 (2)` man page.
         rw_flags: i32 = 0
     }
 );
 
 opcode!(
+    /// Vectored write operations, similar to `pwritev2 (2)`.
+    #[derive(Debug)]
     pub struct Writev {
         fd: Target,
         iovec: *const libc::iovec,
@@ -85,20 +94,33 @@ opcode!(
         ;;
         ioprio: u16 = 0,
         offset: i64 = 0,
+        /// specified for write operations, contains a bitwise OR of per-I/O flags,
+        /// as described in the `preadv2 (2)` man page.
         rw_flags: i32 = 0
     }
 );
 
 opcode!(
+    /// File sync. See also `fsync(2)`.
+    /// Note that, while I/O is initiated in the order in which it appears in the submission queue, completions are unordered.
+    /// For example, an application which places a write I/O followed by an fsync in the submission queue cannot expect the fsync to apply to the write. The two operations execute in parallel, so the fsync may complete before the write is issued to the storage. The same is also true for previously issued writes that have not completed prior to the fsync.
+    #[derive(Debug)]
     pub struct Fsync {
         fd: Target,
         ;;
+        /// The `fsync_flags` bit mask may contain either 0, for a normal file integrity sync,
+        /// or `IORING_FSYNC_DATASYNC` to provide data sync only semantics.
+        /// See the descriptions of `O_SYNC` and `O_DSYNC` in the `open (2)` manual page for more information.
         flags: u32 = 0
     }
 );
 
 opcode!(
+    /// Read from pre-mapped buffers.
+    #[derive(Debug)]
     pub struct ReadFixed {
+        /// `buf_index` is an index into an array of fixed buffers,
+        /// and is only valid if fixed buffers were registered.
         fd: Target,
         buf: *mut u8,
         len: u32,
@@ -106,12 +128,18 @@ opcode!(
         ;;
         ioprio: u16 = 0,
         offset: i64 = 0,
+        /// specified for read operations, contains a bitwise OR of per-I/O flags,
+        /// as described in the `preadv2 (2)` man page.
         rw_flags: i32 = 0
     }
 );
 
 opcode!(
+    /// Write to pre-mapped buffers.
+    #[derive(Debug)]
     pub struct WriteFixed {
+        /// `buf_index` is an index into an array of fixed buffers,
+        /// and is only valid if fixed buffers were registered.
         fd: Target,
         buf: *const u8,
         len: u32,
@@ -119,19 +147,31 @@ opcode!(
         ;;
         ioprio: u16 = 0,
         offset: i64 = 0,
+        /// specified for write operations, contains a bitwise OR of per-I/O flags,
+        /// as described in the `preadv2 (2)` man page.
         rw_flags: i32 = 0
     }
 );
 
 opcode!(
+    /// Poll the fd specified in the submission queue entry for the events specified in the `poll_events` field.
+    /// Unlike poll or epoll without `EPOLLONESHOT`, this interface always works in one shot mode.
+    /// That is, once the poll operation is completed, it will have to be resubmitted.
+    #[derive(Debug)]
     pub struct PollAdd {
+        /// The bits that may be set in `flags` are defined in `<poll.h>`,
+        /// and documented in `poll (2)`.
         fd: Target,
-        mask: u16,
+        flags: u16,
         ;;
     }
 );
 
 opcode!(
+    /// Remove an existing poll request.
+    /// If found, the `result` method of the `cqueue::Entry` will return 0.
+    /// If not found, `result` will return `-libc::ENOENT`.
+    #[derive(Debug)]
     pub struct PollRemove {
         user_data: *const libc::c_void
         ;;
@@ -139,6 +179,7 @@ opcode!(
 );
 
 opcode!(
+    #[derive(Debug)]
     pub struct SyncFileRange {
         fd: Target,
         len: u32,
@@ -149,6 +190,7 @@ opcode!(
 );
 
 opcode!(
+    #[derive(Debug)]
     pub struct SendMsg {
         fd: Target,
         msg: *const libc::msghdr,
@@ -159,6 +201,7 @@ opcode!(
 );
 
 opcode!(
+    #[derive(Debug)]
     pub struct RecvMsg {
         fd: Target,
         msg: *mut libc::msghdr,
@@ -276,12 +319,12 @@ impl WriteFixed {
 
 impl PollAdd {
     pub fn build(self) -> Entry {
-        let PollAdd { fd, mask } = self;
+        let PollAdd { fd, flags } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_POLL_ADD as _;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_1.poll_events = mask as _;
+        sqe.__bindgen_anon_1.poll_events = flags as _;
         Entry(sqe)
     }
 }

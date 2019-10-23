@@ -36,8 +36,24 @@ pub struct Entry(pub(crate) sys::io_uring_sqe);
 
 bitflags!{
     pub struct Flags: u8 {
+        /// When this flag is specified,
+        /// `fd` is an index into the files array registered with the io_uring instance.
         const FIXED_FILE = sys::IOSQE_FIXED_FILE as _;
+
+        /// When this flag is specified,
+        /// the SQE will not be started before previously submitted SQEs have completed,
+        /// and new SQEs will not be started before this one completes.
         const IO_DRAIN = sys::IOSQE_IO_DRAIN as _;
+
+        /// When this flag is specified,
+        /// it forms a link with the next SQE in the submission ring.
+        /// That next SQE will not be started before this one completes.
+        /// This, in effect, forms a chain of SQEs, which can be arbitrarily long.
+        /// The tail of the chain is denoted by the first SQE that does not have this flag set.
+        /// This flag has no effect on previous SQE submissions,
+        /// nor does it impact SQEs that are outside of the chain tail.
+        /// This means that multiple chains can be executing in parallel, or chains and individual SQEs.
+        /// Only members inside the chain are serialized.
         const IO_LINK = sys::IOSQE_IO_LINK as _;
     }
 }
@@ -170,6 +186,8 @@ impl Entry {
         self
     }
 
+    /// `user_data` is an application-supplied value that will be copied into the completion queue
+    /// entry (see below).
     pub fn user_data(mut self, user_data: u64) -> Entry {
         self.0.user_data = user_data;
         self
