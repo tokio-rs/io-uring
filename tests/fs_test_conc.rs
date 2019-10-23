@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::io::{ self, Read };
 use std::os::unix::io::AsRawFd;
 use tempfile::tempfile;
-use linux_io_uring::{ squeue, opcode, IoUring };
+use linux_io_uring::{ opcode, IoUring };
 
 
 #[test]
@@ -28,7 +28,7 @@ fn test_fs() -> io::Result<()> {
         unsafe {
             io_uring2
                 .submission()
-                .push(squeue::Entry::from(entry).user_data(0x42))
+                .push(entry.build().user_data(0x42))
                 .map_err(drop)
                 .expect("queue is full");
         }
@@ -48,7 +48,7 @@ fn test_fs() -> io::Result<()> {
         unsafe {
             io_uring3
                 .submission()
-                .push(squeue::Entry::from(entry).user_data(0x43))
+                .push(entry.build().user_data(0x43))
                 .map_err(drop)
                 .expect("queue is full");
         }
@@ -95,7 +95,7 @@ fn push_then_conc() -> io::Result<()> {
         io_uring
             .submission()
             .available()
-            .push(opcode::Nop::new().into())
+            .push(opcode::Nop::new().build())
             .map_err(drop)
             .expect("queue is full");
     }
@@ -110,7 +110,7 @@ fn push_then_conc() -> io::Result<()> {
     unsafe {
         io_uring
             .submission()
-            .push(opcode::Nop::new().into())
+            .push(opcode::Nop::new().build())
             .map_err(drop)
             .expect("queue is full");
     }

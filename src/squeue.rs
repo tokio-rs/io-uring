@@ -170,11 +170,6 @@ impl Entry {
         self
     }
 
-    pub fn ioprio(mut self, ioprio: u16) -> Entry {
-        self.0.ioprio = ioprio;
-        self
-    }
-
     pub fn user_data(mut self, user_data: u64) -> Entry {
         self.0.user_data = user_data;
         self

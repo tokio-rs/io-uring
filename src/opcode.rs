@@ -19,9 +19,13 @@ macro_rules! opcode {
     (
         $( #[$outer:meta] )*
         pub struct $name:ident {
+            $( #[$new_meta:meta] )*
             $( $field:ident : $tname:ty ),* $(,)?
             ;;
-            $( $opt_field:ident : $opt_tname:ty = $default:expr ),* $(,)?
+            $(
+                $( #[$opt_meta:meta] )*
+                $opt_field:ident : $opt_tname:ty = $default:expr
+            ),* $(,)?
         }
     ) => {
         $( #[$outer] )*
@@ -31,6 +35,7 @@ macro_rules! opcode {
         }
 
         impl $name {
+            $( #[$new_meta] )*
             pub fn new( $( $field : $tname ),* ) -> Self {
                 $name {
                     $( $field , )*
@@ -39,8 +44,9 @@ macro_rules! opcode {
             }
 
             $(
-                pub fn $opt_field<T: Into<$opt_tname>>(mut self, $opt_field: T) -> Self {
-                    self.$opt_field = $opt_field.into();
+                $( #[$opt_meta] )*
+                pub fn $opt_field(mut self, $opt_field: $opt_tname) -> Self {
+                    self.$opt_field = $opt_field;
                     self
                 }
             )*
@@ -55,11 +61,6 @@ pub enum Target {
     Fixed(u32)
 }
 
-// TODO(@quininer)
-//
-// * derive Debug
-// * document
-
 opcode!(
     pub struct Nop { ;; }
 );
@@ -70,6 +71,7 @@ opcode!(
         iovec: *mut libc::iovec,
         len: u32,
         ;;
+        ioprio: u16 = 0,
         offset: i64 = 0,
         rw_flags: i32 = 0
     }
@@ -81,6 +83,7 @@ opcode!(
         iovec: *const libc::iovec,
         len: u32,
         ;;
+        ioprio: u16 = 0,
         offset: i64 = 0,
         rw_flags: i32 = 0
     }
@@ -101,6 +104,7 @@ opcode!(
         len: u32,
         buf_index: u16,
         ;;
+        ioprio: u16 = 0,
         offset: i64 = 0,
         rw_flags: i32 = 0
     }
@@ -113,6 +117,7 @@ opcode!(
         len: u32,
         buf_index: u16,
         ;;
+        ioprio: u16 = 0,
         offset: i64 = 0,
         rw_flags: i32 = 0
     }
@@ -148,6 +153,7 @@ opcode!(
         fd: Target,
         msg: *const libc::msghdr,
         ;;
+        ioprio: u16 = 0,
         flags: u32 = 0
     }
 );
@@ -157,13 +163,14 @@ opcode!(
         fd: Target,
         msg: *mut libc::msghdr,
         ;;
+        ioprio: u16 = 0,
         flags: u32 = 0
     }
 );
 
-impl From<Nop> for Entry {
-    fn from(op: Nop) -> Entry {
-        let Nop {} = op;
+impl Nop {
+    pub fn build(self) -> Entry {
+        let Nop {} = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_NOP as _;
@@ -171,17 +178,18 @@ impl From<Nop> for Entry {
     }
 }
 
-impl From<Readv> for Entry {
-    fn from(op: Readv) -> Entry {
+impl Readv {
+    pub fn build(self) -> Entry {
         let Readv {
             fd,
             iovec, len, offset,
-            rw_flags
-        } = op;
+            ioprio, rw_flags
+        } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_READV as _;
         assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
         sqe.addr = iovec as _;
         sqe.len = len;
         sqe.off = offset as _;
@@ -190,17 +198,18 @@ impl From<Readv> for Entry {
     }
 }
 
-impl From<Writev> for Entry {
-    fn from(op: Writev) -> Entry {
+impl Writev {
+    pub fn build(self) -> Entry {
         let Writev {
             fd,
             iovec, len, offset,
-            rw_flags
-        } = op;
+            ioprio, rw_flags
+        } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_WRITEV as _;
         assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
         sqe.addr = iovec as _;
         sqe.len = len;
         sqe.off = offset as _;
@@ -209,9 +218,9 @@ impl From<Writev> for Entry {
     }
 }
 
-impl From<Fsync> for Entry {
-    fn from(op: Fsync) -> Entry {
-        let Fsync { fd, flags } = op;
+impl Fsync {
+    pub fn build(self) -> Entry {
+        let Fsync { fd, flags } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_FSYNC as _;
@@ -221,18 +230,19 @@ impl From<Fsync> for Entry {
     }
 }
 
-impl From<ReadFixed> for Entry {
-    fn from(op: ReadFixed) -> Entry {
+impl ReadFixed {
+    pub fn build(self) -> Entry {
         let ReadFixed {
             fd,
             buf, len, offset,
             buf_index,
-            rw_flags
-        } = op;
+            ioprio, rw_flags
+        } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_READ_FIXED as _;
         assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
         sqe.addr = buf as _;
         sqe.len = len;
         sqe.off = offset as _;
@@ -242,18 +252,19 @@ impl From<ReadFixed> for Entry {
     }
 }
 
-impl From<WriteFixed> for Entry {
-    fn from(op: WriteFixed) -> Entry {
+impl WriteFixed {
+    pub fn build(self) -> Entry {
         let WriteFixed {
             fd,
             buf, len, offset,
             buf_index,
-            rw_flags
-        } = op;
+            ioprio, rw_flags
+        } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_WRITE_FIXED as _;
         assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
         sqe.addr = buf as _;
         sqe.len = len;
         sqe.off = offset as _;
@@ -263,9 +274,9 @@ impl From<WriteFixed> for Entry {
     }
 }
 
-impl From<PollAdd> for Entry {
-    fn from(op: PollAdd) -> Entry {
-        let PollAdd { fd, mask } = op;
+impl PollAdd {
+    pub fn build(self) -> Entry {
+        let PollAdd { fd, mask } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_POLL_ADD as _;
@@ -275,9 +286,9 @@ impl From<PollAdd> for Entry {
     }
 }
 
-impl From<PollRemove> for Entry {
-    fn from(op: PollRemove) -> Entry {
-        let PollRemove { user_data } = op;
+impl PollRemove {
+    pub fn build(self) -> Entry {
+        let PollRemove { user_data } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_POLL_REMOVE as _;
@@ -286,13 +297,13 @@ impl From<PollRemove> for Entry {
     }
 }
 
-impl From<SyncFileRange> for Entry {
-    fn from(op: SyncFileRange) -> Entry {
+impl SyncFileRange {
+    pub fn build(self) -> Entry {
         let SyncFileRange {
             fd,
             len, offset,
             flags
-        } = op;
+        } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_SYNC_FILE_RANGE as _;
@@ -304,13 +315,14 @@ impl From<SyncFileRange> for Entry {
     }
 }
 
-impl From<SendMsg> for Entry {
-    fn from(op: SendMsg) -> Entry {
-        let SendMsg { fd, msg, flags } = op;
+impl SendMsg {
+    pub fn build(self) -> Entry {
+        let SendMsg { fd, msg, ioprio, flags } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_SENDMSG as _;
         assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
         sqe.addr = msg as _;
         sqe.len = 1;
         sqe.__bindgen_anon_1.msg_flags = flags;
@@ -318,13 +330,14 @@ impl From<SendMsg> for Entry {
     }
 }
 
-impl From<RecvMsg> for Entry {
-    fn from(op: RecvMsg) -> Entry {
-        let RecvMsg { fd, msg, flags } = op;
+impl RecvMsg {
+    pub fn build(self) -> Entry {
+        let RecvMsg { fd, msg, ioprio, flags } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_RECVMSG as _;
         assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
         sqe.addr = msg as _;
         sqe.len = 1;
         sqe.__bindgen_anon_1.msg_flags = flags;

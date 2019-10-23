@@ -44,7 +44,7 @@ impl IoUring {
         IoUring::with_params(entries, sys::io_uring_params::default())
     }
 
-    pub fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<IoUring> {
+    fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<IoUring> {
         #[inline]
         fn setup_queue(fd: &Fd, p: &sys::io_uring_params)
             -> io::Result<(SubmissionQueue, CompletionQueue)>
