@@ -58,4 +58,8 @@ impl IoUring {
             ring_entries: unsafe { *self.ring.cq.ring_entries }
         }
     }
+
+    pub fn into_inner(self) -> crate::IoUring {
+        self.ring
+    }
 }

@@ -38,6 +38,9 @@ pub struct Builder {
     params: sys::io_uring_params
 }
 
+unsafe impl Send for IoUring {}
+unsafe impl Sync for IoUring {}
+
 impl IoUring {
     #[inline]
     pub fn new(entries: u32) -> io::Result<IoUring> {
@@ -151,9 +154,6 @@ impl IoUring {
         concurrent::IoUring::new(self)
     }
 }
-
-unsafe impl Send for IoUring {}
-unsafe impl Sync for IoUring {}
 
 impl Drop for IoUring {
     fn drop(&mut self) {
