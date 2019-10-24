@@ -7,17 +7,17 @@ use linux_io_uring_sys as sys;
 pub mod register {
     use super::*;
 
-    pub enum Target<'a, 'b> {
-        Buffer(&'b [IoSlice<'a>]),
-        File(&'b [RawFd]),
-        Event(&'b [RawFd]),
+    pub enum Target<'a> {
+        Buffer(&'a [IoSlice<'static>]),
+        File(&'a [RawFd]),
+        Event(&'a [RawFd]),
 
         // TODO https://github.com/rust-lang/rust/pull/64639
         #[doc(hidden)]
         __Unknown
     }
 
-    impl Target<'_, '_> {
+    impl Target<'_> {
         pub(crate) fn export(&self) -> (libc::c_uint, *const libc::c_void, libc::c_uint) {
             match self {
                 Target::Buffer(bufs) =>

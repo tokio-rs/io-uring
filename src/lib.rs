@@ -71,7 +71,7 @@ impl IoUring {
         })
     }
 
-    pub unsafe fn register(&self, target: reg::Target<'_, '_>) -> io::Result<()> {
+    pub unsafe fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
         let (opcode, arg, len) = target.export();
 
         if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
