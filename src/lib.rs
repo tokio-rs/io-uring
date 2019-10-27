@@ -7,7 +7,7 @@ pub mod concurrent;
 
 use std::{ io, ptr, cmp };
 use std::convert::TryInto;
-use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{ AsRawFd, RawFd };
 use std::mem::ManuallyDrop;
 use bitflags::bitflags;
 use linux_io_uring_sys as sys;
@@ -131,7 +131,7 @@ impl IoUring {
 
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         let len = self.sq.len();
-        let want = cmp::min(len, want);
+        let want = cmp::min(cmp::max(len, 1), want);
 
         self.inner_enter(len, want)
     }
@@ -189,5 +189,11 @@ impl Builder {
 
     pub fn build(self) -> io::Result<IoUring> {
         IoUring::with_params(self.entries, self.params)
+    }
+}
+
+impl AsRawFd for IoUring {
+    fn as_raw_fd(&self) -> RawFd {
+        self.fd.as_raw_fd()
     }
 }

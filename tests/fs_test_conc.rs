@@ -7,8 +7,8 @@ use linux_io_uring::{ opcode, IoUring };
 
 
 #[test]
-fn test_fs() -> io::Result<()> {
-    const TEXT: &[u8] = b"hello world!";
+fn test_fs() -> anyhow::Result<()> {
+    let text = b"hello world!";
 
     let io_uring = Arc::new(IoUring::new(2)?.concurrent());
     let io_uring2 = io_uring.clone();
@@ -21,7 +21,7 @@ fn test_fs() -> io::Result<()> {
         // writev submit
         let entry = opcode::Writev::new(
             opcode::Target::Fd(raw_fd),
-            [io::IoSlice::new(TEXT)].as_ptr() as *const _,
+            [io::IoSlice::new(text)].as_ptr() as *const _,
             1
         );
 
@@ -40,10 +40,10 @@ fn test_fs() -> io::Result<()> {
         // writev submit
         let entry = opcode::Writev::new(
             opcode::Target::Fd(raw_fd),
-            [io::IoSlice::new(TEXT)].as_ptr() as *const _,
+            [io::IoSlice::new(text)].as_ptr() as *const _,
             1
         );
-        let entry = entry.offset(TEXT.len() as i64);
+        let entry = entry.offset(text.len() as i64);
 
         unsafe {
             io_uring3
@@ -78,8 +78,8 @@ fn test_fs() -> io::Result<()> {
 
     let mut buf = Vec::new();
     fd.read_to_end(&mut buf)?;
-    assert_eq!(&buf[..TEXT.len()], TEXT);
-    assert_eq!(&buf[TEXT.len()..], TEXT);
+    assert_eq!(&buf[..text.len()], text);
+    assert_eq!(&buf[text.len()..], text);
 
     j.join().unwrap();
     j2.join().unwrap();
@@ -88,7 +88,7 @@ fn test_fs() -> io::Result<()> {
 }
 
 #[test]
-fn push_then_conc() -> io::Result<()> {
+fn push_then_conc() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(2)?;
 
     unsafe {

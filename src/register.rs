@@ -1,4 +1,3 @@
-use std::io::IoSlice;
 use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 
@@ -8,9 +7,9 @@ pub mod register {
     use super::*;
 
     pub enum Target<'a> {
-        Buffer(&'a [IoSlice<'static>]),
+        Buffer(&'a [libc::iovec]),
         File(&'a [RawFd]),
-        Event(&'a [RawFd]),
+        Event(RawFd),
 
         // TODO https://github.com/rust-lang/rust/pull/64639
         #[doc(hidden)]
@@ -24,8 +23,8 @@ pub mod register {
                     (sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _),
                 Target::File(fds) =>
                     (sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _),
-                Target::Event(events)
-                    => (sys::IORING_REGISTER_EVENTFD, events.as_ptr() as *const _, events.len() as _),
+                Target::Event(eventfd)
+                    => (sys::IORING_REGISTER_EVENTFD, eventfd as *const RawFd as *const _, 1),
                 _ => unreachable!()
             }
         }

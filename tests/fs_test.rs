@@ -5,17 +5,16 @@ use linux_io_uring::{ opcode, IoUring };
 
 
 #[test]
-fn test_fs() -> io::Result<()> {
-    const TEXT: &[u8] = b"hello world!";
+fn test_fs() -> anyhow::Result<()> {
+    let text = b"hello world!";
 
     let mut io_uring = IoUring::new(1)?;
-
     let mut fd = tempfile()?;
 
     // writev submit
     let entry = opcode::Writev::new(
         opcode::Target::Fd(fd.as_raw_fd()),
-        [io::IoSlice::new(TEXT)].as_ptr() as *const _,
+        [io::IoSlice::new(text)].as_ptr() as *const _,
         1
     );
 
@@ -40,10 +39,11 @@ fn test_fs() -> io::Result<()> {
 
     let mut buf = Vec::new();
     fd.read_to_end(&mut buf)?;
-    assert_eq!(buf, TEXT);
+    assert_eq!(buf, text);
 
     // readv submit
-    let mut buf2 = vec![0; TEXT.len()];
+    let mut buf2 = [0; 12];
+    assert_eq!(buf2.len(), text.len());
 
     let entry = opcode::Readv::new(
         opcode::Target::Fd(fd.as_raw_fd()),
@@ -70,7 +70,7 @@ fn test_fs() -> io::Result<()> {
         .expect("queue is empty");
     assert_eq!(entry.user_data(), 0x43);
 
-    assert_eq!(buf2, TEXT);
+    assert_eq!(&buf2, text);
 
     Ok(())
 }

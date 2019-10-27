@@ -162,7 +162,7 @@ opcode!(
         /// The bits that may be set in `flags` are defined in `<poll.h>`,
         /// and documented in `poll (2)`.
         fd: Target,
-        flags: u16,
+        flags: i16,
         ;;
     }
 );
@@ -173,7 +173,7 @@ opcode!(
     /// If not found, `result` will return `-libc::ENOENT`.
     #[derive(Debug)]
     pub struct PollRemove {
-        user_data: *const libc::c_void
+        user_data: u64
         ;;
     }
 );
