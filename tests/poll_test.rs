@@ -52,7 +52,7 @@ fn test_poll_remove() -> anyhow::Result<()> {
     io_uring.submit()?;
     assert!(io_uring.completion().is_empty());
 
-    let entry = opcode::PollRemove::new(token as _);
+    let entry = opcode::PollRemove::new(token);
     unsafe {
         io_uring
             .submission()

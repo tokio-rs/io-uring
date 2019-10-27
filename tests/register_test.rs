@@ -103,9 +103,9 @@ fn test_fixed_buffer() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_fixed_event() -> anyhow::Result<()> {
+fn test_eventfd() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(1)?;
-    let efd = eventfd(0, EfdFlags::EFD_NONBLOCK)?;
+    let efd = eventfd(0, EfdFlags::EFD_NONBLOCK)?; // just test, we don't close
 
     // register eventfd
     unsafe {

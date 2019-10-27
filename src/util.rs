@@ -19,7 +19,7 @@ macro_rules! mmap_offset {
 
 
 pub struct Mmap {
-    addr: *mut libc::c_void,
+    addr: ptr::NonNull<libc::c_void>,
     len: usize
 }
 
@@ -35,20 +35,24 @@ impl Mmap {
                 offset
             ) {
                 libc::MAP_FAILED => Err(io::Error::last_os_error()),
-                addr => Ok(Mmap { addr, len })
+                addr => {
+                    // here, `mmap` will never return null
+                    let addr = ptr::NonNull::new_unchecked(addr);
+                    Ok(Mmap { addr, len })
+                }
             }
         }
     }
 
     pub fn as_mut_ptr(&self) -> *mut libc::c_void {
-        self.addr
+        self.addr.as_ptr()
     }
 }
 
 impl Drop for Mmap {
     fn drop(&mut self) {
         unsafe {
-            libc::munmap(self.addr, self.len);
+            libc::munmap(self.addr.as_ptr(), self.len);
 
             // TODO log fail
         }
