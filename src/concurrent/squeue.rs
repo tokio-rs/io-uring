@@ -21,6 +21,10 @@ impl SubmissionQueue<'_> {
         self.queue.dropped()
     }
 
+    pub fn capacity(&self) -> usize {
+        self.ring_entries as usize
+    }
+
     pub fn len(&self) -> usize {
         let head = unsafe { (*self.queue.head).load(atomic::Ordering::Acquire) };
         let mark = self.mark.load(atomic::Ordering::Acquire);

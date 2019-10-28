@@ -5,7 +5,7 @@ pub mod cqueue;
 pub mod opcode;
 pub mod concurrent;
 
-use std::{ io, ptr, cmp };
+use std::{ io, ptr };
 use std::convert::TryInto;
 use std::os::unix::io::{ AsRawFd, RawFd };
 use std::mem::ManuallyDrop;
@@ -124,14 +124,11 @@ impl IoUring {
     }
 
     pub fn submit(&self) -> io::Result<usize> {
-        let len = self.sq.len();
-
-        self.inner_enter(len, 0)
+        self.submit_and_wait(0)
     }
 
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         let len = self.sq.len();
-        let want = cmp::min(cmp::max(len, 1), want);
 
         self.inner_enter(len, want)
     }

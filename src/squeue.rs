@@ -31,6 +31,7 @@ pub struct AvailableQueue<'a> {
     queue: &'a mut SubmissionQueue
 }
 
+#[repr(transparent)]
 #[derive(Clone)]
 pub struct Entry(pub(crate) sys::io_uring_sqe);
 
@@ -169,13 +170,13 @@ impl AvailableQueue<'_> {
     }
 
     pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
-        if self.is_full() {
-            Err(Entry(entry))
-        } else {
+        if self.len() < self.capacity() {
             *self.queue.sqes.add((self.tail & self.ring_mask) as usize)
                 = entry;
             self.tail = self.tail.wrapping_add(1);
             Ok(())
+        } else {
+            Err(Entry(entry))
         }
     }
 }

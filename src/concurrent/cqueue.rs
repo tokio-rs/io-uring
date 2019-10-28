@@ -42,13 +42,13 @@ impl CompletionQueue<'_> {
                     return None;
                 }
 
-                let entry = self.queue.cqes.add((head & self.ring_mask) as usize);
+                let entry = *self.queue.cqes.add((head & self.ring_mask) as usize);
 
                 let new_head = head.wrapping_add(1);
                 if (*self.queue.head).compare_and_swap(head, new_head, atomic::Ordering::Release)
                     == head
                 {
-                    return Some(Entry(*entry));
+                    return Some(Entry(entry));
                 }
             }
         }

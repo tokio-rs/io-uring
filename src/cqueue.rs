@@ -18,6 +18,7 @@ pub struct CompletionQueue {
     pub(crate) cqes: *const sys::io_uring_cqe
 }
 
+#[repr(transparent)]
 #[derive(Clone)]
 pub struct Entry(pub(crate) sys::io_uring_cqe);
 
@@ -107,15 +108,15 @@ impl ExactSizeIterator for AvailableQueue<'_> {
     }
 }
 
-impl Iterator for AvailableQueue<'_> {
-    type Item = Entry;
+impl<'a> Iterator for AvailableQueue<'a> {
+    type Item = &'a Entry;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.head != self.tail {
             unsafe {
                 let entry = self.queue.cqes.add((self.head & self.ring_mask) as usize);
                 self.head = self.head.wrapping_add(1);
-                Some(Entry(*entry))
+                Some(&*(entry as *const Entry))
             }
         } else {
             None

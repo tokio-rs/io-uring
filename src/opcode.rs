@@ -1,3 +1,5 @@
+#![allow(clippy::new_without_default)]
+
 use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 use crate::squeue::Entry;
