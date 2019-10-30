@@ -39,6 +39,7 @@ bitflags!{
     pub struct Flags: u8 {
         /// When this flag is specified,
         /// `fd` is an index into the files array registered with the io_uring instance.
+        #[doc(hidden)]
         const FIXED_FILE = sys::IOSQE_FIXED_FILE as _;
 
         /// When this flag is specified,

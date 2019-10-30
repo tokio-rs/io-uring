@@ -18,13 +18,17 @@ pub mod register {
 
     impl Target<'_> {
         pub(crate) fn export(&self) -> (libc::c_uint, *const libc::c_void, libc::c_uint) {
+            fn cast<T>(n: &T) -> *const T {
+                n as *const T
+            }
+
             match self {
                 Target::Buffer(bufs) =>
                     (sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _),
                 Target::File(fds) =>
                     (sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _),
                 Target::Event(eventfd)
-                    => (sys::IORING_REGISTER_EVENTFD, eventfd as *const RawFd as *const _, 1),
+                    => (sys::IORING_REGISTER_EVENTFD, cast::<RawFd>(eventfd) as *const _, 1),
                 _ => unreachable!()
             }
         }

@@ -105,7 +105,13 @@ impl IoUring {
         }
     }
 
-    fn inner_enter(&self, len: usize, want: usize) -> io::Result<usize> {
+    pub fn submit(&self) -> io::Result<usize> {
+        self.submit_and_wait(0)
+    }
+
+    pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
+        let len = self.sq.len();
+
         let flags = match want {
             0 if self.flags.contains(SetupFlags::SQPOLL) =>
                 if self.sq.need_wakeup() {
@@ -121,16 +127,6 @@ impl IoUring {
         unsafe {
             self.enter(len as _, want as _, flags, None)
         }
-    }
-
-    pub fn submit(&self) -> io::Result<usize> {
-        self.submit_and_wait(0)
-    }
-
-    pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
-        let len = self.sq.len();
-
-        self.inner_enter(len, want)
     }
 
     pub fn submission_and_completion(&mut self)
