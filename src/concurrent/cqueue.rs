@@ -14,6 +14,11 @@ impl CompletionQueue<'_> {
         self.queue.overflow()
     }
 
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.ring_entries as usize
+    }
+
     pub fn len(&self) -> usize {
         let head = unsafe { (*self.queue.head).load(atomic::Ordering::Acquire) };
         let tail = unsafe { (*self.queue.tail).load(atomic::Ordering::Acquire) };
@@ -28,8 +33,9 @@ impl CompletionQueue<'_> {
         head == tail
     }
 
+    #[inline]
     pub fn is_full(&self) -> bool {
-        self.len() == self.ring_entries as usize
+        self.len() == self.capacity()
     }
 
     pub fn pop(&self) -> Option<Entry> {

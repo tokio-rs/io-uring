@@ -1,15 +1,11 @@
-use std::{ io, mem };
 use std::sync::atomic;
 use bitflags::bitflags;
 use linux_io_uring_sys as sys;
-use crate::util::{ Mmap, Fd, unsync_load };
+use crate::util::{ Mmap, unsync_load };
 use crate::mmap_offset;
 
 
 pub struct SubmissionQueue {
-    _sq_mmap: Mmap,
-    _sqe_mmap: Mmap,
-
     pub(crate) head: *const atomic::AtomicU32,
     pub(crate) tail: *const atomic::AtomicU32,
     pub(crate) ring_mask: *const u32,
@@ -61,19 +57,8 @@ bitflags!{
 }
 
 impl SubmissionQueue {
-    pub(crate) fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<SubmissionQueue> {
-        let sq_mmap = Mmap::new(
-            &fd,
-            sys::IORING_OFF_SQ_RING as _,
-            p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>()
-        )?;
-        let sqe_mmap = Mmap::new(
-            &fd,
-            sys::IORING_OFF_SQES as _,
-            p.sq_entries as usize * mem::size_of::<sys::io_uring_sqe>()
-        )?;
-
-        mmap_offset!{ unsafe
+    pub(crate) unsafe fn new(sq_mmap: &Mmap, sqe_mmap: &Mmap, p: &sys::io_uring_params) -> SubmissionQueue {
+        mmap_offset!{
             let head            = sq_mmap + p.sq_off.head           => *const atomic::AtomicU32;
             let tail            = sq_mmap + p.sq_off.tail           => *const atomic::AtomicU32;
             let ring_mask       = sq_mmap + p.sq_off.ring_mask      => *const u32;
@@ -85,22 +70,18 @@ impl SubmissionQueue {
             let sqes            = sqe_mmap + 0                      => *mut sys::io_uring_sqe;
         }
 
-        unsafe {
-            // To keep it simple, map it directly to `sqes`.
-            for i in 0..*ring_entries {
-                *array.add(i as usize) = i;
-            }
+        // To keep it simple, map it directly to `sqes`.
+        for i in 0..*ring_entries {
+            *array.add(i as usize) = i;
         }
 
-        Ok(SubmissionQueue {
-            _sq_mmap: sq_mmap,
-            _sqe_mmap: sqe_mmap,
+        SubmissionQueue {
             head, tail,
             ring_mask, ring_entries,
             flags, dropped,
             array,
             sqes
-        })
+        }
     }
 
     pub fn need_wakeup(&self) -> bool {

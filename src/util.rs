@@ -10,13 +10,12 @@ macro_rules! mmap_offset {
     ( $mmap:ident + $offset:expr => $ty:ty ) => {
         $mmap.as_mut_ptr().add($offset as _) as $ty
     };
-    ( unsafe $( let $val:ident = $mmap:ident + $offset:expr => $ty:ty );+ $(;)? ) => {
+    ( $( let $val:ident = $mmap:ident + $offset:expr => $ty:ty );+ $(;)? ) => {
         $(
-            let $val = unsafe { mmap_offset!($mmap + $offset => $ty) };
+            let $val = mmap_offset!($mmap + $offset => $ty);
         )*
     }
 }
-
 
 pub struct Mmap {
     addr: ptr::NonNull<libc::c_void>,

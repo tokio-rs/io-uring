@@ -21,6 +21,7 @@ impl SubmissionQueue<'_> {
         self.queue.dropped()
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.ring_entries as usize
     }
@@ -39,8 +40,9 @@ impl SubmissionQueue<'_> {
         head == tail
     }
 
+    #[inline]
     pub fn is_full(&self) -> bool {
-        self.len() == self.ring_entries as usize
+        self.len() == self.capacity()
     }
 
     pub unsafe fn push(&self, Entry(entry): Entry) -> Result<(), Entry> {
