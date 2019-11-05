@@ -20,6 +20,7 @@ pub const IORING_OP_POLL_REMOVE: u32 = 7;
 pub const IORING_OP_SYNC_FILE_RANGE: u32 = 8;
 pub const IORING_OP_SENDMSG: u32 = 9;
 pub const IORING_OP_RECVMSG: u32 = 10;
+pub const IORING_OP_TIMEOUT: u32 = 11;
 pub const IORING_FSYNC_DATASYNC: u32 = 1;
 pub const IORING_OFF_SQ_RING: u32 = 0;
 pub const IORING_OFF_CQ_RING: u32 = 134217728;
@@ -27,6 +28,7 @@ pub const IORING_OFF_SQES: u32 = 268435456;
 pub const IORING_SQ_NEED_WAKEUP: u32 = 1;
 pub const IORING_ENTER_GETEVENTS: u32 = 1;
 pub const IORING_ENTER_SQ_WAKEUP: u32 = 2;
+pub const IORING_FEAT_SINGLE_MMAP: u32 = 1;
 pub const IORING_REGISTER_BUFFERS: u32 = 0;
 pub const IORING_UNREGISTER_BUFFERS: u32 = 1;
 pub const IORING_REGISTER_FILES: u32 = 2;
@@ -61,6 +63,7 @@ pub union io_uring_sqe__bindgen_ty_1 {
     pub poll_events: __u16,
     pub sync_range_flags: __u32,
     pub msg_flags: __u32,
+    pub timeout_flags: __u32,
     _bindgen_union_align: u32,
 }
 #[test]
@@ -134,6 +137,19 @@ fn bindgen_test_layout_io_uring_sqe__bindgen_ty_1() {
             stringify!(io_uring_sqe__bindgen_ty_1),
             "::",
             stringify!(msg_flags)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_1>())).timeout_flags as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_1),
+            "::",
+            stringify!(timeout_flags)
         )
     );
 }
@@ -557,7 +573,8 @@ pub struct io_uring_params {
     pub flags: __u32,
     pub sq_thread_cpu: __u32,
     pub sq_thread_idle: __u32,
-    pub resv: [__u32; 5usize],
+    pub features: __u32,
+    pub resv: [__u32; 4usize],
     pub sq_off: io_sqring_offsets,
     pub cq_off: io_cqring_offsets,
 }
@@ -624,8 +641,18 @@ fn bindgen_test_layout_io_uring_params() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::core::ptr::null::<io_uring_params>())).resv as *const _ as usize },
+        unsafe { &(*(::core::ptr::null::<io_uring_params>())).features as *const _ as usize },
         20usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_params),
+            "::",
+            stringify!(features)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_params>())).resv as *const _ as usize },
+        24usize,
         concat!(
             "Offset of field: ",
             stringify!(io_uring_params),

@@ -1,13 +1,10 @@
-use std::{ io, mem };
 use std::sync::atomic;
 use linux_io_uring_sys as sys;
-use crate::util::{ Mmap, Fd, unsync_load };
+use crate::util::{ Mmap, unsync_load };
 use crate::mmap_offset;
 
 
 pub struct CompletionQueue {
-    _cq_mmap: Mmap,
-
     pub(crate) head: *const atomic::AtomicU32,
     pub(crate) tail: *const atomic::AtomicU32,
     pub(crate) ring_mask: *const u32,
@@ -32,14 +29,8 @@ pub struct AvailableQueue<'a> {
 }
 
 impl CompletionQueue {
-    pub(crate) fn new(fd: &Fd, p: &sys::io_uring_params) -> io::Result<CompletionQueue> {
-        let cq_mmap = Mmap::new(
-            &fd,
-            sys::IORING_OFF_CQ_RING as _,
-            p.cq_off.cqes as usize + p.cq_entries as usize * mem::size_of::<sys::io_uring_cqe>()
-        )?;
-
-        mmap_offset!{ unsafe
+    pub(crate) unsafe fn new(cq_mmap: &Mmap, p: &sys::io_uring_params) -> CompletionQueue {
+        mmap_offset!{
             let head            = cq_mmap + p.cq_off.head           => *const atomic::AtomicU32;
             let tail            = cq_mmap + p.cq_off.tail           => *const atomic::AtomicU32;
             let ring_mask       = cq_mmap + p.cq_off.ring_mask      => *const u32;
@@ -48,18 +39,24 @@ impl CompletionQueue {
             let cqes            = cq_mmap + p.cq_off.cqes           => *const sys::io_uring_cqe;
         }
 
-        Ok(CompletionQueue {
-            _cq_mmap: cq_mmap,
+        CompletionQueue {
             head, tail,
             ring_mask, ring_entries,
             overflow,
             cqes
-        })
+        }
     }
 
     pub fn overflow(&self) -> u32 {
         unsafe {
             (*self.overflow).load(atomic::Ordering::Acquire)
+        }
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        unsafe {
+            (*self.ring_entries) as usize
         }
     }
 
@@ -97,8 +94,12 @@ impl CompletionQueue {
 }
 
 impl AvailableQueue<'_> {
+    pub fn capacity(&self) -> usize {
+        self.ring_entries as usize
+    }
+
     pub fn is_full(&self) -> bool {
-        self.len() == self.ring_entries as usize
+        self.len() == self.capacity()
     }
 }
 

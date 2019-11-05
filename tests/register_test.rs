@@ -141,5 +141,7 @@ fn test_eventfd() -> anyhow::Result<()> {
     nix::unistd::read(efd, &mut buf)?;
     assert_eq!(u64::from_le_bytes(buf), 0x01);
 
+    io_uring.unregister(unreg::Target::Event)?;
+
     Ok(())
 }
