@@ -44,16 +44,16 @@ impl IoUring {
         SubmissionQueue {
             queue: &self.ring.sq,
             mark: &self.mark,
-            ring_mask: unsafe { *self.ring.sq.ring_mask },
-            ring_entries: unsafe { *self.ring.sq.ring_entries },
+            ring_mask: unsafe { self.ring.sq.ring_mask.read_volatile() },
+            ring_entries: unsafe { self.ring.sq.ring_entries.read_volatile() },
         }
     }
 
     pub fn completion(&self) -> CompletionQueue<'_> {
         CompletionQueue {
             queue: &self.ring.cq,
-            ring_mask: unsafe { *self.ring.cq.ring_mask },
-            ring_entries: unsafe { *self.ring.cq.ring_entries }
+            ring_mask: unsafe { self.ring.cq.ring_mask.read_volatile() },
+            ring_entries: unsafe { self.ring.cq.ring_entries.read_volatile() }
         }
     }
 

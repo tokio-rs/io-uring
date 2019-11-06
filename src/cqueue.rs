@@ -56,7 +56,7 @@ impl CompletionQueue {
     #[inline]
     pub fn capacity(&self) -> usize {
         unsafe {
-            (*self.ring_entries) as usize
+            self.ring_entries.read_volatile() as usize
         }
     }
 
@@ -75,9 +75,7 @@ impl CompletionQueue {
     }
 
     pub fn is_full(&self) -> bool {
-        let ring_entries = unsafe { *self.ring_entries };
-
-        self.len() == ring_entries as usize
+        self.len() == self.capacity()
     }
 
     pub fn available(&mut self) -> AvailableQueue<'_> {
@@ -85,8 +83,8 @@ impl CompletionQueue {
             AvailableQueue {
                 head: unsync_load(self.head),
                 tail: (*self.tail).load(atomic::Ordering::Acquire),
-                ring_mask: *self.ring_mask,
-                ring_entries: *self.ring_entries,
+                ring_mask: self.ring_mask.read_volatile(),
+                ring_entries: self.ring_entries.read_volatile(),
                 queue: self
             }
         }
