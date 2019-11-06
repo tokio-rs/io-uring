@@ -40,6 +40,46 @@ pub type __u16 = libc::c_ushort;
 pub type __s32 = libc::c_int;
 pub type __u32 = libc::c_uint;
 pub type __u64 = libc::c_ulonglong;
+pub type __kernel_time64_t = libc::c_longlong;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct __kernel_timespec {
+    pub tv_sec: __kernel_time64_t,
+    pub tv_nsec: libc::c_longlong,
+}
+#[test]
+fn bindgen_test_layout___kernel_timespec() {
+    assert_eq!(
+        ::core::mem::size_of::<__kernel_timespec>(),
+        16usize,
+        concat!("Size of: ", stringify!(__kernel_timespec))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<__kernel_timespec>(),
+        8usize,
+        concat!("Alignment of ", stringify!(__kernel_timespec))
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<__kernel_timespec>())).tv_sec as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(__kernel_timespec),
+            "::",
+            stringify!(tv_sec)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<__kernel_timespec>())).tv_nsec as *const _ as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(__kernel_timespec),
+            "::",
+            stringify!(tv_nsec)
+        )
+    );
+}
 pub type __kernel_rwf_t = libc::c_int;
 #[repr(C)]
 #[derive(Copy, Clone)]

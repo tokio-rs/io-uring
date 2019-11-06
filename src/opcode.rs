@@ -213,6 +213,16 @@ opcode!(
     }
 );
 
+opcode!(
+    #[derive(Debug)]
+    pub struct Timeout {
+        timespec: *const sys::__kernel_timespec,
+        ;;
+        count: u32 = 0,
+        flags: u32 = 0
+    }
+);
+
 impl Nop {
     pub fn build(self) -> Entry {
         let Nop {} = self;
@@ -386,6 +396,20 @@ impl RecvMsg {
         sqe.addr = msg as _;
         sqe.len = 1;
         sqe.__bindgen_anon_1.msg_flags = flags;
+        Entry(sqe)
+    }
+}
+
+impl Timeout {
+    pub fn build(self) -> Entry {
+        let Timeout { timespec, count, flags } = self;
+
+        let mut sqe = sys::io_uring_sqe::default();
+        sqe.opcode = sys::IORING_OP_TIMEOUT as _;
+        sqe.addr = timespec as _;
+        sqe.len = 1;
+        sqe.off = count as _;
+        sqe.__bindgen_anon_1.timeout_flags = flags;
         Entry(sqe)
     }
 }
