@@ -1,5 +1,6 @@
+#![cfg(feature = "linux_5_4")]
+
 use std::time::Instant;
-use linux_io_uring_sys::__kernel_timespec;
 use linux_io_uring::{ opcode, IoUring };
 
 
@@ -7,7 +8,7 @@ use linux_io_uring::{ opcode, IoUring };
 fn test_timeout() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(1)?;
 
-    let ts = __kernel_timespec {
+    let ts = opcode::KernelTimespec {
         tv_sec: 1,
         tv_nsec: 0
     };
