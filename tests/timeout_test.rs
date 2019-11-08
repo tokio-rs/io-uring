@@ -1,5 +1,3 @@
-#![cfg(feature = "linux_5_4")]
-
 use std::time::Instant;
 use linux_io_uring::{ opcode, IoUring };
 

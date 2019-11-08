@@ -4,7 +4,6 @@ use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 use crate::squeue::Entry;
 
-#[cfg(feature = "linux_5_4")]
 pub use sys::__kernel_timespec as KernelTimespec;
 
 
@@ -216,7 +215,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "linux_5_4")]
 opcode!(
     #[derive(Debug)]
     pub struct Timeout {
@@ -404,7 +402,6 @@ impl RecvMsg {
     }
 }
 
-#[cfg(feature = "linux_5_4")]
 impl Timeout {
     pub fn build(self) -> Entry {
         let Timeout { timespec, count, flags } = self;

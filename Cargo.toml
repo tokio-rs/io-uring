@@ -16,7 +16,6 @@ categories = [ "asynchronous", "network-programming", "filesystem" ]
 
 [features]
 bindgen = [ "linux-io-uring-sys/bindgen" ]
-linux_5_4 = []
 
 [dependencies]
 libc = "0.2"

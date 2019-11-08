@@ -1,5 +1,3 @@
-#![cfg(feature = "linux_5_4")]
-
 use linux_io_uring::{ opcode, squeue, Builder, FeatureFlags };
 
 

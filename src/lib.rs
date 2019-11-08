@@ -210,7 +210,6 @@ impl Builder {
         }
     }
 
-    #[cfg(feature = "linux_5_4")]
     pub fn features(mut self, flags: FeatureFlags) -> Self {
         self.params.features = flags.bits();
         self
