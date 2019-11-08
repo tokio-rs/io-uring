@@ -1,5 +1,4 @@
-use linux_io_uring::{ opcode, IoUring };
-
+use linux_io_uring::{opcode, IoUring};
 
 #[test]
 fn test_full() -> anyhow::Result<()> {
@@ -9,12 +8,8 @@ fn test_full() -> anyhow::Result<()> {
     unsafe {
         let mut queue = io_uring.submission().available();
         for i in 0..4 {
-            let entry = opcode::Nop::new()
-                .build()
-                .user_data(i);
-            queue.push(entry)
-                .map_err(drop)
-                .expect("queue is full");
+            let entry = opcode::Nop::new().build().user_data(i);
+            queue.push(entry).map_err(drop).expect("queue is full");
         }
         assert!(queue.is_full());
     }
@@ -25,12 +20,8 @@ fn test_full() -> anyhow::Result<()> {
     unsafe {
         let mut queue = io_uring.submission().available();
         for i in 4..8 {
-            let entry = opcode::Nop::new()
-                .build()
-                .user_data(i);
-            queue.push(entry)
-                .map_err(drop)
-                .expect("queue is full");
+            let entry = opcode::Nop::new().build().user_data(i);
+            queue.push(entry).map_err(drop).expect("queue is full");
         }
         assert!(queue.is_full());
     }
@@ -42,12 +33,8 @@ fn test_full() -> anyhow::Result<()> {
     unsafe {
         let mut queue = io_uring.submission().available();
         for i in 8..12 {
-            let entry = opcode::Nop::new()
-                .build()
-                .user_data(i);
-            queue.push(entry)
-                .map_err(drop)
-                .expect("queue is full");
+            let entry = opcode::Nop::new().build().user_data(i);
+            queue.push(entry).map_err(drop).expect("queue is full");
         }
         assert!(queue.is_full());
     }

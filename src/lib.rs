@@ -1,38 +1,37 @@
-mod util;
-mod register;
-pub mod squeue;
+pub mod concurrent;
 pub mod cqueue;
 pub mod opcode;
-pub mod concurrent;
+mod register;
+pub mod squeue;
+mod util;
 
-use std::{ io, ptr, cmp, mem };
-use std::convert::TryInto;
-use std::os::unix::io::{ AsRawFd, RawFd };
-use std::mem::ManuallyDrop;
 use bitflags::bitflags;
-use linux_io_uring_sys as sys;
-use util::{ Fd, Mmap };
-use squeue::SubmissionQueue;
 use cqueue::CompletionQueue;
-pub use register::{ register as reg, unregister as unreg };
-
+use linux_io_uring_sys as sys;
+pub use register::{register as reg, unregister as unreg};
+use squeue::SubmissionQueue;
+use std::convert::TryInto;
+use std::mem::ManuallyDrop;
+use std::os::unix::io::{AsRawFd, RawFd};
+use std::{cmp, io, mem, ptr};
+use util::{Fd, Mmap};
 
 pub struct IoUring {
     fd: Fd,
     flags: SetupFlags,
     memory: ManuallyDrop<MemoryMap>,
     sq: SubmissionQueue,
-    cq: CompletionQueue
+    cq: CompletionQueue,
 }
 
 #[allow(dead_code)]
 struct MemoryMap {
     sq_mmap: Mmap,
     sqe_mmap: Mmap,
-    cq_mmap: Option<Mmap>
+    cq_mmap: Option<Mmap>,
 }
 
-bitflags!{
+bitflags! {
     pub struct SetupFlags: u32 {
         const IOPOLL = sys::IORING_SETUP_IOPOLL;
         const SQPOLL = sys::IORING_SETUP_SQPOLL;
@@ -40,7 +39,7 @@ bitflags!{
     }
 }
 
-bitflags!{
+bitflags! {
     pub struct FeatureFlags: u32 {
         const SINGLE_MMAP = sys::IORING_FEAT_SINGLE_MMAP;
     }
@@ -49,7 +48,7 @@ bitflags!{
 #[derive(Clone)]
 pub struct Builder {
     entries: u32,
-    params: sys::io_uring_params
+    params: sys::io_uring_params,
 }
 
 unsafe impl Send for IoUring {}
@@ -63,27 +62,28 @@ impl IoUring {
 
     fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<IoUring> {
         #[inline]
-        unsafe fn setup_queue(fd: &Fd, p: &sys::io_uring_params)
-            -> io::Result<(MemoryMap, SubmissionQueue, CompletionQueue)>
-        {
+        unsafe fn setup_queue(
+            fd: &Fd,
+            p: &sys::io_uring_params,
+        ) -> io::Result<(MemoryMap, SubmissionQueue, CompletionQueue)> {
             let features = FeatureFlags::from_bits_truncate(p.features);
 
-            let sq_len = p.sq_off.array as usize
-                + p.sq_entries as usize * mem::size_of::<u32>();
+            let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
             let cq_len = p.cq_off.cqes as usize
                 + p.cq_entries as usize * mem::size_of::<sys::io_uring_cqe>();
             let sqe_len = p.sq_entries as usize * mem::size_of::<sys::io_uring_sqe>();
             let sqe_mmap = Mmap::new(fd, sys::IORING_OFF_SQES as _, sqe_len)?;
 
             if features.contains(FeatureFlags::SINGLE_MMAP) {
-                let scq_mmap = Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, cmp::max(sq_len, cq_len))?;
+                let scq_mmap =
+                    Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, cmp::max(sq_len, cq_len))?;
 
                 let sq = SubmissionQueue::new(&scq_mmap, &sqe_mmap, p);
                 let cq = CompletionQueue::new(&scq_mmap, p);
                 let mm = MemoryMap {
                     sq_mmap: scq_mmap,
                     cq_mmap: None,
-                    sqe_mmap
+                    sqe_mmap,
                 };
 
                 Ok((mm, sq, cq))
@@ -95,7 +95,8 @@ impl IoUring {
                 let cq = CompletionQueue::new(&cq_mmap, p);
                 let mm = MemoryMap {
                     cq_mmap: Some(cq_mmap),
-                    sq_mmap, sqe_mmap
+                    sq_mmap,
+                    sqe_mmap,
                 };
 
                 Ok((mm, sq, cq))
@@ -112,8 +113,11 @@ impl IoUring {
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
         Ok(IoUring {
-            fd, flags, sq, cq,
-            memory: ManuallyDrop::new(mm)
+            fd,
+            flags,
+            sq,
+            cq,
+            memory: ManuallyDrop::new(mm),
         })
     }
 
@@ -121,9 +125,9 @@ impl IoUring {
         let (opcode, arg, len) = target.export();
 
         if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
-           Ok(())
+            Ok(())
         } else {
-           Err(io::Error::last_os_error())
+            Err(io::Error::last_os_error())
         }
     }
 
@@ -131,17 +135,21 @@ impl IoUring {
         let opcode = target.opcode();
 
         unsafe {
-             if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, ptr::null(), 0) {
+            if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, ptr::null(), 0) {
                 Ok(())
-             } else {
+            } else {
                 Err(io::Error::last_os_error())
-             }
+            }
         }
     }
 
-    pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
-        -> io::Result<usize>
-    {
+    pub unsafe fn enter(
+        &self,
+        to_submit: u32,
+        min_complete: u32,
+        flag: u32,
+        sig: Option<&libc::sigset_t>,
+    ) -> io::Result<usize> {
         let sig = sig.map(|sig| sig as *const _).unwrap_or_else(ptr::null);
         let result = sys::io_uring_enter(self.fd.as_raw_fd(), to_submit, min_complete, flag, sig);
         if result >= 0 {
@@ -159,25 +167,22 @@ impl IoUring {
         let len = self.sq.len();
 
         let flags = match want {
-            0 if self.flags.contains(SetupFlags::SQPOLL) =>
+            0 if self.flags.contains(SetupFlags::SQPOLL) => {
                 if self.sq.need_wakeup() {
                     sys::IORING_ENTER_SQ_WAKEUP
                 } else {
                     // fast poll
-                    return Ok(len)
-                },
+                    return Ok(len);
+                }
+            }
             0 => 0,
             _ => sys::IORING_ENTER_GETEVENTS,
         };
 
-        unsafe {
-            self.enter(len as _, want as _, flags, None)
-        }
+        unsafe { self.enter(len as _, want as _, flags, None) }
     }
 
-    pub fn submission_and_completion(&mut self)
-        -> (&mut SubmissionQueue, &mut CompletionQueue)
-    {
+    pub fn submission_and_completion(&mut self) -> (&mut SubmissionQueue, &mut CompletionQueue) {
         (&mut self.sq, &mut self.cq)
     }
 
@@ -206,7 +211,7 @@ impl Builder {
     pub fn new(entries: u32) -> Self {
         Builder {
             entries,
-            params: sys::io_uring_params::default()
+            params: sys::io_uring_params::default(),
         }
     }
 

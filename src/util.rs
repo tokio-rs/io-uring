@@ -1,8 +1,7 @@
-use std::{ io, ptr, mem };
-use std::sync::atomic;
 use std::convert::TryFrom;
-use std::os::unix::io::{ AsRawFd, IntoRawFd, FromRawFd, RawFd };
-
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::sync::atomic;
+use std::{io, mem, ptr};
 
 #[doc(hidden)]
 #[macro_export(local_inner_macros)]
@@ -19,7 +18,7 @@ macro_rules! mmap_offset {
 
 pub struct Mmap {
     addr: ptr::NonNull<libc::c_void>,
-    len: usize
+    len: usize,
 }
 
 impl Mmap {
@@ -31,7 +30,7 @@ impl Mmap {
                 libc::PROT_READ | libc::PROT_WRITE,
                 libc::MAP_SHARED | libc::MAP_POPULATE,
                 fd.as_raw_fd(),
-                offset
+                offset,
             ) {
                 libc::MAP_FAILED => Err(io::Error::last_os_error()),
                 addr => {

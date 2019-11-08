@@ -1,8 +1,7 @@
-use std::io::{ self, Read };
+use linux_io_uring::{opcode, IoUring};
+use std::io::{self, Read};
 use std::os::unix::io::AsRawFd;
 use tempfile::tempfile;
-use linux_io_uring::{ opcode, IoUring };
-
 
 #[test]
 fn test_fs() -> anyhow::Result<()> {
@@ -15,7 +14,7 @@ fn test_fs() -> anyhow::Result<()> {
     let entry = opcode::Writev::new(
         opcode::Target::Fd(fd.as_raw_fd()),
         [io::IoSlice::new(text)].as_ptr() as *const _,
-        1
+        1,
     );
 
     unsafe {
@@ -48,7 +47,7 @@ fn test_fs() -> anyhow::Result<()> {
     let entry = opcode::Readv::new(
         opcode::Target::Fd(fd.as_raw_fd()),
         [io::IoSliceMut::new(&mut buf2)].as_mut_ptr() as *mut _,
-        1
+        1,
     );
 
     unsafe {

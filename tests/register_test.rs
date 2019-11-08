@@ -1,7 +1,6 @@
-use std::{ io, mem };
+use linux_io_uring::{opcode, reg, unreg, IoUring};
 use nix::sys::eventfd::*;
-use linux_io_uring::{ opcode, IoUring, reg, unreg };
-
+use std::{io, mem};
 
 #[test]
 fn test_fixed_file() -> anyhow::Result<()> {
@@ -19,7 +18,7 @@ fn test_fixed_file() -> anyhow::Result<()> {
     let entry = opcode::Writev::new(
         opcode::Target::Fixed(1),
         [io::IoSlice::new(text)].as_ptr() as *const _,
-        1
+        1,
     );
 
     unsafe {
@@ -70,12 +69,7 @@ fn test_fixed_buffer() -> anyhow::Result<()> {
     nix::unistd::write(wp, text)?;
 
     // read fixed
-    let entry = opcode::ReadFixed::new(
-        opcode::Target::Fd(rp),
-        buf.as_mut_ptr(),
-        buf.len() as _,
-        0
-    );
+    let entry = opcode::ReadFixed::new(opcode::Target::Fd(rp), buf.as_mut_ptr(), buf.len() as _, 0);
 
     unsafe {
         io_uring

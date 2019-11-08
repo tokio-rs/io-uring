@@ -1,5 +1,4 @@
-use linux_io_uring::{ opcode, squeue, IoUring };
-
+use linux_io_uring::{opcode, squeue, IoUring};
 
 #[test]
 fn test_io_drain() -> anyhow::Result<()> {
@@ -7,16 +6,25 @@ fn test_io_drain() -> anyhow::Result<()> {
 
     unsafe {
         let mut queue = io_uring.submission().available();
-        queue.push(opcode::Nop::new().build().user_data(0x01))
+        queue
+            .push(opcode::Nop::new().build().user_data(0x01))
             .map_err(drop)
             .expect("queue is full");
-        queue.push(opcode::Nop::new().build().user_data(0x02))
+        queue
+            .push(opcode::Nop::new().build().user_data(0x02))
             .map_err(drop)
             .expect("queue is full");
-        queue.push(opcode::Nop::new().build().user_data(0x03).flags(squeue::Flags::IO_DRAIN))
+        queue
+            .push(
+                opcode::Nop::new()
+                    .build()
+                    .user_data(0x03)
+                    .flags(squeue::Flags::IO_DRAIN),
+            )
             .map_err(drop)
             .expect("queue is full");
-        queue.push(opcode::Nop::new().build().user_data(0x04))
+        queue
+            .push(opcode::Nop::new().build().user_data(0x04))
             .map_err(drop)
             .expect("queue is full");
     }
@@ -44,16 +52,35 @@ fn test_io_link() -> anyhow::Result<()> {
 
     unsafe {
         let mut queue = io_uring.submission().available();
-        queue.push(opcode::Nop::new().build().user_data(0x01).flags(squeue::Flags::IO_LINK))
+        queue
+            .push(
+                opcode::Nop::new()
+                    .build()
+                    .user_data(0x01)
+                    .flags(squeue::Flags::IO_LINK),
+            )
             .map_err(drop)
             .expect("queue is full");
-        queue.push(opcode::Nop::new().build().user_data(0x02).flags(squeue::Flags::IO_LINK))
+        queue
+            .push(
+                opcode::Nop::new()
+                    .build()
+                    .user_data(0x02)
+                    .flags(squeue::Flags::IO_LINK),
+            )
             .map_err(drop)
             .expect("queue is full");
-        queue.push(opcode::Nop::new().build().user_data(0x03).flags(squeue::Flags::IO_LINK))
+        queue
+            .push(
+                opcode::Nop::new()
+                    .build()
+                    .user_data(0x03)
+                    .flags(squeue::Flags::IO_LINK),
+            )
             .map_err(drop)
             .expect("queue is full");
-        queue.push(opcode::Nop::new().build().user_data(0x04))
+        queue
+            .push(opcode::Nop::new().build().user_data(0x04))
             .map_err(drop)
             .expect("queue is full");
     }

@@ -1,10 +1,9 @@
-use std::thread;
-use std::sync::Arc;
-use std::io::{ self, Read };
+use linux_io_uring::{opcode, IoUring};
+use std::io::{self, Read};
 use std::os::unix::io::AsRawFd;
+use std::sync::Arc;
+use std::thread;
 use tempfile::tempfile;
-use linux_io_uring::{ opcode, IoUring };
-
 
 #[test]
 fn test_fs() -> anyhow::Result<()> {
@@ -22,7 +21,7 @@ fn test_fs() -> anyhow::Result<()> {
         let entry = opcode::Writev::new(
             opcode::Target::Fd(raw_fd),
             [io::IoSlice::new(text)].as_ptr() as *const _,
-            1
+            1,
         );
 
         unsafe {
@@ -41,7 +40,7 @@ fn test_fs() -> anyhow::Result<()> {
         let entry = opcode::Writev::new(
             opcode::Target::Fd(raw_fd),
             [io::IoSlice::new(text)].as_ptr() as *const _,
-            1
+            1,
         );
         let entry = entry.offset(text.len() as i64);
 
@@ -59,17 +58,11 @@ fn test_fs() -> anyhow::Result<()> {
     io_uring.submit_and_wait(2)?;
 
     // writev complete
-    let entry = io_uring
-        .completion()
-        .pop()
-        .expect("queue is empty");
+    let entry = io_uring.completion().pop().expect("queue is empty");
     let data1 = entry.user_data();
 
     // writev complete
-    let entry = io_uring
-        .completion()
-        .pop()
-        .expect("queue is empty");
+    let entry = io_uring.completion().pop().expect("queue is empty");
     let data2 = entry.user_data();
 
     assert!(data1 == 0x42 || data1 == 0x43);
@@ -101,7 +94,6 @@ fn push_then_conc() -> anyhow::Result<()> {
     }
 
     assert_eq!(io_uring.submission().len(), 1);
-
 
     let io_uring = io_uring.concurrent();
 

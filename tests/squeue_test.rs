@@ -1,5 +1,4 @@
-use linux_io_uring::{ opcode, IoUring };
-
+use linux_io_uring::{opcode, IoUring};
 
 #[test]
 fn test_full() -> anyhow::Result<()> {
@@ -13,7 +12,8 @@ fn test_full() -> anyhow::Result<()> {
 
         for _ in 0..queue.capacity() {
             unsafe {
-                queue.push(opcode::Nop::new().build())
+                queue
+                    .push(opcode::Nop::new().build())
                     .map_err(drop)
                     .expect("queue is full");
             }
@@ -25,7 +25,6 @@ fn test_full() -> anyhow::Result<()> {
     assert!(io_uring.submission().is_full());
     io_uring.submit()?;
 
-
     // concurrent squeue full
     let io_uring = io_uring.concurrent();
     let queue = io_uring.submission();
@@ -34,7 +33,8 @@ fn test_full() -> anyhow::Result<()> {
 
     for _ in 0..queue.capacity() {
         unsafe {
-            queue.push(opcode::Nop::new().build())
+            queue
+                .push(opcode::Nop::new().build())
                 .map_err(drop)
                 .expect("queue is full");
         }

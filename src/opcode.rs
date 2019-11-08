@@ -1,11 +1,10 @@
 #![allow(clippy::new_without_default)]
 
-use std::os::unix::io::RawFd;
-use linux_io_uring_sys as sys;
 use crate::squeue::Entry;
+use linux_io_uring_sys as sys;
+use std::os::unix::io::RawFd;
 
 pub use sys::__kernel_timespec as KernelTimespec;
-
 
 macro_rules! assign_fd {
     ( $sqe:ident . fd = $opfd:expr ) => {
@@ -16,7 +15,7 @@ macro_rules! assign_fd {
                 $sqe.flags |= crate::squeue::Flags::FIXED_FILE.bits();
             }
         }
-    }
+    };
 }
 
 macro_rules! opcode {
@@ -58,11 +57,10 @@ macro_rules! opcode {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub enum Target {
     Fd(RawFd),
-    Fixed(u32)
+    Fixed(u32),
 }
 
 opcode!(
@@ -239,8 +237,11 @@ impl Readv {
     pub fn build(self) -> Entry {
         let Readv {
             fd,
-            iovec, len, offset,
-            ioprio, rw_flags
+            iovec,
+            len,
+            offset,
+            ioprio,
+            rw_flags,
         } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
@@ -259,8 +260,11 @@ impl Writev {
     pub fn build(self) -> Entry {
         let Writev {
             fd,
-            iovec, len, offset,
-            ioprio, rw_flags
+            iovec,
+            len,
+            offset,
+            ioprio,
+            rw_flags,
         } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
@@ -291,9 +295,12 @@ impl ReadFixed {
     pub fn build(self) -> Entry {
         let ReadFixed {
             fd,
-            buf, len, offset,
+            buf,
+            len,
+            offset,
             buf_index,
-            ioprio, rw_flags
+            ioprio,
+            rw_flags,
         } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
@@ -313,9 +320,12 @@ impl WriteFixed {
     pub fn build(self) -> Entry {
         let WriteFixed {
             fd,
-            buf, len, offset,
+            buf,
+            len,
+            offset,
             buf_index,
-            ioprio, rw_flags
+            ioprio,
+            rw_flags,
         } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
@@ -358,8 +368,9 @@ impl SyncFileRange {
     pub fn build(self) -> Entry {
         let SyncFileRange {
             fd,
-            len, offset,
-            flags
+            len,
+            offset,
+            flags,
         } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
@@ -374,7 +385,12 @@ impl SyncFileRange {
 
 impl SendMsg {
     pub fn build(self) -> Entry {
-        let SendMsg { fd, msg, ioprio, flags } = self;
+        let SendMsg {
+            fd,
+            msg,
+            ioprio,
+            flags,
+        } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_SENDMSG as _;
@@ -389,7 +405,12 @@ impl SendMsg {
 
 impl RecvMsg {
     pub fn build(self) -> Entry {
-        let RecvMsg { fd, msg, ioprio, flags } = self;
+        let RecvMsg {
+            fd,
+            msg,
+            ioprio,
+            flags,
+        } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_RECVMSG as _;
@@ -404,7 +425,11 @@ impl RecvMsg {
 
 impl Timeout {
     pub fn build(self) -> Entry {
-        let Timeout { timespec, count, flags } = self;
+        let Timeout {
+            timespec,
+            count,
+            flags,
+        } = self;
 
         let mut sqe = sys::io_uring_sqe::default();
         sqe.opcode = sys::IORING_OP_TIMEOUT as _;

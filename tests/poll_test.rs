@@ -1,5 +1,4 @@
-use linux_io_uring::{ opcode, IoUring };
-
+use linux_io_uring::{opcode, IoUring};
 
 #[test]
 fn test_poll_add() -> anyhow::Result<()> {

@@ -1,11 +1,10 @@
+use crate::squeue::{self, Entry};
 use std::sync::atomic;
-use crate::squeue::{ self, Entry };
-
 
 pub struct SubmissionQueue<'a> {
     pub(crate) queue: &'a squeue::SubmissionQueue,
     pub(crate) ring_mask: u32,
-    pub(crate) ring_entries: u32
+    pub(crate) ring_entries: u32,
 }
 
 impl SubmissionQueue<'_> {
@@ -52,15 +51,17 @@ impl SubmissionQueue<'_> {
                 return Err(Entry(entry));
             }
 
-            if (*self.queue.tail).compare_and_swap(tail, tail.wrapping_add(1), atomic::Ordering::Release)
-                == tail
+            if (*self.queue.tail).compare_and_swap(
+                tail,
+                tail.wrapping_add(1),
+                atomic::Ordering::Release,
+            ) == tail
             {
                 break tail;
             }
         };
 
-        *self.queue.sqes.add((tail & self.ring_mask) as usize)
-            = entry;
+        *self.queue.sqes.add((tail & self.ring_mask) as usize) = entry;
 
         Ok(())
     }

@@ -1,6 +1,5 @@
+use linux_io_uring::{opcode, IoUring};
 use std::time::Instant;
-use linux_io_uring::{ opcode, IoUring };
-
 
 #[test]
 fn test_timeout() -> anyhow::Result<()> {
@@ -8,7 +7,7 @@ fn test_timeout() -> anyhow::Result<()> {
 
     let ts = opcode::KernelTimespec {
         tv_sec: 1,
-        tv_nsec: 0
+        tv_nsec: 0,
     };
 
     let entry = opcode::Timeout::new(&ts);

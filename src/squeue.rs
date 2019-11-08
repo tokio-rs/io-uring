@@ -1,9 +1,8 @@
-use std::sync::atomic;
+use crate::mmap_offset;
+use crate::util::{unsync_load, Mmap};
 use bitflags::bitflags;
 use linux_io_uring_sys as sys;
-use crate::util::{ Mmap, unsync_load };
-use crate::mmap_offset;
-
+use std::sync::atomic;
 
 pub struct SubmissionQueue {
     pub(crate) head: *const atomic::AtomicU32,
@@ -16,7 +15,7 @@ pub struct SubmissionQueue {
     #[allow(dead_code)]
     array: *mut u32,
 
-    pub(crate) sqes: *mut sys::io_uring_sqe
+    pub(crate) sqes: *mut sys::io_uring_sqe,
 }
 
 pub struct AvailableQueue<'a> {
@@ -24,14 +23,14 @@ pub struct AvailableQueue<'a> {
     tail: u32,
     ring_mask: u32,
     ring_entries: u32,
-    queue: &'a mut SubmissionQueue
+    queue: &'a mut SubmissionQueue,
 }
 
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct Entry(pub(crate) sys::io_uring_sqe);
 
-bitflags!{
+bitflags! {
     pub struct Flags: u8 {
         /// When this flag is specified,
         /// `fd` is an index into the files array registered with the io_uring instance.
@@ -57,8 +56,12 @@ bitflags!{
 }
 
 impl SubmissionQueue {
-    pub(crate) unsafe fn new(sq_mmap: &Mmap, sqe_mmap: &Mmap, p: &sys::io_uring_params) -> SubmissionQueue {
-        mmap_offset!{
+    pub(crate) unsafe fn new(
+        sq_mmap: &Mmap,
+        sqe_mmap: &Mmap,
+        p: &sys::io_uring_params,
+    ) -> SubmissionQueue {
+        mmap_offset! {
             let head            = sq_mmap + p.sq_off.head           => *const atomic::AtomicU32;
             let tail            = sq_mmap + p.sq_off.tail           => *const atomic::AtomicU32;
             let ring_mask       = sq_mmap + p.sq_off.ring_mask      => *const u32;
@@ -76,31 +79,27 @@ impl SubmissionQueue {
         }
 
         SubmissionQueue {
-            head, tail,
-            ring_mask, ring_entries,
-            flags, dropped,
+            head,
+            tail,
+            ring_mask,
+            ring_entries,
+            flags,
+            dropped,
             array,
-            sqes
+            sqes,
         }
     }
 
     pub fn need_wakeup(&self) -> bool {
-        unsafe {
-            (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP
-                == 0
-        }
+        unsafe { (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP == 0 }
     }
 
     pub fn dropped(&self) -> u32 {
-        unsafe {
-            (*self.dropped).load(atomic::Ordering::Acquire)
-        }
+        unsafe { (*self.dropped).load(atomic::Ordering::Acquire) }
     }
 
     pub fn capacity(&self) -> usize {
-        unsafe {
-            self.ring_entries.read_volatile() as usize
-        }
+        unsafe { self.ring_entries.read_volatile() as usize }
     }
 
     pub fn len(&self) -> usize {
@@ -128,7 +127,7 @@ impl SubmissionQueue {
                 tail: unsync_load(self.tail),
                 ring_mask: self.ring_mask.read_volatile(),
                 ring_entries: self.ring_entries.read_volatile(),
-                queue: self
+                queue: self,
             }
         }
     }
@@ -153,8 +152,7 @@ impl AvailableQueue<'_> {
 
     pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
         if self.len() < self.capacity() {
-            *self.queue.sqes.add((self.tail & self.ring_mask) as usize)
-                = entry;
+            *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = entry;
             self.tail = self.tail.wrapping_add(1);
             Ok(())
         } else {

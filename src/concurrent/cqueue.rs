@@ -1,11 +1,10 @@
+use crate::cqueue::{self, Entry};
 use std::sync::atomic;
-use crate::cqueue::{ self, Entry };
-
 
 pub struct CompletionQueue<'a> {
     pub(crate) queue: &'a cqueue::CompletionQueue,
     pub(crate) ring_mask: u32,
-    pub(crate) ring_entries: u32
+    pub(crate) ring_entries: u32,
 }
 
 impl CompletionQueue<'_> {

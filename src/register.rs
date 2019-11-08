@@ -1,6 +1,5 @@
-use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
-
+use std::os::unix::io::RawFd;
 
 #[allow(clippy::module_inception)]
 pub mod register {
@@ -13,7 +12,7 @@ pub mod register {
 
         // TODO https://github.com/rust-lang/rust/pull/64639
         #[doc(hidden)]
-        __Unknown
+        __Unknown,
     }
 
     impl Target<'_> {
@@ -23,13 +22,22 @@ pub mod register {
             }
 
             match self {
-                Target::Buffer(bufs) =>
-                    (sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _),
-                Target::File(fds) =>
-                    (sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _),
-                Target::Event(eventfd)
-                    => (sys::IORING_REGISTER_EVENTFD, cast_ptr::<RawFd>(eventfd) as *const _, 1),
-                _ => unreachable!()
+                Target::Buffer(bufs) => (
+                    sys::IORING_REGISTER_BUFFERS,
+                    bufs.as_ptr() as *const _,
+                    bufs.len() as _,
+                ),
+                Target::File(fds) => (
+                    sys::IORING_REGISTER_FILES,
+                    fds.as_ptr() as *const _,
+                    fds.len() as _,
+                ),
+                Target::Event(eventfd) => (
+                    sys::IORING_REGISTER_EVENTFD,
+                    cast_ptr::<RawFd>(eventfd) as *const _,
+                    1,
+                ),
+                _ => unreachable!(),
             }
         }
     }
@@ -44,7 +52,7 @@ pub mod unregister {
         Event,
 
         #[doc(hidden)]
-        __Unknown
+        __Unknown,
     }
 
     impl Target {
@@ -53,7 +61,7 @@ pub mod unregister {
                 Target::Buffer => sys::IORING_UNREGISTER_BUFFERS,
                 Target::File => sys::IORING_UNREGISTER_FILES,
                 Target::Event => sys::IORING_UNREGISTER_EVENTFD,
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
     }

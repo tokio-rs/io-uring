@@ -1,13 +1,12 @@
-pub mod squeue;
 pub mod cqueue;
+pub mod squeue;
 
-use std::io;
-use squeue::SubmissionQueue;
 use cqueue::CompletionQueue;
-
+use squeue::SubmissionQueue;
+use std::io;
 
 pub struct IoUring {
-    ring: crate::IoUring
+    ring: crate::IoUring,
 }
 
 unsafe impl Send for IoUring {}
@@ -18,9 +17,13 @@ impl IoUring {
         IoUring { ring }
     }
 
-    pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
-        -> io::Result<usize>
-    {
+    pub unsafe fn enter(
+        &self,
+        to_submit: u32,
+        min_complete: u32,
+        flag: u32,
+        sig: Option<&libc::sigset_t>,
+    ) -> io::Result<usize> {
         self.ring.enter(to_submit, min_complete, flag, sig)
     }
 
@@ -44,7 +47,7 @@ impl IoUring {
         CompletionQueue {
             queue: &self.ring.cq,
             ring_mask: unsafe { self.ring.cq.ring_mask.read_volatile() },
-            ring_entries: unsafe { self.ring.cq.ring_entries.read_volatile() }
+            ring_entries: unsafe { self.ring.cq.ring_entries.read_volatile() },
         }
     }
 
