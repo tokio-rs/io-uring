@@ -2,15 +2,12 @@ pub mod squeue;
 pub mod cqueue;
 
 use std::io;
-use std::sync::atomic;
 use squeue::SubmissionQueue;
 use cqueue::CompletionQueue;
-use crate::util::unsync_load;
 
 
 pub struct IoUring {
-    ring: crate::IoUring,
-    mark: atomic::AtomicU32,
+    ring: crate::IoUring
 }
 
 unsafe impl Send for IoUring {}
@@ -18,12 +15,7 @@ unsafe impl Sync for IoUring {}
 
 impl IoUring {
     pub fn new(ring: crate::IoUring) -> IoUring {
-        let mark = unsafe { unsync_load(ring.sq.tail) };
-
-        IoUring {
-            ring,
-            mark: atomic::AtomicU32::new(mark)
-        }
+        IoUring { ring }
     }
 
     pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
@@ -43,7 +35,6 @@ impl IoUring {
     pub fn submission(&self) -> SubmissionQueue<'_> {
         SubmissionQueue {
             queue: &self.ring.sq,
-            mark: &self.mark,
             ring_mask: unsafe { self.ring.sq.ring_mask.read_volatile() },
             ring_entries: unsafe { self.ring.sq.ring_entries.read_volatile() },
         }
