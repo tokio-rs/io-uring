@@ -11,9 +11,7 @@ fn test_fixed_file() -> anyhow::Result<()> {
     let (rp, wp) = nix::unistd::pipe()?; // just test, we don't close
 
     // register fd
-    unsafe {
-        io_uring.register(reg::Target::File(&[rp, wp]))?;
-    }
+    io_uring.register(reg::Target::File(&[rp, wp]))?;
 
     // write fixed fd
     let entry = opcode::Writev::new(
@@ -108,9 +106,7 @@ fn test_eventfd() -> anyhow::Result<()> {
     let efd = eventfd(0, EfdFlags::EFD_NONBLOCK)?; // just test, we don't close
 
     // register eventfd
-    unsafe {
-        io_uring.register(reg::Target::Event(efd))?;
-    }
+    io_uring.register(reg::Target::Event(efd))?;
 
     let mut buf = [0; 8];
 

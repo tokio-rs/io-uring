@@ -1,11 +1,11 @@
-pub mod squeue;
-pub mod cqueue;
+mod squeue;
+mod cqueue;
 
 use std::io;
 use std::sync::atomic;
-use squeue::SubmissionQueue;
-use cqueue::CompletionQueue;
 use crate::util::unsync_load;
+pub use squeue::SubmissionQueue;
+pub use cqueue::CompletionQueue;
 
 
 pub struct IoUring {
@@ -26,16 +26,23 @@ impl IoUring {
         }
     }
 
+    /// Initiate and/or complete asynchronous I/O
+    ///
+    /// # Safety
+    ///
+    /// This provides a raw interface so developer must ensure that parameters are correct.
     pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
         -> io::Result<usize>
     {
         self.ring.enter(to_submit, min_complete, flag, sig)
     }
 
+    /// Initiate `SubmissionQueue`.
     pub fn submit(&self) -> io::Result<usize> {
         self.ring.submit()
     }
 
+    /// Initiate and/or complete asynchronous I/O
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         self.ring.submit_and_wait(want)
     }

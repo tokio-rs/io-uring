@@ -14,7 +14,6 @@ impl CompletionQueue<'_> {
         self.queue.overflow()
     }
 
-    #[inline]
     pub fn capacity(&self) -> usize {
         self.ring_entries as usize
     }
@@ -33,7 +32,6 @@ impl CompletionQueue<'_> {
         head == tail
     }
 
-    #[inline]
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }

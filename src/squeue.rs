@@ -46,12 +46,6 @@ bitflags!{
         /// When this flag is specified,
         /// it forms a link with the next SQE in the submission ring.
         /// That next SQE will not be started before this one completes.
-        /// This, in effect, forms a chain of SQEs, which can be arbitrarily long.
-        /// The tail of the chain is denoted by the first SQE that does not have this flag set.
-        /// This flag has no effect on previous SQE submissions,
-        /// nor does it impact SQEs that are outside of the chain tail.
-        /// This means that multiple chains can be executing in parallel, or chains and individual SQEs.
-        /// Only members inside the chain are serialized.
         const IO_LINK = sys::IOSQE_IO_LINK as _;
     }
 }
@@ -151,6 +145,13 @@ impl AvailableQueue<'_> {
         self.tail.wrapping_sub(self.head) == self.ring_entries
     }
 
+    /// Attempts to push an [Entry] into the queue.
+    /// If the queue is full, the element is returned back as an error.
+    ///
+    /// # Safety
+    ///
+    /// Developers must ensure that parameters of the [Entry] (such as buffer) are valid,
+    /// otherwise it may cause memory problems.
     pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
         if self.len() < self.capacity() {
             *self.queue.sqes.add((self.tail & self.ring_mask) as usize)

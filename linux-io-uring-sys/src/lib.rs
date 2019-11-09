@@ -1,5 +1,5 @@
 #![allow(non_camel_case_types, non_upper_case_globals)]
-#![allow(clippy::unreadable_literal)]
+#![allow(clippy::unreadable_literal, clippy::missing_safety_doc)]
 
 use libc::*;
 

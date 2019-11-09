@@ -62,11 +62,14 @@ macro_rules! opcode {
 #[derive(Debug, Clone)]
 pub enum Target {
     Fd(RawFd),
+
+    /// The index of registered fd.
     Fixed(u32)
 }
 
 opcode!(
     /// Do not perform any I/O.
+    ///
     /// This is useful for testing the performance of the io_uring implementation itself.
     #[derive(Debug)]
     pub struct Nop { ;; }
@@ -74,6 +77,8 @@ opcode!(
 
 opcode!(
     /// Vectored read operations, similar to `preadv2 (2)`.
+    ///
+    /// The return values match those documented in the `preadv2 (2)` man pages.
     #[derive(Debug)]
     pub struct Readv {
         fd: Target,
@@ -90,6 +95,8 @@ opcode!(
 
 opcode!(
     /// Vectored write operations, similar to `pwritev2 (2)`.
+    ///
+    /// The return values match those documented in the `pwritev2 (2)` man pages.
     #[derive(Debug)]
     pub struct Writev {
         fd: Target,
@@ -105,14 +112,15 @@ opcode!(
 );
 
 opcode!(
-    /// File sync. See also `fsync(2)`.
+    /// File sync. See also `fsync (2)`.
+    ///
     /// Note that, while I/O is initiated in the order in which it appears in the submission queue, completions are unordered.
     /// For example, an application which places a write I/O followed by an fsync in the submission queue cannot expect the fsync to apply to the write. The two operations execute in parallel, so the fsync may complete before the write is issued to the storage. The same is also true for previously issued writes that have not completed prior to the fsync.
     #[derive(Debug)]
     pub struct Fsync {
         fd: Target,
         ;;
-        /// The `fsync_flags` bit mask may contain either 0, for a normal file integrity sync,
+        /// The `flags` bit mask may contain either 0, for a normal file integrity sync,
         /// or `IORING_FSYNC_DATASYNC` to provide data sync only semantics.
         /// See the descriptions of `O_SYNC` and `O_DSYNC` in the `open (2)` manual page for more information.
         flags: u32 = 0
@@ -121,9 +129,11 @@ opcode!(
 
 opcode!(
     /// Read from pre-mapped buffers.
+    ///
+    /// The return values match those documented in the `preadv2 (2)` man pages.
     #[derive(Debug)]
     pub struct ReadFixed {
-        /// `buf_index` is an index into an array of fixed buffers,
+        /// The `buf_index` is an index into an array of fixed buffers,
         /// and is only valid if fixed buffers were registered.
         fd: Target,
         buf: *mut u8,
@@ -140,9 +150,11 @@ opcode!(
 
 opcode!(
     /// Write to pre-mapped buffers.
+    ///
+    /// The return values match those documented in the `pwritev2 (2)` man pages.
     #[derive(Debug)]
     pub struct WriteFixed {
-        /// `buf_index` is an index into an array of fixed buffers,
+        /// The `buf_index` is an index into an array of fixed buffers,
         /// and is only valid if fixed buffers were registered.
         fd: Target,
         buf: *const u8,
@@ -158,7 +170,8 @@ opcode!(
 );
 
 opcode!(
-    /// Poll the fd specified in the submission queue entry for the events specified in the `poll_events` field.
+    /// Poll the specified fd.
+    ///
     /// Unlike poll or epoll without `EPOLLONESHOT`, this interface always works in one shot mode.
     /// That is, once the poll operation is completed, it will have to be resubmitted.
     #[derive(Debug)]
@@ -173,6 +186,7 @@ opcode!(
 
 opcode!(
     /// Remove an existing poll request.
+    ///
     /// If found, the `result` method of the `cqueue::Entry` will return 0.
     /// If not found, `result` will return `-libc::ENOENT`.
     #[derive(Debug)]
@@ -183,17 +197,27 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `sync_file_range (2)` on the file descriptor.
+    ///
+    /// See also `sync_file_range (2)`. for the general description of the related system call.
     #[derive(Debug)]
     pub struct SyncFileRange {
         fd: Target,
         len: u32,
         ;;
+        /// the offset method holds the offset in bytes
         offset: i64 = 0,
+        /// the flags method holds the flags for the command
         flags: u32 = 0
     }
 );
 
 opcode!(
+    /// Issue the equivalent of a `sendmsg (2)` system call.
+    ///
+    /// fd must be set to the socket file descriptor, addr must contains a pointer to the msghdr structure,
+    /// and flags holds the flags associated with the system call.
+    /// See also `sendmsg (2)`. for the general description of the related system call.
     #[derive(Debug)]
     pub struct SendMsg {
         fd: Target,
@@ -205,6 +229,9 @@ opcode!(
 );
 
 opcode!(
+    /// Works just like [SendMsg], except for instead.
+    ///
+    /// See the description of [SendMsg].
     #[derive(Debug)]
     pub struct RecvMsg {
         fd: Target,
@@ -216,11 +243,22 @@ opcode!(
 );
 
 opcode!(
+    /// This command will register a timeout operation.
+    ///
+    /// A timeout will trigger a wakeup event on the completion ring for anyone waiting for events.
+    /// A timeout condition is met when either the specified timeout expires, or the specified number of events have completed.
+    /// Either condition will trigger the event.
+    /// The request will complete with `-ETIME` if the timeout got completed through expiration of the timer,
+    /// or 0 if the timeout got completed through requests completing on their own.
+    /// If the timeout was cancelled before it expired, the request will complete with `-ECANCELED`.
     #[derive(Debug)]
     pub struct Timeout {
         timespec: *const KernelTimespec,
         ;;
+        /// `count` may contain a completion event count. If not set, this defaults to 1.
         count: u32 = 0,
+
+        /// `flags` may contain `IORING_TIMEOUT_ABS` for an absolutel timeout value, or 0 for a relative timeout.
         flags: u32 = 0
     }
 );

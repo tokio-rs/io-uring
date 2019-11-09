@@ -1,3 +1,8 @@
+//! Rusty `io_uring` library.
+//!
+//! The crate only provides a summary of the parameters.
+//! For more detailed documentation, see manpage.
+
 mod util;
 mod register;
 pub mod squeue;
@@ -12,8 +17,8 @@ use std::mem::ManuallyDrop;
 use bitflags::bitflags;
 use linux_io_uring_sys as sys;
 use util::{ Fd, Mmap };
-use squeue::SubmissionQueue;
-use cqueue::CompletionQueue;
+pub use squeue::SubmissionQueue;
+pub use cqueue::CompletionQueue;
 pub use register::{ register as reg, unregister as unreg };
 
 
@@ -34,8 +39,18 @@ struct MemoryMap {
 
 bitflags!{
     pub struct SetupFlags: u32 {
+        /// Perform busy-waiting for an I/O completion,
+        /// as opposed to getting notifications via an asynchronous IRQ (Interrupt Request).
         const IOPOLL = sys::IORING_SETUP_IOPOLL;
+
+        /// When this flag is specified, a kernel thread is created to perform submission queue polling.
+        /// An io_uring instance configured in this way enables an application to issue I/O
+        /// without ever context switching into the kernel.
         const SQPOLL = sys::IORING_SETUP_SQPOLL;
+
+        /// If this flag is specified,
+        /// then the poll thread will be bound to the cpu set in the [Builder::thread_cpu].
+        /// This flag is only meaningful when [SetupFlags::SQPOLL] is specified.
         const SQ_AFF = sys::IORING_SETUP_SQ_AFF;
     }
 }
@@ -62,6 +77,10 @@ impl IoUring {
     }
 
     fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<IoUring> {
+        // NOTE: The `SubmissionQueue` and `CompletionQueue` are references,
+        // and their lifetime can never exceed `MemoryMap`.
+        //
+        // I really hope that Rust can safely use self-reference types.
         #[inline]
         unsafe fn setup_queue(fd: &Fd, p: &sys::io_uring_params)
             -> io::Result<(MemoryMap, SubmissionQueue, CompletionQueue)>
@@ -117,16 +136,20 @@ impl IoUring {
         })
     }
 
-    pub unsafe fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
+    /// Register files or user buffers for asynchronous I/O.
+    pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
         let (opcode, arg, len) = target.export();
 
-        if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
-           Ok(())
-        } else {
-           Err(io::Error::last_os_error())
+        unsafe {
+            if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
+               Ok(())
+            } else {
+               Err(io::Error::last_os_error())
+            }
         }
     }
 
+    /// Unregister files or user buffers for asynchronous I/O.
     pub fn unregister(&self, target: unreg::Target) -> io::Result<()> {
         let opcode = target.opcode();
 
@@ -139,6 +162,11 @@ impl IoUring {
         }
     }
 
+    /// Initiate and/or complete asynchronous I/O
+    ///
+    /// # Safety
+    ///
+    /// This provides a raw interface so developer must ensure that parameters are correct.
     pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
         -> io::Result<usize>
     {
@@ -151,10 +179,12 @@ impl IoUring {
         }
     }
 
+    /// Initiate `SubmissionQueue`.
     pub fn submit(&self) -> io::Result<usize> {
         self.submit_and_wait(0)
     }
 
+    /// Initiate and/or complete asynchronous I/O
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         let len = self.sq.len();
 
@@ -189,6 +219,7 @@ impl IoUring {
         &mut self.cq
     }
 
+    /// Make a concurrent IoUring.
     pub fn concurrent(self) -> concurrent::IoUring {
         concurrent::IoUring::new(self)
     }

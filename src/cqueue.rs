@@ -53,7 +53,6 @@ impl CompletionQueue {
         }
     }
 
-    #[inline]
     pub fn capacity(&self) -> usize {
         unsafe {
             self.ring_entries.read_volatile() as usize

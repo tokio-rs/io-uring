@@ -21,7 +21,6 @@ impl SubmissionQueue<'_> {
         self.queue.dropped()
     }
 
-    #[inline]
     pub fn capacity(&self) -> usize {
         self.ring_entries as usize
     }
@@ -40,12 +39,19 @@ impl SubmissionQueue<'_> {
         head == tail
     }
 
-    #[inline]
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }
 
+    /// Attempts to push an [Entry] into the queue.
+    /// If the queue is full, the element is returned back as an error.
+    ///
+    /// # Safety
+    ///
+    /// Developers must ensure that parameters of the [Entry] (such as buffer) are valid,
+    /// otherwise it may cause memory problems.
     pub unsafe fn push(&self, Entry(entry): Entry) -> Result<(), Entry> {
+        // we use a mark to avoid competition.
         let mark = loop {
             let head = (*self.queue.head).load(atomic::Ordering::Acquire);
             let mark = self.mark.load(atomic::Ordering::Acquire);
