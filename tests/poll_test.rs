@@ -35,7 +35,7 @@ fn test_poll_add() -> anyhow::Result<()> {
 #[test]
 fn test_poll_remove() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(1)?;
-    let (rp, _) = nix::unistd::pipe()?; // just test, we don't close
+    let (rp, _rw) = nix::unistd::pipe()?; // just test, we don't close
 
     let token = 0x43;
 
