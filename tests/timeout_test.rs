@@ -6,7 +6,7 @@ use linux_io_uring::{ opcode, IoUring };
 fn test_timeout() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(1)?;
 
-    let ts = opcode::KernelTimespec {
+    let ts = opcode::Timespec {
         tv_sec: 1,
         tv_nsec: 0
     };
@@ -42,7 +42,7 @@ fn test_timeout() -> anyhow::Result<()> {
 fn test_timeout_want() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(4)?;
 
-    let ts = opcode::KernelTimespec {
+    let ts = opcode::Timespec {
         tv_sec: 1,
         tv_nsec: 0
     };
@@ -121,7 +121,7 @@ fn test_timeout_want() -> anyhow::Result<()> {
 fn test_timeout_early() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(4)?;
 
-    let ts = opcode::KernelTimespec {
+    let ts = opcode::Timespec {
         tv_sec: 1,
         tv_nsec: 0
     };

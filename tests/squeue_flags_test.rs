@@ -1,4 +1,4 @@
-use linux_io_uring::{ opcode, squeue, IoUring };
+use linux_io_uring::{ opcode, squeue, IoUring, Builder, SetupFlags };
 
 
 #[test]
@@ -67,6 +67,85 @@ fn test_io_link() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
 
     assert_eq!(cqes, [0x01, 0x02, 0x03, 0x04]);
+
+    Ok(())
+}
+
+#[test]
+fn test_io_drain_link_empty() -> anyhow::Result<()> {
+    let mut io_uring = IoUring::new(2)?;
+
+    unsafe {
+        io_uring
+            .submission()
+            .available()
+            .push(opcode::Nop::new().build().user_data(0x42).flags(squeue::Flags::IO_DRAIN))
+            .map_err(drop)
+            .expect("queue is full");
+    }
+
+    io_uring.submit_and_wait(1)?;
+
+    let entry = io_uring
+        .completion()
+        .available()
+        .next()
+        .expect("queue is empty");
+
+    assert_eq!(entry.user_data(), 0x42);
+    assert_eq!(entry.result(), 0);
+
+    unsafe {
+        io_uring
+            .submission()
+            .available()
+            .push(opcode::Nop::new().build().user_data(0x43).flags(squeue::Flags::IO_LINK))
+            .map_err(drop)
+            .expect("queue is full");
+    }
+
+    io_uring.submit_and_wait(1)?;
+
+    let entry = io_uring
+        .completion()
+        .available()
+        .next()
+        .expect("queue is empty");
+
+    assert_eq!(entry.user_data(), 0x43);
+    assert_eq!(entry.result(), 0);
+
+    Ok(())
+}
+
+#[test]
+fn test_iopoll_link_invalid() -> anyhow::Result<()> {
+    let mut io_uring = Builder::new(2)
+        .setup_flags(SetupFlags::IOPOLL)
+        .build()?;
+
+    unsafe {
+        let mut sq = io_uring.submission().available();
+        sq.push(opcode::Nop::new().build().user_data(0x42).flags(squeue::Flags::IO_LINK))
+            .map_err(drop)
+            .expect("queue is full");
+        sq.push(opcode::Nop::new().build().user_data(0x43))
+            .map_err(drop)
+            .expect("queue is full");
+    }
+
+    io_uring.submit_and_wait(2)?;
+
+    let cqes = io_uring
+        .completion()
+        .available()
+        .collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 2);
+    assert_eq!(cqes[0].user_data(), 0x42);
+    assert_eq!(cqes[0].result(), -libc::EINVAL);
+    assert_eq!(cqes[1].user_data(), 0); // oh
+    assert_eq!(cqes[1].result(), -libc::ECANCELED);
 
     Ok(())
 }

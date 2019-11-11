@@ -4,7 +4,7 @@ use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 use crate::squeue::Entry;
 
-pub use sys::__kernel_timespec as KernelTimespec;
+pub use sys::__kernel_timespec as Timespec;
 
 
 macro_rules! assign_fd {
@@ -253,7 +253,7 @@ opcode!(
     /// If the timeout was cancelled before it expired, the request will complete with `-ECANCELED`.
     #[derive(Debug)]
     pub struct Timeout {
-        timespec: *const KernelTimespec,
+        timespec: *const Timespec,
         ;;
         /// `count` may contain a completion event count. If not set, this defaults to 1.
         count: u32 = 0,

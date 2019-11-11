@@ -179,7 +179,7 @@ impl IoUring {
         }
     }
 
-    /// Initiate `SubmissionQueue`.
+    /// Initiate asynchronous I/O.
     pub fn submit(&self) -> io::Result<usize> {
         self.submit_and_wait(0)
     }

@@ -13,7 +13,7 @@ categories = [ "asynchronous", "network-programming", "filesystem" ]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-exclude = [ "examples/loom-ringbuf" ]
+exclude = [ "loom-ringbuf" ]
 
 [features]
 bindgen = [ "linux-io-uring-sys/bindgen" ]
@@ -30,3 +30,4 @@ linux-io-uring-sys = { version = "0.0.3", path = "linux-io-uring-sys" }
 tempfile = "3"
 anyhow = "1"
 nix = "0.15"
+lazy_static = "1"

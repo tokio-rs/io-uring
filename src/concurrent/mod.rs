@@ -37,7 +37,7 @@ impl IoUring {
         self.ring.enter(to_submit, min_complete, flag, sig)
     }
 
-    /// Initiate `SubmissionQueue`.
+    /// Initiate asynchronous I/O.
     pub fn submit(&self) -> io::Result<usize> {
         self.ring.submit()
     }
