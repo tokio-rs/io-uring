@@ -1,9 +1,10 @@
 use std::thread;
+use std::mem::MaybeUninit;
 use std::os::unix::io::AsRawFd;
 use std::io::{ self, Read, Write };
 use std::net::{ SocketAddr, TcpListener, TcpStream };
 use lazy_static::lazy_static;
-use linux_io_uring::{ opcode, squeue, IoUring };
+use linux_io_uring::{ opcode, squeue, reg, IoUring };
 
 
 const TEXT: &[u8] = b"hello world!";
@@ -55,21 +56,91 @@ fn test_tcp_write_and_read() -> anyhow::Result<()> {
             [io::IoSliceMut::new(&mut buf)].as_mut_ptr() as *mut _,
             1
         )
-        .build()
-        .flags(squeue::Flags::IO_LINK);
+        .build();
 
     unsafe {
         let mut queue = io_uring.submission().available();
         queue.push(write_entry.user_data(0x01))
             .map_err(drop)
             .expect("queue is full");
-        queue.push(read_entry.user_data(0x02))
+        queue.push(read_entry.user_data(0x02).flags(squeue::Flags::IO_LINK))
             .map_err(drop)
             .expect("queue is full");
     }
 
     io_uring.submit_and_wait(2)?;
 
+    let cqes = io_uring
+        .completion()
+        .available()
+        .collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 2);
+    assert_eq!(cqes[0].user_data(), 0x01);
+    assert_eq!(cqes[1].user_data(), 0x02);
+    assert_eq!(cqes[0].result(), 12);
+    assert_eq!(cqes[1].result(), 12);
+
+    assert_eq!(buf, TEXT);
+
+    Ok(())
+}
+
+#[test]
+fn test_tcp_sendmsg_and_recvmsg() -> anyhow::Result<()> {
+    let addr = echo_server();
+    let sockaddr = socket2::SockAddr::from(*addr);
+    let mut io_uring = IoUring::new(4)?;
+
+    let stream = TcpStream::connect(addr)?;
+
+    let mut buf = vec![0; TEXT.len()];
+
+    // reg fd
+    io_uring.register(reg::Target::File(&[stream.as_raw_fd()]))?;
+
+    // build sendmsg
+    let mut msg = MaybeUninit::<libc::msghdr>::zeroed();
+
+    unsafe {
+        let p = msg.as_mut_ptr();
+        (*p).msg_name = sockaddr.as_ptr() as *const _ as *mut _;
+        (*p).msg_namelen = sockaddr.len();
+        (*p).msg_iov = [io::IoSlice::new(TEXT)].as_ptr() as *const _ as *mut _;
+        (*p).msg_iovlen = 1;
+    }
+
+    let write_entry = opcode::SendMsg::new(opcode::Target::Fixed(0), msg.as_ptr())
+        .build();
+
+    // build recvmsg
+    let mut msg = MaybeUninit::<libc::msghdr>::zeroed();
+
+    unsafe {
+        let p = msg.as_mut_ptr();
+        (*p).msg_name = sockaddr.as_ptr() as *const _ as *mut _;
+        (*p).msg_namelen = sockaddr.len();
+        (*p).msg_iov = [io::IoSliceMut::new(&mut buf)].as_mut_ptr() as *mut _;
+        (*p).msg_iovlen = 1;
+    }
+
+    let read_entry = opcode::RecvMsg::new(opcode::Target::Fixed(0), msg.as_mut_ptr())
+        .build();
+
+    // submit
+    unsafe {
+        let mut queue = io_uring.submission().available();
+        queue.push(write_entry.user_data(0x01))
+            .map_err(drop)
+            .expect("queue is full");
+        queue.push(read_entry.user_data(0x02).flags(squeue::Flags::IO_LINK))
+            .map_err(drop)
+            .expect("queue is full");
+    }
+
+    io_uring.submit_and_wait(2)?;
+
+    // complete
     let cqes = io_uring
         .completion()
         .available()
