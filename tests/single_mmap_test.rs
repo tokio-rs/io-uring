@@ -4,7 +4,7 @@ use linux_io_uring::{ opcode, squeue, Builder, FeatureFlags };
 #[test]
 fn test_single_mmap_nop() -> anyhow::Result<()> {
     let mut io_uring = Builder::new(2)
-        .features(FeatureFlags::SINGLE_MMAP)
+        .feature_flags(FeatureFlags::SINGLE_MMAP)
         .build()?;
 
     unsafe {

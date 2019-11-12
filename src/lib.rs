@@ -241,7 +241,7 @@ impl Builder {
         }
     }
 
-    pub fn features(mut self, flags: FeatureFlags) -> Self {
+    pub fn feature_flags(mut self, flags: FeatureFlags) -> Self {
         self.params.features = flags.bits();
         self
     }

@@ -144,7 +144,6 @@ fn test_iopoll_link_invalid() -> anyhow::Result<()> {
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x42);
     assert_eq!(cqes[0].result(), -libc::EINVAL);
-    assert_eq!(cqes[1].user_data(), 0); // oh
     assert_eq!(cqes[1].result(), -libc::ECANCELED);
 
     Ok(())

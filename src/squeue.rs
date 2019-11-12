@@ -129,6 +129,13 @@ impl SubmissionQueue {
 }
 
 impl AvailableQueue<'_> {
+    pub fn sync(&mut self) {
+        unsafe {
+            (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
+            self.head = (*self.queue.head).load(atomic::Ordering::Acquire);
+        }
+    }
+
     pub fn capacity(&self) -> usize {
         self.ring_entries as usize
     }
