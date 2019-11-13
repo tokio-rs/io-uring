@@ -46,6 +46,36 @@ fn bench_normal(c: &mut Criterion) {
     });
 }
 
+fn bench_concurrent(c: &mut Criterion) {
+    let io_uring = IoUring::new(16).unwrap();
+    let io_uring = io_uring.concurrent();
+
+    c.bench_function("concurrent", |b| {
+        b.iter(|| {
+            let mut queue = TaskQueue(128);
+
+            while queue.want() {
+                let sq = io_uring.submission();
+                while queue.want() {
+                    unsafe {
+                        match sq.push(black_box(opcode::Nop::new()).build()) {
+                            Ok(_) => queue.pop(),
+                            Err(_) => break
+                        }
+                    }
+                }
+
+                io_uring.submit().unwrap();
+
+                let cq = io_uring.completion();
+                while let Some(cqe) = cq.pop() {
+                    black_box(cqe);
+                }
+            }
+        });
+    });
+}
+
 fn bench_iou(c: &mut Criterion) {
     use iou::IoUring;
 
@@ -80,5 +110,5 @@ fn bench_iou(c: &mut Criterion) {
     });
 }
 
-criterion_group!(squeue, bench_normal, bench_iou);
+criterion_group!(squeue, bench_normal, bench_concurrent, bench_iou);
 criterion_main!(squeue);
