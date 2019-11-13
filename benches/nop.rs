@@ -34,7 +34,7 @@ fn bench_normal(c: &mut Criterion) {
                     }
                 }
 
-                io_uring.submit().unwrap();
+                io_uring.submit_and_wait(16).unwrap();
 
                 io_uring
                     .completion()
@@ -65,7 +65,7 @@ fn bench_concurrent(c: &mut Criterion) {
                     }
                 }
 
-                io_uring.submit().unwrap();
+                io_uring.submit_and_wait(16).unwrap();
 
                 let cq = io_uring.completion();
                 while let Some(cqe) = cq.pop() {
@@ -99,7 +99,7 @@ fn bench_iou(c: &mut Criterion) {
                     }
                 }
 
-                io_uring.submit_sqes().unwrap();
+                io_uring.submit_sqes_and_wait(16).unwrap();
 
                 let mut cq = io_uring.cq();
                 while let Some(cqe) = cq.peek_for_cqe() {
