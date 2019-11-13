@@ -91,6 +91,13 @@ impl CompletionQueue {
 }
 
 impl AvailableQueue<'_> {
+    pub fn sync(&mut self) {
+        unsafe {
+            (*self.queue.head).store(self.head, atomic::Ordering::Release);
+            self.tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
+        }
+    }
+
     pub fn capacity(&self) -> usize {
         self.ring_entries as usize
     }

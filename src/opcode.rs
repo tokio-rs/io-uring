@@ -40,7 +40,7 @@ macro_rules! opcode {
 
         impl $name {
             $( #[$new_meta] )*
-            pub fn new( $( $field : $tname ),* ) -> Self {
+            pub const fn new( $( $field : $tname ),* ) -> Self {
                 $name {
                     $( $field , )*
                     $( $opt_field: $default, )*
@@ -49,7 +49,7 @@ macro_rules! opcode {
 
             $(
                 $( #[$opt_meta] )*
-                pub fn $opt_field(mut self, $opt_field: $opt_tname) -> Self {
+                pub const fn $opt_field(mut self, $opt_field: $opt_tname) -> Self {
                     self.$opt_field = $opt_field;
                     self
                 }
@@ -263,11 +263,16 @@ opcode!(
     }
 );
 
+#[inline]
+fn sqe_zeroed() -> sys::io_uring_sqe {
+    unsafe { std::mem::zeroed() }
+}
+
 impl Nop {
     pub fn build(self) -> Entry {
         let Nop {} = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_NOP as _;
         Entry(sqe)
     }
@@ -281,7 +286,7 @@ impl Readv {
             ioprio, rw_flags
         } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_READV as _;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
@@ -301,7 +306,7 @@ impl Writev {
             ioprio, rw_flags
         } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_WRITEV as _;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
@@ -317,7 +322,7 @@ impl Fsync {
     pub fn build(self) -> Entry {
         let Fsync { fd, flags } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_FSYNC as _;
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_1.fsync_flags = flags;
@@ -334,7 +339,7 @@ impl ReadFixed {
             ioprio, rw_flags
         } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_READ_FIXED as _;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
@@ -356,7 +361,7 @@ impl WriteFixed {
             ioprio, rw_flags
         } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_WRITE_FIXED as _;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
@@ -373,7 +378,7 @@ impl PollAdd {
     pub fn build(self) -> Entry {
         let PollAdd { fd, flags } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_POLL_ADD as _;
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_1.poll_events = flags as _;
@@ -385,7 +390,7 @@ impl PollRemove {
     pub fn build(self) -> Entry {
         let PollRemove { user_data } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_POLL_REMOVE as _;
         sqe.addr = user_data as _;
         Entry(sqe)
@@ -400,7 +405,7 @@ impl SyncFileRange {
             flags
         } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_SYNC_FILE_RANGE as _;
         assign_fd!(sqe.fd = fd);
         sqe.len = len;
@@ -414,7 +419,7 @@ impl SendMsg {
     pub fn build(self) -> Entry {
         let SendMsg { fd, msg, ioprio, flags } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_SENDMSG as _;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
@@ -429,7 +434,7 @@ impl RecvMsg {
     pub fn build(self) -> Entry {
         let RecvMsg { fd, msg, ioprio, flags } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_RECVMSG as _;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
@@ -444,7 +449,7 @@ impl Timeout {
     pub fn build(self) -> Entry {
         let Timeout { timespec, count, flags } = self;
 
-        let mut sqe = sys::io_uring_sqe::default();
+        let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_TIMEOUT as _;
         sqe.addr = timespec as _;
         sqe.len = 1;

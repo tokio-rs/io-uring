@@ -32,3 +32,9 @@ anyhow = "1"
 nix = "0.15"
 lazy_static = "1"
 socket2 = "0.3"
+criterion = "0.3"
+iou = "0.1"
+
+[[bench]]
+name = "nop"
+harness = false
