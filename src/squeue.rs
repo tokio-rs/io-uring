@@ -1,3 +1,5 @@
+//! Submission Queue
+
 use std::sync::atomic;
 use bitflags::bitflags;
 use linux_io_uring_sys as sys;
@@ -27,11 +29,13 @@ pub struct AvailableQueue<'a> {
     queue: &'a mut SubmissionQueue
 }
 
+/// Submission Entry
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct Entry(pub(crate) sys::io_uring_sqe);
 
 bitflags!{
+    /// Submission flags
     pub struct Flag: u8 {
         /// When this flag is specified,
         /// `fd` is an index into the files array registered with the io_uring instance.
@@ -115,6 +119,7 @@ impl SubmissionQueue {
         self.len() == self.capacity()
     }
 
+    /// Get currently available submission queue
     pub fn available(&mut self) -> AvailableQueue<'_> {
         unsafe {
             AvailableQueue {
@@ -129,6 +134,7 @@ impl SubmissionQueue {
 }
 
 impl AvailableQueue<'_> {
+    /// Sync queue
     pub fn sync(&mut self) {
         unsafe {
             (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
@@ -180,12 +186,13 @@ impl Drop for AvailableQueue<'_> {
 }
 
 impl Entry {
+    /// Set [Submission flags](Flag)
     pub fn flags(mut self, flags: Flag) -> Entry {
         self.0.flags |= flags.bits();
         self
     }
 
-    /// `user_data` is an application-supplied value that will be copied into the completion queue
+    /// The `user_data` is an application-supplied value that will be copied into the completion queue
     /// entry (see below).
     pub fn user_data(mut self, user_data: u64) -> Entry {
         self.0.user_data = user_data;

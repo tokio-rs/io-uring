@@ -1,3 +1,5 @@
+//! Operation code
+
 #![allow(clippy::new_without_default)]
 
 use std::os::unix::io::RawFd;

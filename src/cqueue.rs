@@ -1,3 +1,5 @@
+//! Completion Queue
+
 use std::sync::atomic;
 use linux_io_uring_sys as sys;
 use crate::util::{ Mmap, unsync_load };
@@ -15,6 +17,7 @@ pub struct CompletionQueue {
     pub(crate) cqes: *const sys::io_uring_cqe
 }
 
+/// Completion Entry
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct Entry(pub(crate) sys::io_uring_cqe);
@@ -47,6 +50,8 @@ impl CompletionQueue {
         }
     }
 
+    /// If queue is full, the new event maybe dropped.
+    /// This value records number of dropped events.
     pub fn overflow(&self) -> u32 {
         unsafe {
             (*self.overflow).load(atomic::Ordering::Acquire)
@@ -77,6 +82,7 @@ impl CompletionQueue {
         self.len() == self.capacity()
     }
 
+    /// Get currently available completion queue
     pub fn available(&mut self) -> AvailableQueue<'_> {
         unsafe {
             AvailableQueue {
@@ -91,6 +97,7 @@ impl CompletionQueue {
 }
 
 impl AvailableQueue<'_> {
+    /// Sync queue
     pub fn sync(&mut self) {
         unsafe {
             (*self.queue.head).store(self.head, atomic::Ordering::Release);
@@ -138,10 +145,14 @@ impl Drop for AvailableQueue<'_> {
 }
 
 impl Entry {
+    /// Result value
     pub fn result(&self) -> i32 {
         self.0.res
     }
 
+    /// User Data
+    ///
+    /// See [Entry::user_data](crate::squeue::Entry::user_data).
     pub fn user_data(&self) -> u64 {
         self.0.user_data
     }

@@ -1,4 +1,4 @@
-//! Rusty `io_uring` library.
+//! The `io_uring` library for Rust.
 //!
 //! The crate only provides a summary of the parameters.
 //! For more detailed documentation, see manpage.
@@ -22,6 +22,7 @@ pub use cqueue::CompletionQueue;
 pub use register::{ register as reg, unregister as unreg };
 
 
+/// IoUring instance
 pub struct IoUring {
     fd: Fd,
     flags: SetupFlag,
@@ -61,6 +62,7 @@ bitflags!{
     }
 }
 
+/// IoUring Builder
 #[derive(Clone)]
 pub struct Builder {
     entries: u32,
@@ -71,6 +73,10 @@ unsafe impl Send for IoUring {}
 unsafe impl Sync for IoUring {}
 
 impl IoUring {
+    /// Create a IoUring instance
+    ///
+    /// The `entries` sets the size of queue,
+    /// and it value should be the power of two.
     #[inline]
     pub fn new(entries: u32) -> io::Result<IoUring> {
         IoUring::with_params(entries, sys::io_uring_params::default())
@@ -180,6 +186,7 @@ impl IoUring {
     }
 
     /// Initiate asynchronous I/O.
+    #[inline]
     pub fn submit(&self) -> io::Result<usize> {
         self.submit_and_wait(0)
     }
@@ -208,16 +215,19 @@ impl IoUring {
         }
     }
 
+    /// Get submission queue and completion queue
     pub fn submission_and_completion(&mut self)
         -> (&mut SubmissionQueue, &mut CompletionQueue)
     {
         (&mut self.sq, &mut self.cq)
     }
 
+    /// Get submission queue
     pub fn submission(&mut self) -> &mut SubmissionQueue {
         &mut self.sq
     }
 
+    /// Get completion queue
     pub fn completion(&mut self) -> &mut CompletionQueue {
         &mut self.cq
     }
@@ -237,6 +247,7 @@ impl Drop for IoUring {
 }
 
 impl Builder {
+    /// Create a builder
     pub fn new(entries: u32) -> Self {
         Builder {
             entries,
@@ -254,11 +265,14 @@ impl Builder {
         self
     }
 
+    /// See [SetupFlag::SQ_AFF]
     pub fn thread_cpu(mut self, n: u32) -> Self {
         self.params.sq_thread_cpu = n;
         self
     }
 
+    /// In [SQPOLL](SetupFlag::SQPOLL) mode,
+    /// if kernel is idle beyond the set value, it will sleep.
     pub fn thread_idle(mut self, n: u32) -> Self {
         self.params.sq_thread_idle = n;
         self
