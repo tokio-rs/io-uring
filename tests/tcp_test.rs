@@ -43,19 +43,13 @@ fn test_tcp_write_and_read() -> anyhow::Result<()> {
 
     let mut buf = vec![0; TEXT.len()];
 
+    let bufs = [io::IoSlice::new(TEXT)];
+    let mut bufs2 = [io::IoSliceMut::new(&mut buf)];
     let write_entry =
-        opcode::Writev::new(
-            opcode::Target::Fd(fd),
-            [io::IoSlice::new(TEXT)].as_ptr() as *const _,
-            1
-        )
+        opcode::Writev::new(opcode::Target::Fd(fd), bufs.as_ptr() as *const _, 1)
         .build();
     let read_entry =
-        opcode::Readv::new(
-            opcode::Target::Fd(fd),
-            [io::IoSliceMut::new(&mut buf)].as_mut_ptr() as *mut _,
-            1
-        )
+        opcode::Readv::new(opcode::Target::Fd(fd), bufs2.as_mut_ptr() as *mut _, 1)
         .build();
 
     unsafe {
@@ -63,7 +57,7 @@ fn test_tcp_write_and_read() -> anyhow::Result<()> {
         queue.push(write_entry.user_data(0x01))
             .map_err(drop)
             .expect("queue is full");
-        queue.push(read_entry.user_data(0x02).flags(squeue::Flags::IO_LINK))
+        queue.push(read_entry.user_data(0x02).flags(squeue::Flag::IO_LINK))
             .map_err(drop)
             .expect("queue is full");
     }
@@ -95,6 +89,8 @@ fn test_tcp_sendmsg_and_recvmsg() -> anyhow::Result<()> {
     let stream = TcpStream::connect(addr)?;
 
     let mut buf = vec![0; TEXT.len()];
+    let bufs = [io::IoSlice::new(TEXT)];
+    let mut bufs2 = [io::IoSliceMut::new(&mut buf)];
 
     // reg fd
     io_uring.register(reg::Target::File(&[stream.as_raw_fd()]))?;
@@ -106,7 +102,7 @@ fn test_tcp_sendmsg_and_recvmsg() -> anyhow::Result<()> {
         let p = msg.as_mut_ptr();
         (*p).msg_name = sockaddr.as_ptr() as *const _ as *mut _;
         (*p).msg_namelen = sockaddr.len();
-        (*p).msg_iov = [io::IoSlice::new(TEXT)].as_ptr() as *const _ as *mut _;
+        (*p).msg_iov = bufs.as_ptr() as *const _ as *mut _;
         (*p).msg_iovlen = 1;
     }
 
@@ -120,7 +116,7 @@ fn test_tcp_sendmsg_and_recvmsg() -> anyhow::Result<()> {
         let p = msg.as_mut_ptr();
         (*p).msg_name = sockaddr.as_ptr() as *const _ as *mut _;
         (*p).msg_namelen = sockaddr.len();
-        (*p).msg_iov = [io::IoSliceMut::new(&mut buf)].as_mut_ptr() as *mut _;
+        (*p).msg_iov = bufs2.as_mut_ptr() as *mut _;
         (*p).msg_iovlen = 1;
     }
 
@@ -133,7 +129,7 @@ fn test_tcp_sendmsg_and_recvmsg() -> anyhow::Result<()> {
         queue.push(write_entry.user_data(0x01))
             .map_err(drop)
             .expect("queue is full");
-        queue.push(read_entry.user_data(0x02).flags(squeue::Flags::IO_LINK))
+        queue.push(read_entry.user_data(0x02).flags(squeue::Flag::IO_LINK))
             .map_err(drop)
             .expect("queue is full");
     }

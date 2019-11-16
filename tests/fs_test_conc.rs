@@ -19,9 +19,10 @@ fn test_fs() -> anyhow::Result<()> {
 
     let j = thread::spawn(move || {
         // writev submit
+        let bufs = [io::IoSlice::new(text)];
         let entry = opcode::Writev::new(
             opcode::Target::Fd(raw_fd),
-            [io::IoSlice::new(text)].as_ptr() as *const _,
+            bufs.as_ptr() as *const _,
             1
         );
 
@@ -38,9 +39,10 @@ fn test_fs() -> anyhow::Result<()> {
 
     let j2 = thread::spawn(move || {
         // writev submit
+        let bufs = [io::IoSlice::new(text)];
         let entry = opcode::Writev::new(
             opcode::Target::Fd(raw_fd),
-            [io::IoSlice::new(text)].as_ptr() as *const _,
+            bufs.as_ptr() as *const _,
             1
         );
         let entry = entry.offset(text.len() as i64);

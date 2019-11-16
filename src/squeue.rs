@@ -32,7 +32,7 @@ pub struct AvailableQueue<'a> {
 pub struct Entry(pub(crate) sys::io_uring_sqe);
 
 bitflags!{
-    pub struct Flags: u8 {
+    pub struct Flag: u8 {
         /// When this flag is specified,
         /// `fd` is an index into the files array registered with the io_uring instance.
         #[doc(hidden)]
@@ -81,7 +81,7 @@ impl SubmissionQueue {
     pub fn need_wakeup(&self) -> bool {
         unsafe {
             (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP
-                == 0
+                != 0
         }
     }
 
@@ -180,7 +180,7 @@ impl Drop for AvailableQueue<'_> {
 }
 
 impl Entry {
-    pub fn flags(mut self, flags: Flags) -> Entry {
+    pub fn flags(mut self, flags: Flag) -> Entry {
         self.0.flags |= flags.bits();
         self
     }

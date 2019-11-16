@@ -24,7 +24,7 @@ pub use register::{ register as reg, unregister as unreg };
 
 pub struct IoUring {
     fd: Fd,
-    flags: SetupFlags,
+    flags: SetupFlag,
     memory: ManuallyDrop<MemoryMap>,
     sq: SubmissionQueue,
     cq: CompletionQueue
@@ -38,7 +38,7 @@ struct MemoryMap {
 }
 
 bitflags!{
-    pub struct SetupFlags: u32 {
+    pub struct SetupFlag: u32 {
         /// Perform busy-waiting for an I/O completion,
         /// as opposed to getting notifications via an asynchronous IRQ (Interrupt Request).
         const IOPOLL = sys::IORING_SETUP_IOPOLL;
@@ -50,13 +50,13 @@ bitflags!{
 
         /// If this flag is specified,
         /// then the poll thread will be bound to the cpu set in the [Builder::thread_cpu].
-        /// This flag is only meaningful when [SetupFlags::SQPOLL] is specified.
+        /// This flag is only meaningful when [SetupFlag::SQPOLL] is specified.
         const SQ_AFF = sys::IORING_SETUP_SQ_AFF;
     }
 }
 
 bitflags!{
-    pub struct FeatureFlags: u32 {
+    pub struct FeatureFlag: u32 {
         const SINGLE_MMAP = sys::IORING_FEAT_SINGLE_MMAP;
     }
 }
@@ -85,7 +85,7 @@ impl IoUring {
         unsafe fn setup_queue(fd: &Fd, p: &sys::io_uring_params)
             -> io::Result<(MemoryMap, SubmissionQueue, CompletionQueue)>
         {
-            let features = FeatureFlags::from_bits_truncate(p.features);
+            let features = FeatureFlag::from_bits_truncate(p.features);
 
             let sq_len = p.sq_off.array as usize
                 + p.sq_entries as usize * mem::size_of::<u32>();
@@ -94,7 +94,7 @@ impl IoUring {
             let sqe_len = p.sq_entries as usize * mem::size_of::<sys::io_uring_sqe>();
             let sqe_mmap = Mmap::new(fd, sys::IORING_OFF_SQES as _, sqe_len)?;
 
-            if features.contains(FeatureFlags::SINGLE_MMAP) {
+            if features.contains(FeatureFlag::SINGLE_MMAP) {
                 let scq_mmap = Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, cmp::max(sq_len, cq_len))?;
 
                 let sq = SubmissionQueue::new(&scq_mmap, &sqe_mmap, p);
@@ -127,7 +127,7 @@ impl IoUring {
                 .map_err(|_| io::Error::last_os_error())?
         };
 
-        let flags = SetupFlags::from_bits_truncate(p.flags);
+        let flags = SetupFlag::from_bits_truncate(p.flags);
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
         Ok(IoUring {
@@ -188,17 +188,20 @@ impl IoUring {
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         let len = self.sq.len();
 
-        let flags = match want {
-            0 if self.flags.contains(SetupFlags::SQPOLL) =>
-                if self.sq.need_wakeup() {
-                    sys::IORING_ENTER_SQ_WAKEUP
-                } else {
-                    // fast poll
-                    return Ok(len)
-                },
-            0 => 0,
-            _ => sys::IORING_ENTER_GETEVENTS,
-        };
+        let mut flags = 0;
+
+        if want > 0 {
+            flags |= sys::IORING_ENTER_GETEVENTS;
+        }
+
+        if self.flags.contains(SetupFlag::SQPOLL) {
+            if self.sq.need_wakeup() {
+                flags |= sys::IORING_ENTER_SQ_WAKEUP;
+            } else if want == 0 {
+                // fast poll
+                return Ok(len)
+            }
+        }
 
         unsafe {
             self.enter(len as _, want as _, flags, None)
@@ -241,12 +244,12 @@ impl Builder {
         }
     }
 
-    pub fn feature_flags(mut self, flags: FeatureFlags) -> Self {
+    pub fn feature_flags(mut self, flags: FeatureFlag) -> Self {
         self.params.features = flags.bits();
         self
     }
 
-    pub fn setup_flags(mut self, flags: SetupFlags) -> Self {
+    pub fn setup_flags(mut self, flags: SetupFlag) -> Self {
         self.params.flags = flags.bits();
         self
     }

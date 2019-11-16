@@ -14,9 +14,10 @@ fn test_fixed_file() -> anyhow::Result<()> {
     io_uring.register(reg::Target::File(&[rp, wp]))?;
 
     // write fixed fd
+    let bufs = [io::IoSlice::new(text)];
     let entry = opcode::Writev::new(
         opcode::Target::Fixed(1),
-        [io::IoSlice::new(text)].as_ptr() as *const _,
+        bufs.as_ptr() as *const _,
         1
     );
 

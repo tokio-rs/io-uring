@@ -12,9 +12,10 @@ fn test_fs() -> anyhow::Result<()> {
     let mut fd = tempfile()?;
 
     // writev submit
+    let bufs = [io::IoSlice::new(text)];
     let entry = opcode::Writev::new(
         opcode::Target::Fd(fd.as_raw_fd()),
-        [io::IoSlice::new(text)].as_ptr() as *const _,
+        bufs.as_ptr() as *const _,
         1
     );
 
@@ -45,9 +46,10 @@ fn test_fs() -> anyhow::Result<()> {
     let mut buf2 = [0; 12];
     assert_eq!(buf2.len(), text.len());
 
+    let mut bufs = [io::IoSliceMut::new(&mut buf2)];
     let entry = opcode::Readv::new(
         opcode::Target::Fd(fd.as_raw_fd()),
-        [io::IoSliceMut::new(&mut buf2)].as_mut_ptr() as *mut _,
+        bufs.as_mut_ptr() as *mut _,
         1
     );
 

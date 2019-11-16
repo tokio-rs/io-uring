@@ -13,7 +13,7 @@ macro_rules! assign_fd {
             Target::Fd(fd) => $sqe.fd = fd,
             Target::Fixed(i) => {
                 $sqe.fd = i as _;
-                $sqe.flags |= crate::squeue::Flags::FIXED_FILE.bits();
+                $sqe.flags |= crate::squeue::Flag::FIXED_FILE.bits();
             }
         }
     }
@@ -263,7 +263,8 @@ opcode!(
     }
 );
 
-#[inline]
+/// inline zeroed to improve codegen
+#[inline(always)]
 fn sqe_zeroed() -> sys::io_uring_sqe {
     unsafe { std::mem::zeroed() }
 }
