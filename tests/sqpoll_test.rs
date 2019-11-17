@@ -1,7 +1,7 @@
 use std::io;
 use std::os::unix::io::AsRawFd;
 use tempfile::tempfile;
-use linux_io_uring::{ opcode, reg, squeue, SetupFlag, Builder };
+use linux_io_uring::{ opcode, reg, squeue, Builder };
 
 
 #[ignore]
@@ -10,7 +10,7 @@ fn test_fs_sqpoll() -> anyhow::Result<()> {
     assert_eq!(unsafe { libc::geteuid() }, 0);
 
     let mut io_uring = Builder::new(4)
-        .setup_flags(SetupFlag::SQPOLL)
+        .setup_sqpoll(None)
         .build()?;
     let fd = tempfile()?;
 

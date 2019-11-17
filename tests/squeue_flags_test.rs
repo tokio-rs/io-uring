@@ -1,4 +1,4 @@
-use linux_io_uring::{ opcode, squeue, IoUring, Builder, SetupFlag };
+use linux_io_uring::{ opcode, squeue, IoUring, Builder };
 
 
 #[test]
@@ -121,7 +121,7 @@ fn test_io_drain_link_empty() -> anyhow::Result<()> {
 #[test]
 fn test_iopoll_link_invalid() -> anyhow::Result<()> {
     let mut io_uring = Builder::new(2)
-        .setup_flags(SetupFlag::IOPOLL)
+        .setup_iopoll()
         .build()?;
 
     unsafe {

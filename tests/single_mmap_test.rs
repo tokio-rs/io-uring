@@ -1,10 +1,10 @@
-use linux_io_uring::{ opcode, squeue, Builder, FeatureFlag };
+use linux_io_uring::{ opcode, squeue, Builder };
 
 
 #[test]
 fn test_single_mmap_nop() -> anyhow::Result<()> {
     let mut io_uring = Builder::new(2)
-        .feature_flags(FeatureFlag::SINGLE_MMAP)
+        .feature_single_mmap()
         .build()?;
 
     unsafe {
