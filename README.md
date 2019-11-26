@@ -2,6 +2,23 @@
 
 The `io_uring` library for Rust.
 
+## Safety
+
+All APIs are safe except for pushing entries into submission queue.
+This means that the developer must ensure that entry is valid, otherwise it will cause UB.
+
+I am trying to develop a proactor library to provide a safety abstraction.
+
+## Why Rust ?
+
+I don't think it needs a special reason.
+
+The `io_uring` api design is so simple and elegant
+that implementing the new `io_uring` library is not much more complicated than wrapping `liburing`.
+
+This has some advantages over wrapping c library,
+it have more freedom (see concurrent mod), and it can be easier to static link.
+
 ### License
 
 This project is licensed under either of
