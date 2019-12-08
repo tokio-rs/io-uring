@@ -1,4 +1,4 @@
-use std::time::{ Instant, Duration };
+use std::time::Instant;
 use linux_io_uring::{ opcode, IoUring };
 
 
@@ -140,7 +140,7 @@ fn test_timeout_early() -> anyhow::Result<()> {
     let now = Instant::now();
     io_uring.submit_and_wait(2)?;
     let t = now.elapsed();
-    assert!(t < Duration::from_secs(1));
+    assert_eq!(t.as_secs(), 1);
 
     let mut cqes = io_uring
         .completion()
@@ -152,7 +152,7 @@ fn test_timeout_early() -> anyhow::Result<()> {
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x42);
     assert_eq!(cqes[1].user_data(), 0x43);
-    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(cqes[0].result(), -libc::ETIME);
 
 
     // early then timeout
@@ -163,7 +163,6 @@ fn test_timeout_early() -> anyhow::Result<()> {
             .push(opcode::Timeout::new(&ts).build().user_data(0x42))
             .map_err(drop)
             .expect("queue is full");
-
     }
 
     let now = Instant::now();
@@ -198,7 +197,7 @@ fn test_timeout_early() -> anyhow::Result<()> {
     assert_eq!(cqes[0].user_data(), 0x42);
     assert_eq!(cqes[1].user_data(), 0x43);
     assert_eq!(cqes[2].user_data(), 0x44);
-    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(cqes[0].result(), -libc::ETIME);
     assert_eq!(cqes[2].result(), -libc::ETIME);
 
     Ok(())
