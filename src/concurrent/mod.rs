@@ -4,8 +4,7 @@ mod squeue;
 mod cqueue;
 
 use std::io;
-use std::sync::atomic;
-use crate::util::unsync_load;
+use parking_lot::Mutex;
 pub use squeue::SubmissionQueue;
 pub use cqueue::CompletionQueue;
 
@@ -13,7 +12,7 @@ pub use cqueue::CompletionQueue;
 /// Concurrent IoUring instance
 pub struct IoUring {
     ring: crate::IoUring,
-    mark: atomic::AtomicU32,
+    push_lock: Mutex<()>
 }
 
 unsafe impl Send for IoUring {}
@@ -21,11 +20,9 @@ unsafe impl Sync for IoUring {}
 
 impl IoUring {
     pub(crate) fn new(ring: crate::IoUring) -> IoUring {
-        let mark = unsafe { unsync_load(ring.sq.tail) };
-
         IoUring {
             ring,
-            mark: atomic::AtomicU32::new(mark)
+            push_lock: Mutex::new(())
         }
     }
 
@@ -57,7 +54,7 @@ impl IoUring {
     pub fn submission(&self) -> SubmissionQueue<'_> {
         SubmissionQueue {
             queue: &self.ring.sq,
-            mark: &self.mark,
+            push_lock: &self.push_lock,
             ring_mask: unsafe { self.ring.sq.ring_mask.read_volatile() },
             ring_entries: unsafe { self.ring.sq.ring_entries.read_volatile() },
         }

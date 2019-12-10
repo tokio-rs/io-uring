@@ -21,7 +21,7 @@ bindgen = [ "linux-io-uring-sys/bindgen" ]
 [dependencies]
 libc = "0.2"
 bitflags = "1"
-crossbeam-utils = "0.7"
+parking_lot = "0.10"
 
 # Avoid leaking types from -sys because it is unstable.
 linux-io-uring-sys = { version = "0.0.3", path = "linux-io-uring-sys" }

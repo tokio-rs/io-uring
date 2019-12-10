@@ -1,11 +1,12 @@
 use std::sync::atomic;
-use crossbeam_utils::Backoff;
+use parking_lot::Mutex;
+use crate::util::unsync_load;
 use crate::squeue::{ self, Entry };
 
 
 pub struct SubmissionQueue<'a> {
     pub(crate) queue: &'a squeue::SubmissionQueue,
-    pub(crate) mark: &'a atomic::AtomicU32,
+    pub(crate) push_lock: &'a Mutex<()>,
     pub(crate) ring_mask: u32,
     pub(crate) ring_entries: u32
 }
@@ -27,9 +28,9 @@ impl SubmissionQueue<'_> {
 
     pub fn len(&self) -> usize {
         let head = unsafe { (*self.queue.head).load(atomic::Ordering::Acquire) };
-        let mark = self.mark.load(atomic::Ordering::Acquire);
+        let tail = unsafe { (*self.queue.tail).load(atomic::Ordering::Acquire) };
 
-        mark.wrapping_sub(head) as usize
+        tail.wrapping_sub(head) as usize
     }
 
     pub fn is_empty(&self) -> bool {
@@ -51,32 +52,19 @@ impl SubmissionQueue<'_> {
     /// Developers must ensure that parameters of the [Entry] (such as buffer) are valid,
     /// otherwise it may cause memory problems.
     pub unsafe fn push(&self, Entry(entry): Entry) -> Result<(), Entry> {
-        // we use a mark to avoid competition.
-        let mark = loop {
-            let head = (*self.queue.head).load(atomic::Ordering::Acquire);
-            let mark = self.mark.load(atomic::Ordering::Acquire);
+        let _lock = self.push_lock.lock();
 
-            if mark.wrapping_sub(head) == self.ring_entries {
-                return Err(Entry(entry));
-            }
+        let head = (*self.queue.head).load(atomic::Ordering::Acquire);
+        let tail = unsync_load(self.queue.tail);
 
-            if self.mark.compare_and_swap(mark, mark.wrapping_add(1), atomic::Ordering::Release)
-                == mark
-            {
-                break mark;
-            }
-        };
+        if tail.wrapping_sub(head) == self.ring_entries {
+            return Err(Entry(entry));
+        }
 
-        *self.queue.sqes.add((mark & self.ring_mask) as usize)
+        *self.queue.sqes.add((tail & self.ring_mask) as usize)
             = entry;
 
-        let backoff = Backoff::new();
-        let new_tail = mark.wrapping_add(1);
-        while (*self.queue.tail).compare_and_swap(mark, new_tail, atomic::Ordering::Release)
-            != mark
-        {
-            backoff.snooze();
-        }
+        (*self.queue.tail).store(tail.wrapping_add(1), atomic::Ordering::Release);
 
         Ok(())
     }

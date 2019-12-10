@@ -1,6 +1,6 @@
 use std::mem::MaybeUninit;
 use loom::cell::CausalCell;
-use loom::sync::atomic;
+use loom::sync::{ atomic, Mutex };
 
 const LENGTH: u32 = 8;
 const MASK: u32 = LENGTH - 1;
@@ -10,7 +10,7 @@ pub struct Ring<T> {
     buf: Box<[CausalCell<MaybeUninit<T>>]>,
     head: atomic::AtomicU32,
     tail: atomic::AtomicU32,
-    mark: atomic::AtomicU32
+    push_lock: Mutex<()>
 }
 
 impl<T: Copy> Ring<T> {
@@ -25,36 +25,25 @@ impl<T: Copy> Ring<T> {
             buf: buf.into_boxed_slice(),
             head: atomic::AtomicU32::new(0),
             tail: atomic::AtomicU32::new(0),
-            mark: atomic::AtomicU32::new(0)
+            push_lock: Mutex::new(())
         }
     }
 
     pub fn push(&self, t: T) -> Result<(), T> {
-        let mark = loop {
-            let head = self.head.load(atomic::Ordering::Acquire);
-            let mark = self.mark.load(atomic::Ordering::Acquire);
+        let _lock = self.push_lock.lock().unwrap();
+        let head = self.head.load(atomic::Ordering::Acquire);
+        let tail = unsafe { self.tail.unsync_load() };
 
-            if mark.wrapping_sub(head) == LENGTH {
-                return Err(t);
-            }
-
-            if self.mark.compare_and_swap(mark, mark.wrapping_add(1), atomic::Ordering::Release)
-                == mark
-            {
-                break mark;
-            }
-        };
+        if tail.wrapping_sub(head) == LENGTH {
+            return Err(t);
+        }
 
         unsafe {
-            self.buf[(mark & MASK) as usize]
+            self.buf[(tail & MASK) as usize]
                 .with_mut(|p| (*p).as_mut_ptr().write(t));
         }
 
-        while self.tail.compare_and_swap(mark, mark.wrapping_add(1), atomic::Ordering::Release)
-            != mark
-        {
-            atomic::spin_loop_hint();
-        }
+        self.tail.store(tail.wrapping_add(1), atomic::Ordering::Release);
 
         Ok(())
     }
