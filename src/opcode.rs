@@ -5,6 +5,7 @@
 use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 use crate::squeue::Entry;
+use crate::util::sqe_zeroed;
 
 pub use sys::__kernel_timespec as Timespec;
 
@@ -33,6 +34,8 @@ macro_rules! opcode {
                 $opt_field:ident : $opt_tname:ty = $default:expr
             ),* $(,)?
         }
+
+        pub fn build($self:ident) -> Entry $build_block:block
     ) => {
         $( #[$outer] )*
         pub struct $name {
@@ -56,6 +59,8 @@ macro_rules! opcode {
                     self
                 }
             )*
+
+            pub fn build($self) -> Entry $build_block
         }
     }
 }
@@ -75,6 +80,14 @@ opcode!(
     /// This is useful for testing the performance of the io_uring implementation itself.
     #[derive(Debug)]
     pub struct Nop { ;; }
+
+    pub fn build(self) -> Entry {
+        let Nop {} = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_NOP as _;
+        Entry(sqe)
+    }
 );
 
 opcode!(
@@ -92,6 +105,24 @@ opcode!(
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2 (2)` man page.
         rw_flags: i32 = 0
+    }
+
+    pub fn build(self) -> Entry {
+        let Readv {
+            fd,
+            iovec, len, offset,
+            ioprio, rw_flags
+        } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_READV as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.addr = iovec as _;
+        sqe.len = len;
+        sqe.off = offset as _;
+        sqe.__bindgen_anon_1.rw_flags = rw_flags;
+        Entry(sqe)
     }
 );
 
@@ -111,6 +142,24 @@ opcode!(
         /// as described in the `preadv2 (2)` man page.
         rw_flags: i32 = 0
     }
+
+    pub fn build(self) -> Entry {
+        let Writev {
+            fd,
+            iovec, len, offset,
+            ioprio, rw_flags
+        } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_WRITEV as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.addr = iovec as _;
+        sqe.len = len;
+        sqe.off = offset as _;
+        sqe.__bindgen_anon_1.rw_flags = rw_flags;
+        Entry(sqe)
+    }
 );
 
 opcode!(
@@ -126,6 +175,16 @@ opcode!(
         /// or `IORING_FSYNC_DATASYNC` to provide data sync only semantics.
         /// See the descriptions of `O_SYNC` and `O_DSYNC` in the `open (2)` manual page for more information.
         flags: u32 = 0
+    }
+
+    pub fn build(self) -> Entry {
+        let Fsync { fd, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_FSYNC as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.fsync_flags = flags;
+        Entry(sqe)
     }
 );
 
@@ -148,6 +207,26 @@ opcode!(
         /// as described in the `preadv2 (2)` man page.
         rw_flags: i32 = 0
     }
+
+    pub fn build(self) -> Entry {
+        let ReadFixed {
+            fd,
+            buf, len, offset,
+            buf_index,
+            ioprio, rw_flags
+        } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_READ_FIXED as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.addr = buf as _;
+        sqe.len = len;
+        sqe.off = offset as _;
+        sqe.__bindgen_anon_1.rw_flags = rw_flags;
+        sqe.__bindgen_anon_2.buf_index = buf_index;
+        Entry(sqe)
+    }
 );
 
 opcode!(
@@ -169,6 +248,26 @@ opcode!(
         /// as described in the `preadv2 (2)` man page.
         rw_flags: i32 = 0
     }
+
+    pub fn build(self) -> Entry {
+        let WriteFixed {
+            fd,
+            buf, len, offset,
+            buf_index,
+            ioprio, rw_flags
+        } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_WRITE_FIXED as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.addr = buf as _;
+        sqe.len = len;
+        sqe.off = offset as _;
+        sqe.__bindgen_anon_1.rw_flags = rw_flags;
+        sqe.__bindgen_anon_2.buf_index = buf_index;
+        Entry(sqe)
+    }
 );
 
 opcode!(
@@ -184,6 +283,16 @@ opcode!(
         flags: i16,
         ;;
     }
+
+    pub fn build(self) -> Entry {
+        let PollAdd { fd, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_POLL_ADD as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.poll_events = flags as _;
+        Entry(sqe)
+    }
 );
 
 opcode!(
@@ -195,6 +304,15 @@ opcode!(
     pub struct PollRemove {
         user_data: u64
         ;;
+    }
+
+    pub fn build(self) -> Entry {
+        let PollRemove { user_data } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_POLL_REMOVE as _;
+        sqe.addr = user_data as _;
+        Entry(sqe)
     }
 );
 
@@ -212,6 +330,22 @@ opcode!(
         /// the flags method holds the flags for the command
         flags: u32 = 0
     }
+
+    pub fn build(self) -> Entry {
+        let SyncFileRange {
+            fd,
+            len, offset,
+            flags
+        } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_SYNC_FILE_RANGE as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.len = len;
+        sqe.off = offset as _;
+        sqe.__bindgen_anon_1.sync_range_flags = flags;
+        Entry(sqe)
+    }
 );
 
 opcode!(
@@ -228,6 +362,19 @@ opcode!(
         ioprio: u16 = 0,
         flags: u32 = 0
     }
+
+    pub fn build(self) -> Entry {
+        let SendMsg { fd, msg, ioprio, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_SENDMSG as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.addr = msg as _;
+        sqe.len = 1;
+        sqe.__bindgen_anon_1.msg_flags = flags;
+        Entry(sqe)
+    }
 );
 
 opcode!(
@@ -241,6 +388,19 @@ opcode!(
         ;;
         ioprio: u16 = 0,
         flags: u32 = 0
+    }
+
+    pub fn build(self) -> Entry {
+        let RecvMsg { fd, msg, ioprio, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_RECVMSG as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.addr = msg as _;
+        sqe.len = 1;
+        sqe.__bindgen_anon_1.msg_flags = flags;
+        Entry(sqe)
     }
 );
 
@@ -263,192 +423,7 @@ opcode!(
         /// `flags` may contain `IORING_TIMEOUT_ABS` for an absolutel timeout value, or 0 for a relative timeout.
         flags: u32 = 0
     }
-);
 
-/// inline zeroed to improve codegen
-#[inline(always)]
-fn sqe_zeroed() -> sys::io_uring_sqe {
-    unsafe { std::mem::zeroed() }
-}
-
-impl Nop {
-    pub fn build(self) -> Entry {
-        let Nop {} = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_NOP as _;
-        Entry(sqe)
-    }
-}
-
-impl Readv {
-    pub fn build(self) -> Entry {
-        let Readv {
-            fd,
-            iovec, len, offset,
-            ioprio, rw_flags
-        } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_READV as _;
-        assign_fd!(sqe.fd = fd);
-        sqe.ioprio = ioprio;
-        sqe.addr = iovec as _;
-        sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.rw_flags = rw_flags;
-        Entry(sqe)
-    }
-}
-
-impl Writev {
-    pub fn build(self) -> Entry {
-        let Writev {
-            fd,
-            iovec, len, offset,
-            ioprio, rw_flags
-        } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_WRITEV as _;
-        assign_fd!(sqe.fd = fd);
-        sqe.ioprio = ioprio;
-        sqe.addr = iovec as _;
-        sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.rw_flags = rw_flags;
-        Entry(sqe)
-    }
-}
-
-impl Fsync {
-    pub fn build(self) -> Entry {
-        let Fsync { fd, flags } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_FSYNC as _;
-        assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_1.fsync_flags = flags;
-        Entry(sqe)
-    }
-}
-
-impl ReadFixed {
-    pub fn build(self) -> Entry {
-        let ReadFixed {
-            fd,
-            buf, len, offset,
-            buf_index,
-            ioprio, rw_flags
-        } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_READ_FIXED as _;
-        assign_fd!(sqe.fd = fd);
-        sqe.ioprio = ioprio;
-        sqe.addr = buf as _;
-        sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.rw_flags = rw_flags;
-        sqe.__bindgen_anon_2.buf_index = buf_index;
-        Entry(sqe)
-    }
-}
-
-impl WriteFixed {
-    pub fn build(self) -> Entry {
-        let WriteFixed {
-            fd,
-            buf, len, offset,
-            buf_index,
-            ioprio, rw_flags
-        } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_WRITE_FIXED as _;
-        assign_fd!(sqe.fd = fd);
-        sqe.ioprio = ioprio;
-        sqe.addr = buf as _;
-        sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.rw_flags = rw_flags;
-        sqe.__bindgen_anon_2.buf_index = buf_index;
-        Entry(sqe)
-    }
-}
-
-impl PollAdd {
-    pub fn build(self) -> Entry {
-        let PollAdd { fd, flags } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_POLL_ADD as _;
-        assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_1.poll_events = flags as _;
-        Entry(sqe)
-    }
-}
-
-impl PollRemove {
-    pub fn build(self) -> Entry {
-        let PollRemove { user_data } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_POLL_REMOVE as _;
-        sqe.addr = user_data as _;
-        Entry(sqe)
-    }
-}
-
-impl SyncFileRange {
-    pub fn build(self) -> Entry {
-        let SyncFileRange {
-            fd,
-            len, offset,
-            flags
-        } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_SYNC_FILE_RANGE as _;
-        assign_fd!(sqe.fd = fd);
-        sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.sync_range_flags = flags;
-        Entry(sqe)
-    }
-}
-
-impl SendMsg {
-    pub fn build(self) -> Entry {
-        let SendMsg { fd, msg, ioprio, flags } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_SENDMSG as _;
-        assign_fd!(sqe.fd = fd);
-        sqe.ioprio = ioprio;
-        sqe.addr = msg as _;
-        sqe.len = 1;
-        sqe.__bindgen_anon_1.msg_flags = flags;
-        Entry(sqe)
-    }
-}
-
-impl RecvMsg {
-    pub fn build(self) -> Entry {
-        let RecvMsg { fd, msg, ioprio, flags } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_RECVMSG as _;
-        assign_fd!(sqe.fd = fd);
-        sqe.ioprio = ioprio;
-        sqe.addr = msg as _;
-        sqe.len = 1;
-        sqe.__bindgen_anon_1.msg_flags = flags;
-        Entry(sqe)
-    }
-}
-
-impl Timeout {
     pub fn build(self) -> Entry {
         let Timeout { timespec, count, flags } = self;
 
@@ -460,4 +435,4 @@ impl Timeout {
         sqe.__bindgen_anon_1.timeout_flags = flags;
         Entry(sqe)
     }
-}
+);

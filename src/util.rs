@@ -2,6 +2,7 @@ use std::{ io, ptr, mem };
 use std::sync::atomic;
 use std::convert::TryFrom;
 use std::os::unix::io::{ AsRawFd, IntoRawFd, FromRawFd, RawFd };
+use linux_io_uring_sys as sys;
 
 
 #[doc(hidden)]
@@ -102,4 +103,10 @@ impl Drop for Fd {
 
 pub unsafe fn unsync_load(u: *const atomic::AtomicU32) -> u32 {
     u.cast::<u32>().read()
+}
+
+/// inline zeroed to improve codegen
+#[inline(always)]
+pub fn sqe_zeroed() -> sys::io_uring_sqe {
+    unsafe { std::mem::zeroed() }
 }

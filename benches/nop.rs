@@ -46,6 +46,11 @@ fn bench_normal(c: &mut Criterion) {
     });
 }
 
+
+#[cfg(not(feature = "concurrent"))]
+fn bench_concurrent(_: &mut Criterion) {}
+
+#[cfg(feature = "concurrent")]
 fn bench_concurrent(c: &mut Criterion) {
     let io_uring = IoUring::new(16).unwrap();
     let io_uring = io_uring.concurrent();
