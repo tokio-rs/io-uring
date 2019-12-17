@@ -1,3 +1,5 @@
+#![cfg(feature = "concurrent")]
+
 use std::thread;
 use std::sync::Arc;
 use std::io::{ self, Read };

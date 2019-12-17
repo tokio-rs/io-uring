@@ -26,21 +26,23 @@ fn test_full() -> anyhow::Result<()> {
     io_uring.submit()?;
 
 
-    // concurrent squeue full
-    let io_uring = io_uring.concurrent();
-    let queue = io_uring.submission();
+    #[cfg(feature = "concurrent")] {
+        // concurrent squeue full
+        let io_uring = io_uring.concurrent();
+        let queue = io_uring.submission();
 
-    assert!(queue.is_empty());
+        assert!(queue.is_empty());
 
-    for _ in 0..queue.capacity() {
-        unsafe {
-            queue.push(opcode::Nop::new().build())
-                .map_err(drop)
-                .expect("queue is full");
+        for _ in 0..queue.capacity() {
+            unsafe {
+                queue.push(opcode::Nop::new().build())
+                    .map_err(drop)
+                    .expect("queue is full");
+            }
         }
-    }
 
-    assert!(queue.is_full());
+        assert!(queue.is_full());
+    }
 
     Ok(())
 }

@@ -8,6 +8,8 @@ mod register;
 pub mod squeue;
 pub mod cqueue;
 pub mod opcode;
+
+#[cfg(feature = "concurrent")]
 pub mod concurrent;
 
 use std::{ io, ptr, cmp, mem };
@@ -206,6 +208,7 @@ impl IoUring {
     }
 
     /// Make a concurrent IoUring.
+    #[cfg(feature = "concurrent")]
     pub fn concurrent(self) -> concurrent::IoUring {
         concurrent::IoUring::new(self)
     }
