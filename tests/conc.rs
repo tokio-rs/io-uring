@@ -3,6 +3,7 @@
 use std::thread;
 use std::sync::Arc;
 use std::io::{ self, Read };
+use std::time::{ Duration, Instant };
 use std::os::unix::io::AsRawFd;
 use tempfile::tempfile;
 use linux_io_uring::{ opcode, IoUring };
@@ -92,7 +93,7 @@ fn test_fs() -> anyhow::Result<()> {
 }
 
 #[test]
-fn push_then_conc() -> anyhow::Result<()> {
+fn test_push_then_conc() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(2)?;
 
     unsafe {
@@ -120,6 +121,36 @@ fn push_then_conc() -> anyhow::Result<()> {
     }
 
     assert_eq!(io_uring.submission().len(), 2);
+
+    Ok(())
+}
+
+#[test]
+fn test_nop_notify() -> anyhow::Result<()> {
+    let io_uring = Arc::new(IoUring::new(1)?.concurrent());
+    let io_uring2 = io_uring.clone();
+
+    let now = Instant::now();
+
+    let handle = thread::spawn(move || {
+        thread::sleep(Duration::from_secs(1));
+        unsafe {
+            io_uring2.submission()
+                .push(opcode::Nop::new().build())
+                .map_err(drop)
+                .expect("queue is full");
+            io_uring2.submit()?;
+        }
+
+        Ok(()) as anyhow::Result<()>
+    });
+
+    io_uring.submit_and_wait(1)?;
+
+    let t = now.elapsed();
+    assert_eq!(t.as_secs(), 1);
+
+    handle.join().unwrap()?;
 
     Ok(())
 }
