@@ -12,7 +12,7 @@ pub struct SubmissionQueue {
     pub(crate) tail: *const atomic::AtomicU32,
     pub(crate) ring_mask: *const u32,
     pub(crate) ring_entries: *const u32,
-    flags: *const atomic::AtomicU32,
+    pub(crate) flags: *const atomic::AtomicU32,
     dropped: *const atomic::AtomicU32,
 
     #[allow(dead_code)]

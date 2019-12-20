@@ -8,16 +8,18 @@ mod register;
 pub mod squeue;
 pub mod cqueue;
 pub mod opcode;
+pub mod submit;
 
 #[cfg(feature = "concurrent")]
 pub mod concurrent;
 
-use std::{ io, ptr, cmp, mem };
+use std::{ io, cmp, mem };
 use std::convert::TryInto;
 use std::os::unix::io::{ AsRawFd, RawFd };
 use std::mem::ManuallyDrop;
 use linux_io_uring_sys as sys;
 use util::{ Fd, Mmap };
+pub use submit::Submitter;
 pub use squeue::SubmissionQueue;
 pub use cqueue::CompletionQueue;
 pub use register::{ register as reg, unregister as unreg };
@@ -117,30 +119,20 @@ impl IoUring {
         })
     }
 
-    /// Register files or user buffers for asynchronous I/O.
-    pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
-        let (opcode, arg, len) = target.export();
+    const fn as_submit(&self) -> Submitter<'_> {
+        Submitter::new(&self.fd, self.flags, &self.sq)
+    }
 
-        unsafe {
-            if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
-               Ok(())
-            } else {
-               Err(io::Error::last_os_error())
-            }
-        }
+    /// Register files or user buffers for asynchronous I/O.
+    #[inline]
+    pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
+        self.as_submit().register(target)
     }
 
     /// Unregister files or user buffers for asynchronous I/O.
+    #[inline]
     pub fn unregister(&self, target: unreg::Target) -> io::Result<()> {
-        let opcode = target.opcode();
-
-        unsafe {
-             if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, ptr::null(), 0) {
-                Ok(())
-             } else {
-                Err(io::Error::last_os_error())
-             }
-        }
+        self.as_submit().unregister(target)
     }
 
     /// Initiate and/or complete asynchronous I/O
@@ -148,53 +140,31 @@ impl IoUring {
     /// # Safety
     ///
     /// This provides a raw interface so developer must ensure that parameters are correct.
+    #[inline]
     pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
         -> io::Result<usize>
     {
-        let sig = sig.map(|sig| sig as *const _).unwrap_or_else(ptr::null);
-        let result = sys::io_uring_enter(self.fd.as_raw_fd(), to_submit, min_complete, flag, sig);
-        if result >= 0 {
-            Ok(result as _)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        self.as_submit().enter(to_submit, min_complete, flag, sig)
     }
 
     /// Initiate asynchronous I/O.
     #[inline]
     pub fn submit(&self) -> io::Result<usize> {
-        self.submit_and_wait(0)
+        self.as_submit().submit()
     }
 
     /// Initiate and/or complete asynchronous I/O
+    #[inline]
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
-        let len = self.sq.len();
-
-        let mut flags = 0;
-
-        if want > 0 {
-            flags |= sys::IORING_ENTER_GETEVENTS;
-        }
-
-        if self.flags & sys::IORING_SETUP_SQPOLL != 0 {
-            if self.sq.need_wakeup() {
-                flags |= sys::IORING_ENTER_SQ_WAKEUP;
-            } else if want == 0 {
-                // fast poll
-                return Ok(len)
-            }
-        }
-
-        unsafe {
-            self.enter(len as _, want as _, flags, None)
-        }
+        self.as_submit().submit_and_wait(want)
     }
 
-    /// Get submission queue and completion queue
-    pub fn submission_and_completion(&mut self)
-        -> (&mut SubmissionQueue, &mut CompletionQueue)
+    /// Get submitter and submission queue and completion queue
+    pub fn split(&mut self)
+        -> (Submitter<'_>, &mut SubmissionQueue, &mut CompletionQueue)
     {
-        (&mut self.sq, &mut self.cq)
+        let submit = Submitter::new(&self.fd, self.flags, &self.sq);
+        (submit, &mut self.sq, &mut self.cq)
     }
 
     /// Get submission queue
