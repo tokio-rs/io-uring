@@ -2,16 +2,21 @@ use std::time::Instant;
 use linux_io_uring::{ opcode, IoUring };
 
 
+const TS1: opcode::Timespec = opcode::Timespec {
+    tv_sec: 1,
+    tv_nsec: 0
+};
+
+const TS2: opcode::Timespec = opcode::Timespec {
+    tv_sec: 2,
+    tv_nsec: 0
+};
+
 #[test]
 fn test_timeout() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(1)?;
 
-    let ts = opcode::Timespec {
-        tv_sec: 1,
-        tv_nsec: 0
-    };
-
-    let entry = opcode::Timeout::new(&ts);
+    let entry = opcode::Timeout::new(&TS1);
     unsafe {
         io_uring
             .submission()
@@ -42,13 +47,8 @@ fn test_timeout() -> anyhow::Result<()> {
 fn test_timeout_want() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(4)?;
 
-    let ts = opcode::Timespec {
-        tv_sec: 1,
-        tv_nsec: 0
-    };
-
     // want many but timeout
-    let entry = opcode::Timeout::new(&ts);
+    let entry = opcode::Timeout::new(&TS1);
     unsafe {
         io_uring
             .submission()
@@ -77,7 +77,7 @@ fn test_timeout_want() -> anyhow::Result<()> {
     // want event buf timeout
     let (rp, _wp) = nix::unistd::pipe()?; // just test, we don't close
 
-    let entry = opcode::Timeout::new(&ts);
+    let entry = opcode::Timeout::new(&TS1);
     unsafe {
         io_uring
             .submission()
@@ -121,15 +121,10 @@ fn test_timeout_want() -> anyhow::Result<()> {
 fn test_timeout_early() -> anyhow::Result<()> {
     let mut io_uring = IoUring::new(4)?;
 
-    let ts = opcode::Timespec {
-        tv_sec: 1,
-        tv_nsec: 0
-    };
-
     // early
     unsafe {
         let mut sq = io_uring.submission().available();
-        sq.push(opcode::Timeout::new(&ts).build().user_data(0x42))
+        sq.push(opcode::Timeout::new(&TS1).build().user_data(0x42))
             .map_err(drop)
             .expect("queue is full");
         sq.push(opcode::Nop::new().build().user_data(0x43))
@@ -160,20 +155,21 @@ fn test_timeout_early() -> anyhow::Result<()> {
         io_uring
             .submission()
             .available()
-            .push(opcode::Timeout::new(&ts).build().user_data(0x42))
+            .push(opcode::Timeout::new(&TS1).build().user_data(0x42))
             .map_err(drop)
             .expect("queue is full");
     }
 
     let now = Instant::now();
     io_uring.submit()?;
+    assert_eq!(io_uring.completion().len(), 0);
 
     unsafe {
         let mut sq = io_uring.submission().available();
         sq.push(opcode::Nop::new().build().user_data(0x43))
             .map_err(drop)
             .expect("queue is full");
-        sq.push(opcode::Timeout::new(&ts).build().user_data(0x44))
+        sq.push(opcode::Timeout::new(&TS1).build().user_data(0x44))
             .map_err(drop)
             .expect("queue is full");
     }
@@ -199,6 +195,118 @@ fn test_timeout_early() -> anyhow::Result<()> {
     assert_eq!(cqes[2].user_data(), 0x44);
     assert_eq!(cqes[0].result(), -libc::ETIME);
     assert_eq!(cqes[2].result(), -libc::ETIME);
+
+    Ok(())
+}
+
+#[test]
+fn test_timeout_park() -> anyhow::Result<()> {
+    let mut io_uring = IoUring::new(4)?;
+
+    unsafe {
+        let mut sq = io_uring.submission().available();
+        sq.push(opcode::Nop::new().build().user_data(0x42))
+            .map_err(drop)
+            .expect("queue is full");
+        sq.push(opcode::Timeout::new(&TS1).build().user_data(0x43))
+            .map_err(drop)
+            .expect("queue is full");
+    }
+
+    let now = Instant::now();
+    io_uring.submit_and_wait(1)?;
+    let t = now.elapsed();
+    assert_eq!(t.as_secs(), 0);
+
+    let cqes = io_uring
+        .completion()
+        .available()
+        .cloned()
+        .collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x42);
+
+    io_uring.submit_and_wait(1)?;
+    let t = now.elapsed();
+    assert_eq!(t.as_secs(), 1);
+
+    let cqes = io_uring
+        .completion()
+        .available()
+        .cloned()
+        .collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x43);
+    assert_eq!(cqes[0].result(), -libc::ETIME);
+
+    Ok(())
+}
+
+#[test]
+fn test_timeout_park2() -> anyhow::Result<()> {
+    let mut io_uring = IoUring::new(4)?;
+
+    unsafe {
+        let mut sq = io_uring.submission().available();
+        sq.push(opcode::Nop::new().build().user_data(0x42))
+            .map_err(drop)
+            .expect("queue is full");
+        sq.push(opcode::Timeout::new(&TS1).build().user_data(0x43))
+            .map_err(drop)
+            .expect("queue is full");
+    }
+
+    let now = Instant::now();
+    io_uring.submit_and_wait(1)?;
+    let t = now.elapsed();
+    assert_eq!(t.as_secs(), 0);
+
+    let cqes = io_uring
+        .completion()
+        .available()
+        .cloned()
+        .collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x42);
+
+    unsafe {
+        let mut sq = io_uring.submission().available();
+        sq.push(opcode::Timeout::new(&TS2).build().user_data(0x44))
+            .map_err(drop)
+            .expect("queue is full");
+    }
+
+    let now2 = Instant::now();
+    io_uring.submit_and_wait(1)?;
+    let t = now.elapsed();
+    assert_eq!(t.as_secs(), 1);
+
+    let cqes = io_uring
+        .completion()
+        .available()
+        .cloned()
+        .collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x43);
+    assert_eq!(cqes[0].result(), -libc::ETIME);
+
+
+    io_uring.submit_and_wait(1)?;
+    let t = now2.elapsed();
+    assert_eq!(t.as_secs(), 2);
+
+    let cqes = io_uring
+        .completion()
+        .available()
+        .cloned()
+        .collect::<Vec<_>>();
+
+    assert_eq!(cqes[0].user_data(), 0x44);
+    assert_eq!(cqes[0].result(), -libc::ETIME);
 
     Ok(())
 }
