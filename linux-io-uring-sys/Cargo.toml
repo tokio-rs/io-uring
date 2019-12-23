@@ -1,6 +1,6 @@
 [package]
 name = "linux-io-uring-sys"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -19,4 +19,4 @@ overwrite = [ "bindgen" ]
 libc = "0.2"
 
 [build-dependencies]
-bindgen = { version = "0.51", optional = true }
+bindgen = { version = "0.52", optional = true }

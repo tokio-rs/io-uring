@@ -6,22 +6,13 @@ pub const __NR_io_uring_register: u32 = 427;
 pub const IOSQE_FIXED_FILE: u32 = 1;
 pub const IOSQE_IO_DRAIN: u32 = 2;
 pub const IOSQE_IO_LINK: u32 = 4;
+pub const IOSQE_IO_HARDLINK: u32 = 8;
 pub const IORING_SETUP_IOPOLL: u32 = 1;
 pub const IORING_SETUP_SQPOLL: u32 = 2;
 pub const IORING_SETUP_SQ_AFF: u32 = 4;
-pub const IORING_OP_NOP: u32 = 0;
-pub const IORING_OP_READV: u32 = 1;
-pub const IORING_OP_WRITEV: u32 = 2;
-pub const IORING_OP_FSYNC: u32 = 3;
-pub const IORING_OP_READ_FIXED: u32 = 4;
-pub const IORING_OP_WRITE_FIXED: u32 = 5;
-pub const IORING_OP_POLL_ADD: u32 = 6;
-pub const IORING_OP_POLL_REMOVE: u32 = 7;
-pub const IORING_OP_SYNC_FILE_RANGE: u32 = 8;
-pub const IORING_OP_SENDMSG: u32 = 9;
-pub const IORING_OP_RECVMSG: u32 = 10;
-pub const IORING_OP_TIMEOUT: u32 = 11;
+pub const IORING_SETUP_CQSIZE: u32 = 8;
 pub const IORING_FSYNC_DATASYNC: u32 = 1;
+pub const IORING_TIMEOUT_ABS: u32 = 1;
 pub const IORING_OFF_SQ_RING: u32 = 0;
 pub const IORING_OFF_CQ_RING: u32 = 134217728;
 pub const IORING_OFF_SQES: u32 = 268435456;
@@ -29,12 +20,15 @@ pub const IORING_SQ_NEED_WAKEUP: u32 = 1;
 pub const IORING_ENTER_GETEVENTS: u32 = 1;
 pub const IORING_ENTER_SQ_WAKEUP: u32 = 2;
 pub const IORING_FEAT_SINGLE_MMAP: u32 = 1;
+pub const IORING_FEAT_NODROP: u32 = 2;
+pub const IORING_FEAT_SUBMIT_STABLE: u32 = 4;
 pub const IORING_REGISTER_BUFFERS: u32 = 0;
 pub const IORING_UNREGISTER_BUFFERS: u32 = 1;
 pub const IORING_REGISTER_FILES: u32 = 2;
 pub const IORING_UNREGISTER_FILES: u32 = 3;
 pub const IORING_REGISTER_EVENTFD: u32 = 4;
 pub const IORING_UNREGISTER_EVENTFD: u32 = 5;
+pub const IORING_REGISTER_FILES_UPDATE: u32 = 6;
 pub type __u8 = libc::c_uchar;
 pub type __u16 = libc::c_ushort;
 pub type __s32 = libc::c_int;
@@ -88,108 +82,52 @@ pub struct io_uring_sqe {
     pub flags: __u8,
     pub ioprio: __u16,
     pub fd: __s32,
-    pub off: __u64,
+    pub __bindgen_anon_1: io_uring_sqe__bindgen_ty_1,
     pub addr: __u64,
     pub len: __u32,
-    pub __bindgen_anon_1: io_uring_sqe__bindgen_ty_1,
-    pub user_data: __u64,
     pub __bindgen_anon_2: io_uring_sqe__bindgen_ty_2,
+    pub user_data: __u64,
+    pub __bindgen_anon_3: io_uring_sqe__bindgen_ty_3,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union io_uring_sqe__bindgen_ty_1 {
-    pub rw_flags: __kernel_rwf_t,
-    pub fsync_flags: __u32,
-    pub poll_events: __u16,
-    pub sync_range_flags: __u32,
-    pub msg_flags: __u32,
-    pub timeout_flags: __u32,
-    _bindgen_union_align: u32,
+    pub off: __u64,
+    pub addr2: __u64,
+    _bindgen_union_align: u64,
 }
 #[test]
 fn bindgen_test_layout_io_uring_sqe__bindgen_ty_1() {
     assert_eq!(
         ::core::mem::size_of::<io_uring_sqe__bindgen_ty_1>(),
-        4usize,
+        8usize,
         concat!("Size of: ", stringify!(io_uring_sqe__bindgen_ty_1))
     );
     assert_eq!(
         ::core::mem::align_of::<io_uring_sqe__bindgen_ty_1>(),
-        4usize,
+        8usize,
         concat!("Alignment of ", stringify!(io_uring_sqe__bindgen_ty_1))
     );
     assert_eq!(
-        unsafe {
-            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_1>())).rw_flags as *const _ as usize
-        },
+        unsafe { &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_1>())).off as *const _ as usize },
         0usize,
         concat!(
             "Offset of field: ",
             stringify!(io_uring_sqe__bindgen_ty_1),
             "::",
-            stringify!(rw_flags)
+            stringify!(off)
         )
     );
     assert_eq!(
         unsafe {
-            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_1>())).fsync_flags as *const _ as usize
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_1>())).addr2 as *const _ as usize
         },
         0usize,
         concat!(
             "Offset of field: ",
             stringify!(io_uring_sqe__bindgen_ty_1),
             "::",
-            stringify!(fsync_flags)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_1>())).poll_events as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(io_uring_sqe__bindgen_ty_1),
-            "::",
-            stringify!(poll_events)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_1>())).sync_range_flags as *const _
-                as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(io_uring_sqe__bindgen_ty_1),
-            "::",
-            stringify!(sync_range_flags)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_1>())).msg_flags as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(io_uring_sqe__bindgen_ty_1),
-            "::",
-            stringify!(msg_flags)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_1>())).timeout_flags as *const _
-                as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(io_uring_sqe__bindgen_ty_1),
-            "::",
-            stringify!(timeout_flags)
+            stringify!(addr2)
         )
     );
 }
@@ -201,48 +139,179 @@ impl Default for io_uring_sqe__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union io_uring_sqe__bindgen_ty_2 {
-    pub buf_index: __u16,
-    pub __pad2: [__u64; 3usize],
-    _bindgen_union_align: [u64; 3usize],
+    pub rw_flags: __kernel_rwf_t,
+    pub fsync_flags: __u32,
+    pub poll_events: __u16,
+    pub sync_range_flags: __u32,
+    pub msg_flags: __u32,
+    pub timeout_flags: __u32,
+    pub accept_flags: __u32,
+    pub cancel_flags: __u32,
+    _bindgen_union_align: u32,
 }
 #[test]
 fn bindgen_test_layout_io_uring_sqe__bindgen_ty_2() {
     assert_eq!(
         ::core::mem::size_of::<io_uring_sqe__bindgen_ty_2>(),
-        24usize,
+        4usize,
         concat!("Size of: ", stringify!(io_uring_sqe__bindgen_ty_2))
     );
     assert_eq!(
         ::core::mem::align_of::<io_uring_sqe__bindgen_ty_2>(),
-        8usize,
+        4usize,
         concat!("Alignment of ", stringify!(io_uring_sqe__bindgen_ty_2))
     );
     assert_eq!(
         unsafe {
-            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).buf_index as *const _ as usize
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).rw_flags as *const _ as usize
         },
         0usize,
         concat!(
             "Offset of field: ",
             stringify!(io_uring_sqe__bindgen_ty_2),
+            "::",
+            stringify!(rw_flags)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).fsync_flags as *const _ as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_2),
+            "::",
+            stringify!(fsync_flags)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).poll_events as *const _ as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_2),
+            "::",
+            stringify!(poll_events)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).sync_range_flags as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_2),
+            "::",
+            stringify!(sync_range_flags)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).msg_flags as *const _ as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_2),
+            "::",
+            stringify!(msg_flags)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).timeout_flags as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_2),
+            "::",
+            stringify!(timeout_flags)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).accept_flags as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_2),
+            "::",
+            stringify!(accept_flags)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).cancel_flags as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_2),
+            "::",
+            stringify!(cancel_flags)
+        )
+    );
+}
+impl Default for io_uring_sqe__bindgen_ty_2 {
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union io_uring_sqe__bindgen_ty_3 {
+    pub buf_index: __u16,
+    pub __pad2: [__u64; 3usize],
+    _bindgen_union_align: [u64; 3usize],
+}
+#[test]
+fn bindgen_test_layout_io_uring_sqe__bindgen_ty_3() {
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_sqe__bindgen_ty_3>(),
+        24usize,
+        concat!("Size of: ", stringify!(io_uring_sqe__bindgen_ty_3))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_sqe__bindgen_ty_3>(),
+        8usize,
+        concat!("Alignment of ", stringify!(io_uring_sqe__bindgen_ty_3))
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_3>())).buf_index as *const _ as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_3),
             "::",
             stringify!(buf_index)
         )
     );
     assert_eq!(
         unsafe {
-            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_2>())).__pad2 as *const _ as usize
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_3>())).__pad2 as *const _ as usize
         },
         0usize,
         concat!(
             "Offset of field: ",
-            stringify!(io_uring_sqe__bindgen_ty_2),
+            stringify!(io_uring_sqe__bindgen_ty_3),
             "::",
             stringify!(__pad2)
         )
     );
 }
-impl Default for io_uring_sqe__bindgen_ty_2 {
+impl Default for io_uring_sqe__bindgen_ty_3 {
     fn default() -> Self {
         unsafe { ::core::mem::zeroed() }
     }
@@ -300,16 +369,6 @@ fn bindgen_test_layout_io_uring_sqe() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::core::ptr::null::<io_uring_sqe>())).off as *const _ as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(io_uring_sqe),
-            "::",
-            stringify!(off)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::core::ptr::null::<io_uring_sqe>())).addr as *const _ as usize },
         16usize,
         concat!(
@@ -345,6 +404,25 @@ impl Default for io_uring_sqe {
         unsafe { ::core::mem::zeroed() }
     }
 }
+pub const IORING_OP_NOP: _bindgen_ty_4 = 0;
+pub const IORING_OP_READV: _bindgen_ty_4 = 1;
+pub const IORING_OP_WRITEV: _bindgen_ty_4 = 2;
+pub const IORING_OP_FSYNC: _bindgen_ty_4 = 3;
+pub const IORING_OP_READ_FIXED: _bindgen_ty_4 = 4;
+pub const IORING_OP_WRITE_FIXED: _bindgen_ty_4 = 5;
+pub const IORING_OP_POLL_ADD: _bindgen_ty_4 = 6;
+pub const IORING_OP_POLL_REMOVE: _bindgen_ty_4 = 7;
+pub const IORING_OP_SYNC_FILE_RANGE: _bindgen_ty_4 = 8;
+pub const IORING_OP_SENDMSG: _bindgen_ty_4 = 9;
+pub const IORING_OP_RECVMSG: _bindgen_ty_4 = 10;
+pub const IORING_OP_TIMEOUT: _bindgen_ty_4 = 11;
+pub const IORING_OP_TIMEOUT_REMOVE: _bindgen_ty_4 = 12;
+pub const IORING_OP_ACCEPT: _bindgen_ty_4 = 13;
+pub const IORING_OP_ASYNC_CANCEL: _bindgen_ty_4 = 14;
+pub const IORING_OP_LINK_TIMEOUT: _bindgen_ty_4 = 15;
+pub const IORING_OP_CONNECT: _bindgen_ty_4 = 16;
+pub const IORING_OP_LAST: _bindgen_ty_4 = 17;
+pub type _bindgen_ty_4 = u32;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct io_uring_cqe {
@@ -720,4 +798,48 @@ fn bindgen_test_layout_io_uring_params() {
             stringify!(cq_off)
         )
     );
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct io_uring_files_update {
+    pub offset: __u32,
+    pub fds: *mut __s32,
+}
+#[test]
+fn bindgen_test_layout_io_uring_files_update() {
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_files_update>(),
+        16usize,
+        concat!("Size of: ", stringify!(io_uring_files_update))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_files_update>(),
+        8usize,
+        concat!("Alignment of ", stringify!(io_uring_files_update))
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_files_update>())).offset as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_files_update),
+            "::",
+            stringify!(offset)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_files_update>())).fds as *const _ as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_files_update),
+            "::",
+            stringify!(fds)
+        )
+    );
+}
+impl Default for io_uring_files_update {
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }

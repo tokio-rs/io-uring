@@ -206,6 +206,18 @@ impl Builder {
         self
     }
 
+    #[cfg(feature = "unstable")]
+    pub fn feature_nodrop(mut self) -> Self {
+        self.params.features |= sys::IORING_FEAT_NODROP;
+        self
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn feature_submit_stable(mut self) -> Self {
+        self.params.features |= sys::IORING_FEAT_SUBMIT_STABLE;
+        self
+    }
+
     /// Perform busy-waiting for an I/O completion,
     /// as opposed to getting notifications via an asynchronous IRQ (Interrupt Request).
     pub fn setup_iopoll(mut self) -> Self {

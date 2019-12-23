@@ -120,8 +120,8 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.addr = iovec as _;
         sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.rw_flags = rw_flags;
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
@@ -156,8 +156,8 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.addr = iovec as _;
         sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.rw_flags = rw_flags;
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
@@ -183,7 +183,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_FSYNC as _;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_1.fsync_flags = flags;
+        sqe.__bindgen_anon_2.fsync_flags = flags;
         Entry(sqe)
     }
 );
@@ -222,9 +222,9 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.addr = buf as _;
         sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.rw_flags = rw_flags;
-        sqe.__bindgen_anon_2.buf_index = buf_index;
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.buf_index = buf_index;
         Entry(sqe)
     }
 );
@@ -263,9 +263,9 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.addr = buf as _;
         sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.rw_flags = rw_flags;
-        sqe.__bindgen_anon_2.buf_index = buf_index;
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.buf_index = buf_index;
         Entry(sqe)
     }
 );
@@ -290,7 +290,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_POLL_ADD as _;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_1.poll_events = flags as _;
+        sqe.__bindgen_anon_2.poll_events = flags as _;
         Entry(sqe)
     }
 );
@@ -342,8 +342,8 @@ opcode!(
         sqe.opcode = sys::IORING_OP_SYNC_FILE_RANGE as _;
         assign_fd!(sqe.fd = fd);
         sqe.len = len;
-        sqe.off = offset as _;
-        sqe.__bindgen_anon_1.sync_range_flags = flags;
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.sync_range_flags = flags;
         Entry(sqe)
     }
 );
@@ -372,7 +372,7 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.addr = msg as _;
         sqe.len = 1;
-        sqe.__bindgen_anon_1.msg_flags = flags;
+        sqe.__bindgen_anon_2.msg_flags = flags;
         Entry(sqe)
     }
 );
@@ -399,7 +399,7 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.addr = msg as _;
         sqe.len = 1;
-        sqe.__bindgen_anon_1.msg_flags = flags;
+        sqe.__bindgen_anon_2.msg_flags = flags;
         Entry(sqe)
     }
 );
@@ -431,8 +431,8 @@ opcode!(
         sqe.opcode = sys::IORING_OP_TIMEOUT as _;
         sqe.addr = timespec as _;
         sqe.len = 1;
-        sqe.off = count as _;
-        sqe.__bindgen_anon_1.timeout_flags = flags;
+        sqe.__bindgen_anon_1.off = count as _;
+        sqe.__bindgen_anon_2.timeout_flags = flags;
         Entry(sqe)
     }
 );

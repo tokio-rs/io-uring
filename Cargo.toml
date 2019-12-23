@@ -18,6 +18,7 @@ exclude = [ "loom-ringbuf" ]
 [features]
 bindgen = [ "linux-io-uring-sys/bindgen" ]
 concurrent = [ "parking_lot" ]
+unstable = []
 
 [dependencies]
 libc = "0.2"
@@ -25,7 +26,7 @@ bitflags = "1"
 parking_lot = { version = "0.10", optional = true }
 
 # Avoid leaking types from -sys because it is unstable.
-linux-io-uring-sys = { version = "0.0.3", path = "linux-io-uring-sys" }
+linux-io-uring-sys = { version = "0.0.4", path = "linux-io-uring-sys" }
 
 [dev-dependencies]
 tempfile = "3"

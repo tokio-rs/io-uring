@@ -42,29 +42,15 @@ impl<'a> Submitter<'a> {
     }
 
     /// Register files or user buffers for asynchronous I/O.
+    #[inline]
     pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
-        let (opcode, arg, len) = target.export();
-
-        unsafe {
-            if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, arg, len) {
-               Ok(())
-            } else {
-               Err(io::Error::last_os_error())
-            }
-        }
+        target.execute(self.fd.as_raw_fd())
     }
 
     /// Unregister files or user buffers for asynchronous I/O.
+    #[inline]
     pub fn unregister(&self, target: unreg::Target) -> io::Result<()> {
-        let opcode = target.opcode();
-
-        unsafe {
-             if 0 == sys::io_uring_register(self.fd.as_raw_fd(), opcode, ptr::null(), 0) {
-                Ok(())
-             } else {
-                Err(io::Error::last_os_error())
-             }
-        }
+        target.execute(self.fd.as_raw_fd())
     }
 
     /// Initiate and/or complete asynchronous I/O
