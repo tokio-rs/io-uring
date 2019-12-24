@@ -41,12 +41,9 @@ struct MemoryMap {
     cq_mmap: Option<Mmap>
 }
 
-/// IoUring Builder
-#[derive(Clone)]
-pub struct Builder {
-    entries: u32,
-    params: sys::io_uring_params
-}
+/// IoUring build params
+#[derive(Clone, Default)]
+pub struct Params(sys::io_uring_params);
 
 unsafe impl Send for IoUring {}
 unsafe impl Sync for IoUring {}
@@ -58,10 +55,11 @@ impl IoUring {
     /// and it value should be the power of two.
     #[inline]
     pub fn new(entries: u32) -> io::Result<IoUring> {
-        IoUring::with_params(entries, sys::io_uring_params::default())
+        let mut p = Params::default();
+        IoUring::with_params(entries, &mut p)
     }
 
-    fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<IoUring> {
+    pub fn with_params(entries: u32, Params(p): &mut Params) -> io::Result<IoUring> {
         // NOTE: The `SubmissionQueue` and `CompletionQueue` are references,
         // and their lifetime can never exceed `MemoryMap`.
         //
@@ -105,13 +103,13 @@ impl IoUring {
         }
 
         let fd: Fd = unsafe {
-            sys::io_uring_setup(entries, &mut p)
+            sys::io_uring_setup(entries, p)
                 .try_into()
                 .map_err(|_| io::Error::last_os_error())?
         };
 
         let flags = p.flags;
-        let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
+        let (mm, sq, cq) = unsafe { setup_queue(&fd, p)? };
 
         Ok(IoUring {
             fd, flags, sq, cq,
@@ -192,47 +190,39 @@ impl Drop for IoUring {
     }
 }
 
-impl Builder {
-    /// Create a builder
-    pub fn new(entries: u32) -> Self {
-        Builder {
-            entries,
-            params: sys::io_uring_params::default()
-        }
-    }
-
-    pub fn feature_single_mmap(mut self) -> Self {
-        self.params.features |= sys::IORING_FEAT_SINGLE_MMAP;
+impl Params {
+    pub fn feature_single_mmap(&mut self) -> &mut Self {
+        self.0.features |= sys::IORING_FEAT_SINGLE_MMAP;
         self
     }
 
     #[cfg(feature = "unstable")]
-    pub fn feature_nodrop(mut self) -> Self {
-        self.params.features |= sys::IORING_FEAT_NODROP;
+    pub fn feature_nodrop(&mut self) -> &mut Self {
+        self.0.features |= sys::IORING_FEAT_NODROP;
         self
     }
 
     #[cfg(feature = "unstable")]
-    pub fn feature_submit_stable(mut self) -> Self {
-        self.params.features |= sys::IORING_FEAT_SUBMIT_STABLE;
+    pub fn feature_submit_stable(&mut self) -> &mut Self {
+        self.0.features |= sys::IORING_FEAT_SUBMIT_STABLE;
         self
     }
 
     /// Perform busy-waiting for an I/O completion,
     /// as opposed to getting notifications via an asynchronous IRQ (Interrupt Request).
-    pub fn setup_iopoll(mut self) -> Self {
-        self.params.flags |= sys::IORING_SETUP_IOPOLL;
+    pub fn setup_iopoll(&mut self) -> &mut Self {
+        self.0.flags |= sys::IORING_SETUP_IOPOLL;
         self
     }
 
     /// When this flag is specified, a kernel thread is created to perform submission queue polling.
     /// An io_uring instance configured in this way enables an application to issue I/O
     /// without ever context switching into the kernel.
-    pub fn setup_sqpoll(mut self, idle: impl Into<Option<u32>>) -> Self {
-        self.params.flags |= sys::IORING_SETUP_SQPOLL;
+    pub fn setup_sqpoll(&mut self, idle: impl Into<Option<u32>>) -> &mut Self {
+        self.0.flags |= sys::IORING_SETUP_SQPOLL;
 
         if let Some(n) = idle.into() {
-            self.params.sq_thread_idle = n;
+            self.0.sq_thread_idle = n;
         }
 
         self
@@ -241,23 +231,37 @@ impl Builder {
     /// If this flag is specified,
     /// then the poll thread will be bound to the cpu set in the value.
     /// This flag is only meaningful when [Builder::setup_sqpoll] is enabled.
-    pub fn setup_sqpoll_cpu(mut self, n: u32) -> Self {
-        self.params.flags |= sys::IORING_SETUP_SQ_AFF;
-        self.params.sq_thread_cpu = n;
+    pub fn setup_sqpoll_cpu(&mut self, n: u32) -> &mut Self {
+        self.0.flags |= sys::IORING_SETUP_SQ_AFF;
+        self.0.sq_thread_cpu = n;
         self
     }
 
     /// Create the completion queue with struct `io_uring_params.cq_entries` entries.
     /// The value must be greater than entries, and may be rounded up to the next power-of-two.
     #[cfg(feature = "unstable")]
-    pub fn setup_cqsize(mut self, n: u32) -> Self {
-        self.params.flags |= sys::IORING_SETUP_CQSIZE;
-        self.params.cq_entries = n;
+    pub fn setup_cqsize(&mut self, n: u32) -> &mut Self {
+        self.0.flags |= sys::IORING_SETUP_CQSIZE;
+        self.0.cq_entries = n;
         self
     }
 
-    pub fn build(self) -> io::Result<IoUring> {
-        IoUring::with_params(self.entries, self.params)
+    #[cfg(feature = "unstable")]
+    pub fn is_feature_nodrop(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_NODROP != 0
+    }
+
+    pub fn sq_entries(&self) -> u32 {
+        self.0.sq_entries
+    }
+
+    pub fn cq_entries(&self) -> u32 {
+        self.0.cq_entries
+    }
+
+    #[inline]
+    pub fn build(&mut self, entries: u32) -> io::Result<IoUring> {
+        IoUring::with_params(entries, self)
     }
 }
 

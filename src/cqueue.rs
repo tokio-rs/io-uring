@@ -121,14 +121,14 @@ impl ExactSizeIterator for AvailableQueue<'_> {
 }
 
 impl<'a> Iterator for AvailableQueue<'a> {
-    type Item = &'a Entry;
+    type Item = Entry;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.head != self.tail {
             unsafe {
                 let entry = self.queue.cqes.add((self.head & self.ring_mask) as usize);
                 self.head = self.head.wrapping_add(1);
-                Some(&*(entry as *const Entry))
+                Some(Entry(*entry))
             }
         } else {
             None
