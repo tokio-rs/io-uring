@@ -190,7 +190,7 @@ opcode!(
         fd: Target,
         ;;
         /// The `flags` bit mask may contain either 0, for a normal file integrity sync,
-        /// or `IORING_FSYNC_DATASYNC` to provide data sync only semantics.
+        /// or [params::Fsync::DATASYNC] to provide data sync only semantics.
         /// See the descriptions of `O_SYNC` and `O_DSYNC` in the `open (2)` manual page for more information.
         flags: params::Fsync = params::Fsync::empty()
     }
@@ -438,7 +438,8 @@ opcode!(
         /// `count` may contain a completion event count. If not set, this defaults to 1.
         count: u32 = 0,
 
-        /// `flags` may contain `IORING_TIMEOUT_ABS` for an absolutel timeout value, or 0 for a relative timeout.
+        #[cfg_attr(not(feature = "unstable"), allow(intra_doc_link_resolution_failure))]
+        /// `flags` may contain [params::Timeout::ABS] for an absolutel timeout value, or 0 for a relative timeout.
         flags: params::Timeout = params::Timeout::empty()
     }
 
