@@ -242,7 +242,17 @@ impl Builder {
     /// then the poll thread will be bound to the cpu set in the value.
     /// This flag is only meaningful when [Builder::setup_sqpoll] is enabled.
     pub fn setup_sqpoll_cpu(mut self, n: u32) -> Self {
+        self.params.flags |= sys::IORING_SETUP_SQ_AFF;
         self.params.sq_thread_cpu = n;
+        self
+    }
+
+    /// Create the completion queue with struct `io_uring_params.cq_entries` entries.
+    /// The value must be greater than entries, and may be rounded up to the next power-of-two.
+    #[cfg(feature = "unstable")]
+    pub fn setup_cqsize(mut self, n: u32) -> Self {
+        self.params.flags |= sys::IORING_SETUP_CQSIZE;
+        self.params.cq_entries = n;
         self
     }
 

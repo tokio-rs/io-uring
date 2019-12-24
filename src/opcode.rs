@@ -7,7 +7,25 @@ use linux_io_uring_sys as sys;
 use crate::squeue::Entry;
 use crate::util::sqe_zeroed;
 
-pub use sys::__kernel_timespec as Timespec;
+pub mod params {
+    use bitflags::bitflags;
+    use linux_io_uring_sys as sys;
+
+    pub use sys::__kernel_timespec as Timespec;
+
+    bitflags!{
+        pub struct Timeout: u32 {
+            #[cfg(feature = "unstable")]
+            const ABS = sys::IORING_TIMEOUT_ABS;
+        }
+    }
+
+    bitflags!{
+        pub struct Fsync: u32 {
+            const DATASYNC = sys::IORING_FSYNC_DATASYNC;
+        }
+    }
+}
 
 
 macro_rules! assign_fd {
@@ -174,7 +192,7 @@ opcode!(
         /// The `flags` bit mask may contain either 0, for a normal file integrity sync,
         /// or `IORING_FSYNC_DATASYNC` to provide data sync only semantics.
         /// See the descriptions of `O_SYNC` and `O_DSYNC` in the `open (2)` manual page for more information.
-        flags: u32 = 0
+        flags: params::Fsync = params::Fsync::empty()
     }
 
     pub fn build(self) -> Entry {
@@ -183,7 +201,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_FSYNC as _;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_2.fsync_flags = flags;
+        sqe.__bindgen_anon_2.fsync_flags = flags.bits();
         Entry(sqe)
     }
 );
@@ -415,13 +433,13 @@ opcode!(
     /// If the timeout was cancelled before it expired, the request will complete with `-ECANCELED`.
     #[derive(Debug)]
     pub struct Timeout {
-        timespec: *const Timespec,
+        timespec: *const params::Timespec,
         ;;
         /// `count` may contain a completion event count. If not set, this defaults to 1.
         count: u32 = 0,
 
         /// `flags` may contain `IORING_TIMEOUT_ABS` for an absolutel timeout value, or 0 for a relative timeout.
-        flags: u32 = 0
+        flags: params::Timeout = params::Timeout::empty()
     }
 
     pub fn build(self) -> Entry {
@@ -432,7 +450,7 @@ opcode!(
         sqe.addr = timespec as _;
         sqe.len = 1;
         sqe.__bindgen_anon_1.off = count as _;
-        sqe.__bindgen_anon_2.timeout_flags = flags;
+        sqe.__bindgen_anon_2.timeout_flags = flags.bits();
         Entry(sqe)
     }
 );

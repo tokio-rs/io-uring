@@ -51,6 +51,9 @@ bitflags!{
         /// it forms a link with the next SQE in the submission ring.
         /// That next SQE will not be started before this one completes.
         const IO_LINK = sys::IOSQE_IO_LINK as _;
+
+        #[cfg(feature = "unstable")]
+        const IO_HARDLINK = sys::IOSQE_IO_HARDLINK as _;
     }
 }
 
