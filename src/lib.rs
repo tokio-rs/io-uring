@@ -28,7 +28,7 @@ pub use register::{ register as reg, unregister as unreg };
 /// IoUring instance
 pub struct IoUring {
     fd: Fd,
-    flags: u32,
+    params: Parameters,
     memory: ManuallyDrop<MemoryMap>,
     sq: SubmissionQueue,
     cq: CompletionQueue
@@ -43,7 +43,10 @@ struct MemoryMap {
 
 /// IoUring build params
 #[derive(Clone, Default)]
-pub struct Params(sys::io_uring_params);
+pub struct Builder(sys::io_uring_params);
+
+#[derive(Clone)]
+pub struct Parameters(sys::io_uring_params);
 
 unsafe impl Send for IoUring {}
 unsafe impl Sync for IoUring {}
@@ -55,11 +58,10 @@ impl IoUring {
     /// and it value should be the power of two.
     #[inline]
     pub fn new(entries: u32) -> io::Result<IoUring> {
-        let mut p = Params::default();
-        IoUring::with_params(entries, &mut p)
+        IoUring::with_params(entries, Default::default())
     }
 
-    pub fn with_params(entries: u32, Params(p): &mut Params) -> io::Result<IoUring> {
+    fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<IoUring> {
         // NOTE: The `SubmissionQueue` and `CompletionQueue` are references,
         // and their lifetime can never exceed `MemoryMap`.
         //
@@ -103,22 +105,26 @@ impl IoUring {
         }
 
         let fd: Fd = unsafe {
-            sys::io_uring_setup(entries, p)
+            sys::io_uring_setup(entries, &mut p)
                 .try_into()
                 .map_err(|_| io::Error::last_os_error())?
         };
 
-        let flags = p.flags;
-        let (mm, sq, cq) = unsafe { setup_queue(&fd, p)? };
+        let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
         Ok(IoUring {
-            fd, flags, sq, cq,
+            fd, sq, cq,
+            params: Parameters(p),
             memory: ManuallyDrop::new(mm)
         })
     }
 
     const fn as_submit(&self) -> Submitter<'_> {
-        Submitter::new(&self.fd, self.flags, &self.sq)
+        Submitter::new(&self.fd, self.params.0.flags, &self.sq)
+    }
+
+    pub fn params(&self) -> &Parameters {
+        &self.params
     }
 
     /// Register files or user buffers for asynchronous I/O.
@@ -161,7 +167,7 @@ impl IoUring {
     pub fn split(&mut self)
         -> (Submitter<'_>, &mut SubmissionQueue, &mut CompletionQueue)
     {
-        let submit = Submitter::new(&self.fd, self.flags, &self.sq);
+        let submit = Submitter::new(&self.fd, self.params.0.flags, &self.sq);
         (submit, &mut self.sq, &mut self.cq)
     }
 
@@ -190,7 +196,7 @@ impl Drop for IoUring {
     }
 }
 
-impl Params {
+impl Builder {
     pub fn feature_single_mmap(&mut self) -> &mut Self {
         self.0.features |= sys::IORING_FEAT_SINGLE_MMAP;
         self
@@ -246,6 +252,13 @@ impl Params {
         self
     }
 
+    #[inline]
+    pub fn build(self, entries: u32) -> io::Result<IoUring> {
+        IoUring::with_params(entries, self.0)
+    }
+}
+
+impl Parameters {
     #[cfg(feature = "unstable")]
     pub fn is_feature_nodrop(&self) -> bool {
         self.0.features & sys::IORING_FEAT_NODROP != 0
@@ -257,11 +270,6 @@ impl Params {
 
     pub fn cq_entries(&self) -> u32 {
         self.0.cq_entries
-    }
-
-    #[inline]
-    pub fn build(&mut self, entries: u32) -> io::Result<IoUring> {
-        IoUring::with_params(entries, self)
     }
 }
 

@@ -1,4 +1,4 @@
-use linux_io_uring::{ opcode, IoUring, Params };
+use linux_io_uring::{ opcode, IoUring };
 
 
 #[test]
@@ -64,10 +64,9 @@ fn test_sq_full() -> anyhow::Result<()> {
 #[cfg(feature = "unstable")]
 #[test]
 fn test_cq_overflow() -> anyhow::Result<()> {
-    let mut p = Params::default();
-    let mut ring = p.build(4)?;
+    let mut ring = IoUring::new(4)?;
 
-    if p.is_feature_nodrop() {
+    if ring.params().is_feature_nodrop() {
         // fill cq
         for _ in 0..2 {
             for _ in 0..4 {
