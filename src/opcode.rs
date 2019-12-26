@@ -2,26 +2,34 @@
 
 #![allow(clippy::new_without_default)]
 
-use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 use crate::squeue::Entry;
 use crate::util::sqe_zeroed;
 
-pub mod params {
+pub mod types {
+    use std::os::unix::io::RawFd;
     use bitflags::bitflags;
     use linux_io_uring_sys as sys;
 
     pub use sys::__kernel_timespec as Timespec;
 
+    #[derive(Debug, Clone)]
+    pub enum Target {
+        Fd(RawFd),
+
+        /// The index of registered fd.
+        Fixed(u32)
+    }
+
     bitflags!{
-        pub struct Timeout: u32 {
+        pub struct TimeoutFlags: u32 {
             #[cfg(feature = "unstable")]
             const ABS = sys::IORING_TIMEOUT_ABS;
         }
     }
 
     bitflags!{
-        pub struct Fsync: u32 {
+        pub struct FsyncFlags: u32 {
             const DATASYNC = sys::IORING_FSYNC_DATASYNC;
         }
     }
@@ -31,10 +39,10 @@ pub mod params {
 macro_rules! assign_fd {
     ( $sqe:ident . fd = $opfd:expr ) => {
         match $opfd {
-            Target::Fd(fd) => $sqe.fd = fd,
-            Target::Fixed(i) => {
+            types::Target::Fd(fd) => $sqe.fd = fd,
+            types::Target::Fixed(i) => {
                 $sqe.fd = i as _;
-                $sqe.flags |= crate::squeue::Flag::FIXED_FILE.bits();
+                $sqe.flags |= crate::squeue::Flags::FIXED_FILE.bits();
             }
         }
     }
@@ -83,15 +91,6 @@ macro_rules! opcode {
     }
 }
 
-
-#[derive(Debug, Clone)]
-pub enum Target {
-    Fd(RawFd),
-
-    /// The index of registered fd.
-    Fixed(u32)
-}
-
 opcode!(
     /// Do not perform any I/O.
     ///
@@ -114,7 +113,7 @@ opcode!(
     /// The return values match those documented in the `preadv2 (2)` man pages.
     #[derive(Debug)]
     pub struct Readv {
-        fd: Target,
+        fd: types::Target,
         iovec: *mut libc::iovec,
         len: u32,
         ;;
@@ -150,7 +149,7 @@ opcode!(
     /// The return values match those documented in the `pwritev2 (2)` man pages.
     #[derive(Debug)]
     pub struct Writev {
-        fd: Target,
+        fd: types::Target,
         iovec: *const libc::iovec,
         len: u32,
         ;;
@@ -187,12 +186,12 @@ opcode!(
     /// For example, an application which places a write I/O followed by an fsync in the submission queue cannot expect the fsync to apply to the write. The two operations execute in parallel, so the fsync may complete before the write is issued to the storage. The same is also true for previously issued writes that have not completed prior to the fsync.
     #[derive(Debug)]
     pub struct Fsync {
-        fd: Target,
+        fd: types::Target,
         ;;
         /// The `flags` bit mask may contain either 0, for a normal file integrity sync,
-        /// or [params::Fsync::DATASYNC] to provide data sync only semantics.
+        /// or [types::FsyncFlags::DATASYNC] to provide data sync only semantics.
         /// See the descriptions of `O_SYNC` and `O_DSYNC` in the `open (2)` manual page for more information.
-        flags: params::Fsync = params::Fsync::empty()
+        flags: types::FsyncFlags = types::FsyncFlags::empty()
     }
 
     pub fn build(self) -> Entry {
@@ -214,7 +213,7 @@ opcode!(
     pub struct ReadFixed {
         /// The `buf_index` is an index into an array of fixed buffers,
         /// and is only valid if fixed buffers were registered.
-        fd: Target,
+        fd: types::Target,
         buf: *mut u8,
         len: u32,
         buf_index: u16,
@@ -255,7 +254,7 @@ opcode!(
     pub struct WriteFixed {
         /// The `buf_index` is an index into an array of fixed buffers,
         /// and is only valid if fixed buffers were registered.
-        fd: Target,
+        fd: types::Target,
         buf: *const u8,
         len: u32,
         buf_index: u16,
@@ -297,7 +296,7 @@ opcode!(
     pub struct PollAdd {
         /// The bits that may be set in `flags` are defined in `<poll.h>`,
         /// and documented in `poll (2)`.
-        fd: Target,
+        fd: types::Target,
         flags: i16,
         ;;
     }
@@ -340,7 +339,7 @@ opcode!(
     /// See also `sync_file_range (2)`. for the general description of the related system call.
     #[derive(Debug)]
     pub struct SyncFileRange {
-        fd: Target,
+        fd: types::Target,
         len: u32,
         ;;
         /// the offset method holds the offset in bytes
@@ -374,7 +373,7 @@ opcode!(
     /// See also `sendmsg (2)`. for the general description of the related system call.
     #[derive(Debug)]
     pub struct SendMsg {
-        fd: Target,
+        fd: types::Target,
         msg: *const libc::msghdr,
         ;;
         ioprio: u16 = 0,
@@ -401,7 +400,7 @@ opcode!(
     /// See the description of [SendMsg].
     #[derive(Debug)]
     pub struct RecvMsg {
-        fd: Target,
+        fd: types::Target,
         msg: *mut libc::msghdr,
         ;;
         ioprio: u16 = 0,
@@ -433,14 +432,14 @@ opcode!(
     /// If the timeout was cancelled before it expired, the request will complete with `-ECANCELED`.
     #[derive(Debug)]
     pub struct Timeout {
-        timespec: *const params::Timespec,
+        timespec: *const types::Timespec,
         ;;
         /// `count` may contain a completion event count. If not set, this defaults to 1.
         count: u32 = 0,
 
         #[cfg_attr(not(feature = "unstable"), allow(intra_doc_link_resolution_failure))]
-        /// `flags` may contain [params::Timeout::ABS] for an absolutel timeout value, or 0 for a relative timeout.
-        flags: params::Timeout = params::Timeout::empty()
+        /// `flags` may contain [types::TimeoutFlags::ABS] for an absolutel timeout value, or 0 for a relative timeout.
+        flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
 
     pub fn build(self) -> Entry {

@@ -18,6 +18,7 @@ pub struct Submitter<'a> {
 }
 
 impl<'a> Submitter<'a> {
+    #[inline]
     pub(crate) const fn new(fd: &'a Fd, flags: u32, sq: &SubmissionQueue) -> Submitter<'a> {
         Submitter {
             fd, flags,

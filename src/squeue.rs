@@ -36,7 +36,7 @@ pub struct Entry(pub(crate) sys::io_uring_sqe);
 
 bitflags!{
     /// Submission flags
-    pub struct Flag: u8 {
+    pub struct Flags: u8 {
         /// When this flag is specified,
         /// `fd` is an index into the files array registered with the io_uring instance.
         #[doc(hidden)]
@@ -189,8 +189,8 @@ impl Drop for AvailableQueue<'_> {
 }
 
 impl Entry {
-    /// Set [Submission flags](Flag)
-    pub fn flags(mut self, flags: Flag) -> Entry {
+    /// Set [Submission flags](Flags)
+    pub fn flags(mut self, flags: Flags) -> Entry {
         self.0.flags |= flags.bits();
         self
     }
