@@ -454,3 +454,105 @@ opcode!(
         Entry(sqe)
     }
 );
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct TimeoutRemove {
+        user_data: u64,
+        ;;
+        flags: types::TimeoutFlags = types::TimeoutFlags::empty()
+    }
+
+    pub fn build(self) -> Entry {
+        let TimeoutRemove { user_data, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_TIMEOUT_REMOVE as _;
+        sqe.addr = user_data as _;
+        sqe.__bindgen_anon_2.timeout_flags = flags.bits();
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Accept {
+        fd: types::Target,
+        addr: *const libc::sockaddr,
+        addrlen: libc::socklen_t
+        ;;
+        flags: u32 = 0
+    }
+
+    pub fn build(self) -> Entry {
+        let Accept { fd, addr, addrlen, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_ACCEPT as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.addr = addr as _;
+        sqe.__bindgen_anon_1.off = addrlen as _;
+        sqe.__bindgen_anon_2.accept_flags = flags;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct AsyncCancel {
+        user_data: u64,
+        ;;
+        flags: u32 = 0
+    }
+
+    pub fn build(self) -> Entry {
+        let AsyncCancel { user_data, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_ASYNC_CANCEL as _;
+        sqe.addr = user_data as _;
+        sqe.__bindgen_anon_2.timeout_flags = flags;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct LinkTimeout {
+        timespec: *const types::Timespec,
+        ;;
+        flags: types::TimeoutFlags = types::TimeoutFlags::empty()
+    }
+
+    pub fn build(self) -> Entry {
+        let LinkTimeout { timespec, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_TIMEOUT as _;
+        sqe.addr = timespec as _;
+        sqe.len = 1;
+        sqe.__bindgen_anon_2.timeout_flags = flags.bits();
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Connect {
+        fd: types::Target,
+        addr: *const libc::sockaddr,
+        addrlen: libc::socklen_t
+        ;;
+    }
+
+    pub fn build(self) -> Entry {
+        let Connect { fd, addr, addrlen } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = sys::IORING_OP_CONNECT as _;
+        assign_fd!(sqe.fd = fd);
+        sqe.addr = addr as _;
+        sqe.__bindgen_anon_1.off = addrlen as _;
+        Entry(sqe)
+    }
+);
