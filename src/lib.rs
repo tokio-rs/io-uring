@@ -5,10 +5,10 @@
 
 mod util;
 mod register;
+mod submit;
 pub mod squeue;
 pub mod cqueue;
 pub mod opcode;
-pub mod submit;
 
 #[cfg(feature = "concurrent")]
 pub mod concurrent;
@@ -129,7 +129,7 @@ impl IoUring {
 
     /// Register files or user buffers for asynchronous I/O.
     #[inline]
-    pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
+    pub unsafe fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
         self.as_submit().register(target)
     }
 

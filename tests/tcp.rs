@@ -60,7 +60,9 @@ fn test_tcp_sendmsg_and_recvmsg() -> anyhow::Result<()> {
     let mut bufs2 = [io::IoSliceMut::new(&mut buf2)];
 
     // reg fd
-    ring.register(reg::Target::Files(&[stream.as_raw_fd()]))?;
+    unsafe {
+        ring.register(reg::Target::Files(&[stream.as_raw_fd()]))?;
+    }
 
     // build sendmsg
     let mut msg = MaybeUninit::<libc::msghdr>::zeroed();

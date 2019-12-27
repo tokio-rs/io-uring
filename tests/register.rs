@@ -15,7 +15,9 @@ fn test_fixed_file() -> anyhow::Result<()> {
     let fd = tempfile()?;
 
     // register fd
-    ring.register(reg::Target::Files(&[fd.as_raw_fd()]))?;
+    unsafe {
+        ring.register(reg::Target::Files(&[fd.as_raw_fd()]))?;
+    }
 
     let fd = types::Target::Fixed(0);
 
@@ -85,7 +87,9 @@ fn test_reg_eventfd() -> anyhow::Result<()> {
     let efd = eventfd(0, EfdFlags::EFD_CLOEXEC | EfdFlags::EFD_NONBLOCK)?;
 
     // register eventfd
-    ring.register(reg::Target::EventFd(efd))?;
+    unsafe {
+        ring.register(reg::Target::EventFd(efd))?;
+    }
 
     let mut buf = [0; 8];
 

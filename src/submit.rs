@@ -44,7 +44,7 @@ impl<'a> Submitter<'a> {
 
     /// Register files or user buffers for asynchronous I/O.
     #[inline]
-    pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
+    pub unsafe fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
         target.execute(self.fd.as_raw_fd())
     }
 

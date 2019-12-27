@@ -3,15 +3,13 @@ use std::os::unix::io::RawFd;
 use linux_io_uring_sys as sys;
 
 
-fn execute(fd: RawFd, opcode: libc::c_uint, arg: *const libc::c_void, len: libc::c_uint)
+unsafe fn execute(fd: RawFd, opcode: libc::c_uint, arg: *const libc::c_void, len: libc::c_uint)
     -> io::Result<()>
 {
-    unsafe {
-        if 0 == sys::io_uring_register(fd, opcode, arg, len) {
-           Ok(())
-        } else {
-           Err(io::Error::last_os_error())
-        }
+    if 0 == sys::io_uring_register(fd, opcode, arg, len) {
+       Ok(())
+    } else {
+       Err(io::Error::last_os_error())
     }
 }
 
@@ -39,7 +37,7 @@ pub mod register {
     }
 
     impl Target<'_> {
-        pub(crate) fn execute(&self, fd: RawFd) -> io::Result<()> {
+        pub(crate) unsafe fn execute(&self, fd: RawFd) -> io::Result<()> {
             fn cast_ptr<T>(n: &T) -> *const T {
                 n as *const T
             }
@@ -90,7 +88,9 @@ pub mod unregister {
                 Target::EventFd => sys::IORING_UNREGISTER_EVENTFD
             };
 
-            execute(fd, opcode, ptr::null(), 0)
+            unsafe {
+                execute(fd, opcode, ptr::null(), 0)
+            }
         }
     }
 }
