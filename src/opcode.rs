@@ -103,6 +103,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_NOP as _;
+        sqe.fd = -1;
         Entry(sqe)
     }
 );
@@ -328,6 +329,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_POLL_REMOVE as _;
+        sqe.fd = -1;
         sqe.addr = user_data as _;
         Entry(sqe)
     }
@@ -447,6 +449,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_TIMEOUT as _;
+        sqe.fd = -1;
         sqe.addr = timespec as _;
         sqe.len = 1;
         sqe.__bindgen_anon_1.off = count as _;
@@ -468,6 +471,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_TIMEOUT_REMOVE as _;
+        sqe.fd = -1;
         sqe.addr = user_data as _;
         sqe.__bindgen_anon_2.timeout_flags = flags.bits();
         Entry(sqe)
@@ -510,6 +514,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_ASYNC_CANCEL as _;
+        sqe.fd = -1;
         sqe.addr = user_data as _;
         sqe.__bindgen_anon_2.timeout_flags = flags;
         Entry(sqe)
@@ -529,6 +534,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_TIMEOUT as _;
+        sqe.fd = -1;
         sqe.addr = timespec as _;
         sqe.len = 1;
         sqe.__bindgen_anon_2.timeout_flags = flags.bits();
