@@ -1,6 +1,6 @@
 # Linux IO Uring
 
-The `io_uring` library for Rust.
+The [io\_uring](https://kernel.dk/io_uring.pdf) library for Rust.
 
 ## Safety
 
