@@ -1,4 +1,4 @@
-name: Rust
+name: ci
 
 on: [push]
 
@@ -19,4 +19,4 @@ jobs:
     - uses: actions-rs/cargo@v1
       with:
         command: check
-        args: --features unstable
+        args: --features unstable,concurrent

@@ -15,14 +15,14 @@ fn test_fixed_file() -> anyhow::Result<()> {
     let fd = tempfile()?;
 
     // register fd
-    ring.register(reg::Target::File(&[fd.as_raw_fd()]))?;
+    ring.register(reg::Target::Files(&[fd.as_raw_fd()]))?;
 
     let fd = types::Target::Fixed(0);
 
     do_write_read(&mut ring, fd)?;
 
     // unregister
-    ring.unregister(unreg::Target::File)?;
+    ring.unregister(unreg::Target::Files)?;
 
     Ok(())
 }
@@ -40,7 +40,7 @@ fn test_fixed_buffer() -> anyhow::Result<()> {
     // register buffer
     unsafe {
         let buf = io::IoSliceMut::new(&mut buf);
-        ring.register(reg::Target::Buffer(&[mem::transmute(buf)]))?;
+        ring.register(reg::Target::Buffers(&[mem::transmute(buf)]))?;
     }
 
     nix::unistd::write(wp.as_raw_fd(), text)?;
@@ -73,7 +73,7 @@ fn test_fixed_buffer() -> anyhow::Result<()> {
     assert_eq!(buf, text);
 
     // unregister
-    ring.unregister(unreg::Target::Buffer)?;
+    ring.unregister(unreg::Target::Buffers)?;
 
     Ok(())
 }

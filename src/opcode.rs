@@ -12,6 +12,7 @@ pub mod types {
     use linux_io_uring_sys as sys;
 
     pub use sys::__kernel_timespec as Timespec;
+    pub use sys::__kernel_rwf_t as RwFlags;
 
     #[derive(Debug, Clone, Copy)]
     pub enum Target {
@@ -119,10 +120,10 @@ opcode!(
         len: u32,
         ;;
         ioprio: u16 = 0,
-        offset: i64 = 0,
+        offset: libc::off_t = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2 (2)` man page.
-        rw_flags: i32 = 0
+        rw_flags: types::RwFlags = 0
     }
 
     pub fn build(self) -> Entry {
@@ -155,10 +156,10 @@ opcode!(
         len: u32,
         ;;
         ioprio: u16 = 0,
-        offset: i64 = 0,
+        offset: libc::off_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2 (2)` man page.
-        rw_flags: i32 = 0
+        rw_flags: types::RwFlags = 0
     }
 
     pub fn build(self) -> Entry {
@@ -220,10 +221,10 @@ opcode!(
         buf_index: u16,
         ;;
         ioprio: u16 = 0,
-        offset: i64 = 0,
+        offset: libc::off_t = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2 (2)` man page.
-        rw_flags: i32 = 0
+        rw_flags: types::RwFlags = 0
     }
 
     pub fn build(self) -> Entry {
@@ -261,10 +262,10 @@ opcode!(
         buf_index: u16,
         ;;
         ioprio: u16 = 0,
-        offset: i64 = 0,
+        offset: libc::off_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2 (2)` man page.
-        rw_flags: i32 = 0
+        rw_flags: types::RwFlags = 0
     }
 
     pub fn build(self) -> Entry {
@@ -298,7 +299,7 @@ opcode!(
         /// The bits that may be set in `flags` are defined in `<poll.h>`,
         /// and documented in `poll (2)`.
         fd: types::Target,
-        flags: i16,
+        flags: libc::c_short,
         ;;
     }
 
@@ -345,7 +346,7 @@ opcode!(
         len: u32,
         ;;
         /// the offset method holds the offset in bytes
-        offset: i64 = 0,
+        offset: libc::off_t = 0,
         /// the flags method holds the flags for the command
         flags: u32 = 0
     }

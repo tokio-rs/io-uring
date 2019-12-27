@@ -25,16 +25,17 @@ pub mod register {
         /// Register buffer,
         /// then use the already registered buffer in
         /// [ReadFixed](crate::opcode::ReadFixed) and [WriteFixed](crate::opcode::WriteFixed).
-        Buffer(&'a [libc::iovec]),
+        Buffers(&'a [libc::iovec]),
 
         /// Register file descriptor,
-        /// then use the already registered fd in [Target::Fixed](crate::opcode::Target).
-        File(&'a [RawFd]),
+        /// then use the already registered fd in [Target::Fixed](crate::opcode::types::Target).
+        Files(&'a [RawFd]),
 
         /// Register eventfd.
         EventFd(RawFd),
 
-        FileUpdate { offset: u32, fds: &'a [RawFd] }
+        #[cfg(feature = "unstable")]
+        FilesUpdate { offset: u32, fds: &'a [RawFd] }
     }
 
     impl Target<'_> {
@@ -44,13 +45,14 @@ pub mod register {
             }
 
             match self {
-                Target::Buffer(bufs) =>
+                Target::Buffers(bufs) =>
                     execute(fd, sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _),
-                Target::File(fds) =>
+                Target::Files(fds) =>
                     execute(fd, sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _),
                 Target::EventFd(eventfd) =>
                     execute(fd, sys::IORING_REGISTER_EVENTFD, cast_ptr::<RawFd>(eventfd) as *const _, 1),
-                Target::FileUpdate { offset, fds } => {
+                #[cfg(feature = "unstable")]
+                Target::FilesUpdate { offset, fds } => {
                     let fu = sys::io_uring_files_update {
                         offset: *offset,
                         fds: fds.as_ptr() as *mut _
@@ -71,10 +73,10 @@ pub mod unregister {
     #[non_exhaustive]
     pub enum Target {
         /// Unregister buffer.
-        Buffer,
+        Buffers,
 
         /// Unregister file descriptor.
-        File,
+        Files,
 
         /// Unregister eventfd.
         EventFd,
@@ -83,8 +85,8 @@ pub mod unregister {
     impl Target {
         pub(crate) fn execute(&self, fd: RawFd) -> io::Result<()> {
             let opcode = match self {
-                Target::Buffer => sys::IORING_UNREGISTER_BUFFERS,
-                Target::File => sys::IORING_UNREGISTER_FILES,
+                Target::Buffers => sys::IORING_UNREGISTER_BUFFERS,
+                Target::Files => sys::IORING_UNREGISTER_FILES,
                 Target::EventFd => sys::IORING_UNREGISTER_EVENTFD
             };
 

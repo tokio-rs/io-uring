@@ -252,6 +252,7 @@ impl Builder {
         self
     }
 
+    /// Build a [IoUring].
     #[inline]
     pub fn build(self, entries: u32) -> io::Result<IoUring> {
         IoUring::with_params(entries, self.0)
@@ -259,9 +260,18 @@ impl Builder {
 }
 
 impl Parameters {
+    pub fn is_setup_sqpoll(&self) -> bool {
+        self.0.flags & sys::IORING_SETUP_SQPOLL != 0
+    }
+
     #[cfg(feature = "unstable")]
     pub fn is_feature_nodrop(&self) -> bool {
         self.0.features & sys::IORING_FEAT_NODROP != 0
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn is_feature_submit_stable(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_SUBMIT_STABLE != 0
     }
 
     pub fn sq_entries(&self) -> u32 {
