@@ -59,7 +59,7 @@ impl Drop for Mmap {
     }
 }
 
-pub struct Fd(RawFd);
+pub struct Fd(pub RawFd);
 
 impl TryFrom<RawFd> for Fd {
     type Error = ();

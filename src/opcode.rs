@@ -13,7 +13,7 @@ pub mod types {
 
     pub use sys::__kernel_timespec as Timespec;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Copy)]
     pub enum Target {
         Fd(RawFd),
 

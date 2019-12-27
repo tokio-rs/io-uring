@@ -32,7 +32,7 @@ pub mod register {
         File(&'a [RawFd]),
 
         /// Register eventfd.
-        Event(RawFd),
+        EventFd(RawFd),
 
         FileUpdate { offset: u32, fds: &'a [RawFd] }
     }
@@ -48,7 +48,7 @@ pub mod register {
                     execute(fd, sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _),
                 Target::File(fds) =>
                     execute(fd, sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _),
-                Target::Event(eventfd) =>
+                Target::EventFd(eventfd) =>
                     execute(fd, sys::IORING_REGISTER_EVENTFD, cast_ptr::<RawFd>(eventfd) as *const _, 1),
                 Target::FileUpdate { offset, fds } => {
                     let fu = sys::io_uring_files_update {
@@ -77,7 +77,7 @@ pub mod unregister {
         File,
 
         /// Unregister eventfd.
-        Event,
+        EventFd,
     }
 
     impl Target {
@@ -85,7 +85,7 @@ pub mod unregister {
             let opcode = match self {
                 Target::Buffer => sys::IORING_UNREGISTER_BUFFERS,
                 Target::File => sys::IORING_UNREGISTER_FILES,
-                Target::Event => sys::IORING_UNREGISTER_EVENTFD
+                Target::EventFd => sys::IORING_UNREGISTER_EVENTFD
             };
 
             execute(fd, opcode, ptr::null(), 0)
