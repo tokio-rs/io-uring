@@ -5,7 +5,7 @@
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/quininer/linux-io-uring/blob/master/LICENSE-APACHE)
 [![docs.rs](https://docs.rs/linux-io-uring/badge.svg)](https://docs.rs/linux-io-uring/)
 
-The [`io\_uring`](https://kernel.dk/io_uring.pdf) userspace interface for Rust.
+The [`io_uring`](https://kernel.dk/io_uring.pdf) userspace interface for Rust.
 
 ## Safety
 
