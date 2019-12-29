@@ -1,4 +1,9 @@
 # Linux IO Uring
+[![github actions](https://github.com/quininer/linux-io-uring/workflows/Rust/badge.svg)](https://github.com/quininer/linux-io-uring/actions)
+[![crates](https://img.shields.io/crates/v/linux-io-uring.svg)](https://crates.io/crates/linux-io-uring)
+[![license](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/quininer/linux-io-uring/blob/master/LICENSE-MIT)
+[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/quininer/linux-io-uring/blob/master/LICENSE-APACHE)
+[![docs.rs](https://docs.rs/linux-io-uring/badge.svg)](https://docs.rs/linux-io-uring/)
 
 The [`io\_uring`](https://kernel.dk/io_uring.pdf) userspace interface for Rust.
 
