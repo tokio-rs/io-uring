@@ -120,7 +120,7 @@ impl ExactSizeIterator for AvailableQueue<'_> {
     }
 }
 
-impl<'a> Iterator for AvailableQueue<'a> {
+impl Iterator for AvailableQueue<'_> {
     type Item = Entry;
 
     fn next(&mut self) -> Option<Self::Item> {

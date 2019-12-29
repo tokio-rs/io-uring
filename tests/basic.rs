@@ -66,24 +66,26 @@ fn test_sq_full() -> anyhow::Result<()> {
 fn test_cq_overflow() -> anyhow::Result<()> {
     let mut ring = IoUring::new(4)?;
 
-    if ring.params().is_feature_nodrop() {
-        // fill cq
-        for _ in 0..2 {
-            for _ in 0..4 {
-                unsafe {
-                    ring.submission()
-                        .available()
-                        .push(opcode::Nop::new().build())
-                        .ok()
-                        .expect("squeue is full");
-                }
+    // fill cq
+    for _ in 0..2 {
+        for _ in 0..4 {
+            unsafe {
+                ring.submission()
+                    .available()
+                    .push(opcode::Nop::new().build())
+                    .ok()
+                    .expect("squeue is full");
             }
-
-            ring.submit()?;
         }
 
-        assert_eq!(ring.completion().len(), 8);
-        assert!(ring.completion().is_full());
+        ring.submit()?;
+    }
+
+    assert_eq!(ring.completion().len(), 8);
+    assert!(ring.completion().is_full());
+
+    if ring.params().is_feature_nodrop() {
+        // 5.5+ kernel
 
         // overflow cq
         for _ in 0..4 {
@@ -134,7 +136,24 @@ fn test_cq_overflow() -> anyhow::Result<()> {
         // fill again
         assert_eq!(ring.completion().len(), 8);
     } else {
-        todo!("5.4 kernel");
+        // 5.4 kernel
+
+        // overflow cq
+        for _ in 0..4 {
+            unsafe {
+                ring.submission()
+                    .available()
+                    .push(opcode::Nop::new().build())
+                    .ok()
+                    .expect("squeue is full");
+            }
+        }
+
+        ring.submit()?;
+
+        assert_eq!(ring.completion().len(), 8);
+        assert!(ring.completion().is_full());
+        assert_eq!(ring.completion().overflow(), 4);
     }
 
     Ok(())

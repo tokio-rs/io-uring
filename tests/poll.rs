@@ -3,12 +3,12 @@ mod common;
 use std::os::unix::io::AsRawFd;
 use linux_io_uring::opcode::{ self, types };
 use linux_io_uring::IoUring;
-use common::Fd;
+use common::{ Fd, is_stable_kernel };
 
 
 #[test]
 fn test_poll_add() -> anyhow::Result<()> {
-    let mut io_uring = IoUring::new(1)?;
+    let mut ring = IoUring::new(1)?;
     let (rp, wp) = nix::unistd::pipe()?;
     let (rp, wp) = (Fd(rp), Fd(wp));
 
@@ -17,7 +17,7 @@ fn test_poll_add() -> anyhow::Result<()> {
         libc::POLLIN
     );
     unsafe {
-        io_uring
+        ring
             .submission()
             .available()
             .push(entry.build().user_data(0x42))
@@ -25,12 +25,12 @@ fn test_poll_add() -> anyhow::Result<()> {
             .expect("queue is full");
     }
 
-    io_uring.submit()?;
-    assert!(io_uring.completion().is_empty());
+    ring.submit()?;
+    assert!(ring.completion().is_empty());
 
     nix::unistd::write(wp.as_raw_fd(), b"pipe")?;
-    io_uring.submit_and_wait(1)?;
-    let entry = io_uring
+    ring.submit_and_wait(1)?;
+    let entry = ring
         .completion()
         .available()
         .next()
@@ -43,7 +43,7 @@ fn test_poll_add() -> anyhow::Result<()> {
 
 #[test]
 fn test_poll_remove() -> anyhow::Result<()> {
-    let mut io_uring = IoUring::new(1)?;
+    let mut ring = IoUring::new(1)?;
     let (rp, wp) = nix::unistd::pipe()?;
     let (rp, wp) = (Fd(rp), Fd(wp));
 
@@ -54,7 +54,7 @@ fn test_poll_remove() -> anyhow::Result<()> {
         libc::POLLIN
     );
     unsafe {
-        io_uring
+        ring
             .submission()
             .available()
             .push(entry.build().user_data(token))
@@ -62,12 +62,12 @@ fn test_poll_remove() -> anyhow::Result<()> {
             .expect("queue is full");
     }
 
-    io_uring.submit()?;
-    assert!(io_uring.completion().is_empty());
+    ring.submit()?;
+    assert!(ring.completion().is_empty());
 
     let entry = opcode::PollRemove::new(token);
     unsafe {
-        io_uring
+        ring
             .submission()
             .available()
             .push(entry.build().user_data(0x44))
@@ -75,18 +75,24 @@ fn test_poll_remove() -> anyhow::Result<()> {
             .expect("queue is full");
     }
 
-    io_uring.submit()?;
+    ring.submit()?;
 
     nix::unistd::write(wp.as_raw_fd(), b"pipe")?;
 
-    io_uring.submit_and_wait(2)?;
+    ring.submit_and_wait(2)?;
 
-    let mut cqes = io_uring
+    let mut cqes = ring
         .completion()
         .available()
         .collect::<Vec<_>>();
     cqes.sort_by_key(|cqe| cqe.user_data());
-    assert_eq!(cqes[0].result(), -libc::ECANCELED);
+
+    if is_stable_kernel(&ring) {
+        assert_eq!(cqes[0].result(), 0);
+    } else {
+        assert_eq!(cqes[0].result(), -libc::ECANCELED);
+    }
+
     assert_eq!(cqes[0].user_data(), token);
     assert_eq!(cqes[1].result(), 0);
     assert_eq!(cqes[1].user_data(), 0x44);

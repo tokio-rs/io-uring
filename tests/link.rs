@@ -8,7 +8,7 @@ use std::os::unix::io::AsRawFd;
 use nix::sys::eventfd::*;
 use linux_io_uring::opcode::{ self, types };
 use linux_io_uring::{ squeue, IoUring };
-use common::Fd;
+use common::{ Fd, is_stable_kernel };
 
 
 #[test]
@@ -136,9 +136,24 @@ fn test_fail_link() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
     cqes.sort_by_key(|cqe| cqe.user_data());
 
-    assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].result(), -libc::EBADF);
-    assert_eq!(cqes[0].user_data(), 0x42);
+    if cfg!(feature = "unstable") {
+
+    }
+
+    if is_stable_kernel(&ring) {
+        assert_eq!(cqes.len(), 2);
+        assert_eq!(cqes[0].result(), -libc::EBADF);
+        assert_eq!(cqes[0].user_data(), 0x42);
+        assert_eq!(cqes[1].result(), 0);
+        assert_eq!(cqes[1].user_data(), 0x43);
+    } else {
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].result(), -libc::EBADF);
+        assert_eq!(cqes[0].user_data(), 0x42);
+    }
+
+    /*
+    */
 
     Ok(())
 }
