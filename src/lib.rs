@@ -4,6 +4,7 @@
 //! For more detailed documentation, see manpage.
 
 mod util;
+mod sys;
 mod register;
 mod submit;
 pub mod squeue;
@@ -17,7 +18,6 @@ use std::{ io, cmp, mem };
 use std::convert::TryInto;
 use std::os::unix::io::{ AsRawFd, RawFd };
 use std::mem::ManuallyDrop;
-use linux_io_uring_sys as sys;
 use util::{ Fd, Mmap };
 pub use submit::Submitter;
 pub use squeue::SubmissionQueue;

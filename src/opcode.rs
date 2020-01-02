@@ -2,14 +2,13 @@
 
 #![allow(clippy::new_without_default)]
 
-use linux_io_uring_sys as sys;
 use crate::squeue::Entry;
-use crate::util::sqe_zeroed;
+use crate::sys;
 
 pub mod types {
     use std::os::unix::io::RawFd;
     use bitflags::bitflags;
-    use linux_io_uring_sys as sys;
+    use crate::sys;
 
     pub use sys::__kernel_timespec as Timespec;
     pub use sys::__kernel_rwf_t as RwFlags;
@@ -90,6 +89,12 @@ macro_rules! opcode {
             pub fn build($self) -> Entry $build_block
         }
     }
+}
+
+/// inline zeroed to improve codegen
+#[inline(always)]
+fn sqe_zeroed() -> sys::io_uring_sqe {
+    unsafe { std::mem::zeroed() }
 }
 
 opcode!(
@@ -534,7 +539,7 @@ opcode!(
         let LinkTimeout { timespec, flags } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_TIMEOUT as _;
+        sqe.opcode = sys::IORING_OP_LINK_TIMEOUT as _;
         sqe.fd = -1;
         sqe.addr = timespec as _;
         sqe.len = 1;

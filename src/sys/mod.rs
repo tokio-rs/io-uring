@@ -1,4 +1,4 @@
-#![allow(non_camel_case_types, non_upper_case_globals)]
+#![allow(non_camel_case_types, non_upper_case_globals, dead_code, non_snake_case)]
 #![allow(clippy::unreadable_literal, clippy::missing_safety_doc)]
 
 use libc::*;

@@ -1,6 +1,6 @@
 use std::{ io, ptr };
 use std::os::unix::io::RawFd;
-use linux_io_uring_sys as sys;
+use crate::sys;
 
 
 unsafe fn execute(fd: RawFd, opcode: libc::c_uint, arg: *const libc::c_void, len: libc::c_uint)

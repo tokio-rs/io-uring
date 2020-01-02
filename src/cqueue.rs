@@ -1,9 +1,8 @@
 //! Completion Queue
 
 use std::sync::atomic;
-use linux_io_uring_sys as sys;
 use crate::util::{ Mmap, unsync_load };
-use crate::mmap_offset;
+use crate::{ sys, mmap_offset };
 
 
 pub struct CompletionQueue {
@@ -78,6 +77,7 @@ impl CompletionQueue {
         head == tail
     }
 
+    #[inline]
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }
@@ -109,6 +109,7 @@ impl AvailableQueue<'_> {
         self.ring_entries as usize
     }
 
+    #[inline]
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }

@@ -1,10 +1,10 @@
 use std::{ io, ptr };
 use std::sync::atomic;
 use std::os::unix::io::AsRawFd;
-use linux_io_uring_sys as sys;
 use crate::register::{ register as reg, unregister as unreg };
 use crate::squeue::SubmissionQueue;
 use crate::util::{ Fd, unsync_load };
+use crate::sys;
 
 
 /// Submitter

@@ -18,7 +18,7 @@ fn main() {
 
     #[cfg(feature = "overwrite")]
     let outdir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("src");
+        .join("src/sys");
 
     bindgen::Builder::default()
         .header_contents("include-file.h", INCLUDE)

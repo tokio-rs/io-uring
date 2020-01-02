@@ -16,17 +16,17 @@ categories = [ "asynchronous", "network-programming", "filesystem" ]
 exclude = [ "loom-ringbuf" ]
 
 [features]
-bindgen = [ "linux-io-uring-sys/bindgen" ]
 concurrent = [ "parking_lot" ]
 unstable = []
+overwrite = [ "bindgen" ]
 
 [dependencies]
 libc = "0.2"
 bitflags = "1"
 parking_lot = { version = "0.10", optional = true }
 
-# Avoid leaking types from -sys because it is unstable.
-linux-io-uring-sys = { version = "0.0.4", path = "linux-io-uring-sys" }
+[build-dependencies]
+bindgen = { version = "0.52", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

@@ -32,6 +32,7 @@ impl CompletionQueue<'_> {
         head == tail
     }
 
+    #[inline]
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }
