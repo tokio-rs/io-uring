@@ -14,22 +14,24 @@ impl CompletionQueue<'_> {
         self.queue.overflow()
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.ring_entries as usize
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
-        let head = unsafe { (*self.queue.head).load(atomic::Ordering::Acquire) };
-        let tail = unsafe { (*self.queue.tail).load(atomic::Ordering::Acquire) };
+        unsafe {
+            let head = (*self.queue.head).load(atomic::Ordering::Acquire);
+            let tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
 
-        tail.wrapping_sub(head) as usize
+            tail.wrapping_sub(head) as usize
+        }
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        let head = unsafe { (*self.queue.head).load(atomic::Ordering::Acquire) };
-        let tail = unsafe { (*self.queue.tail).load(atomic::Ordering::Acquire) };
-
-        head == tail
+        self.len() == 0
     }
 
     #[inline]
@@ -49,11 +51,14 @@ impl CompletionQueue<'_> {
 
                 let entry = *self.queue.cqes.add((head & self.ring_mask) as usize);
 
-                let new_head = head.wrapping_add(1);
-                if (*self.queue.head).compare_and_swap(head, new_head, atomic::Ordering::Release)
-                    == head
-                {
-                    return Some(Entry(entry));
+                match (*self.queue.head).compare_exchange_weak(
+                    head,
+                    head.wrapping_add(1),
+                    atomic::Ordering::Release,
+                    atomic::Ordering::Relaxed
+                ) {
+                    Ok(_) => return Some(Entry(entry)),
+                    Err(_) => continue
                 }
             }
         }

@@ -57,24 +57,26 @@ impl CompletionQueue {
         }
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         unsafe {
             self.ring_entries.read_volatile() as usize
         }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
-        let head = unsafe { unsync_load(self.head) };
-        let tail = unsafe { (*self.tail).load(atomic::Ordering::Acquire) };
+        unsafe {
+            let head = unsync_load(self.head);
+            let tail = (*self.tail).load(atomic::Ordering::Acquire);
 
-        tail.wrapping_sub(head) as usize
+            tail.wrapping_sub(head) as usize
+        }
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        let head = unsafe { unsync_load(self.head) };
-        let tail = unsafe { (*self.tail).load(atomic::Ordering::Acquire) };
-
-        head == tail
+        self.len() == 0
     }
 
     #[inline]
@@ -105,6 +107,7 @@ impl AvailableQueue<'_> {
         }
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.ring_entries as usize
     }
@@ -116,6 +119,7 @@ impl AvailableQueue<'_> {
 }
 
 impl ExactSizeIterator for AvailableQueue<'_> {
+    #[inline]
     fn len(&self) -> usize {
         self.tail.wrapping_sub(self.head) as usize
     }

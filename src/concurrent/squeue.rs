@@ -22,22 +22,24 @@ impl SubmissionQueue<'_> {
         self.queue.dropped()
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.ring_entries as usize
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
-        let head = unsafe { (*self.queue.head).load(atomic::Ordering::Acquire) };
-        let tail = unsafe { (*self.queue.tail).load(atomic::Ordering::Acquire) };
+        unsafe {
+            let head = (*self.queue.head).load(atomic::Ordering::Acquire);
+            let tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
 
-        tail.wrapping_sub(head) as usize
+            tail.wrapping_sub(head) as usize
+        }
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        let head = unsafe { (*self.queue.head).load(atomic::Ordering::Acquire) };
-        let tail = unsafe { (*self.queue.tail).load(atomic::Ordering::Acquire) };
-
-        head == tail
+        self.len() == 0
     }
 
     #[inline]

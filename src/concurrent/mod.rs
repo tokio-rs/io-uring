@@ -52,20 +52,24 @@ impl IoUring {
 
     /// Get submission queue
     pub fn submission(&self) -> SubmissionQueue<'_> {
-        SubmissionQueue {
-            queue: &self.ring.sq,
-            push_lock: &self.push_lock,
-            ring_mask: unsafe { self.ring.sq.ring_mask.read_volatile() },
-            ring_entries: unsafe { self.ring.sq.ring_entries.read_volatile() },
+        unsafe {
+            SubmissionQueue {
+                queue: &self.ring.sq,
+                push_lock: &self.push_lock,
+                ring_mask: self.ring.sq.ring_mask.read_volatile(),
+                ring_entries: self.ring.sq.ring_entries.read_volatile(),
+            }
         }
     }
 
     /// Get completion queue
     pub fn completion(&self) -> CompletionQueue<'_> {
-        CompletionQueue {
-            queue: &self.ring.cq,
-            ring_mask: unsafe { self.ring.cq.ring_mask.read_volatile() },
-            ring_entries: unsafe { self.ring.cq.ring_entries.read_volatile() }
+        unsafe {
+            CompletionQueue {
+                queue: &self.ring.cq,
+                ring_mask: self.ring.cq.ring_mask.read_volatile(),
+                ring_entries: self.ring.cq.ring_entries.read_volatile()
+            }
         }
     }
 

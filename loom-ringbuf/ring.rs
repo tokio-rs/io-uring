@@ -60,10 +60,14 @@ impl<T: Copy> Ring<T> {
             let t = self.buf[(head & MASK) as usize]
                 .with(|p| unsafe { (*p).as_ptr().read() });
 
-            if self.head.compare_and_swap(head, head.wrapping_add(1), atomic::Ordering::Release)
-                == head
-            {
-                return Some(t);
+            match self.head.compare_exchange_weak(
+                head,
+                head.wrapping_add(1),
+                atomic::Ordering::Release,
+                atomic::Ordering::Relaxed
+            ) {
+                Ok(_) => return Some(t),
+                Err(_) => continue
             }
         }
     }

@@ -14,9 +14,6 @@ pub struct SubmissionQueue {
     pub(crate) flags: *const atomic::AtomicU32,
     dropped: *const atomic::AtomicU32,
 
-    #[allow(dead_code)]
-    array: *mut u32,
-
     pub(crate) sqes: *mut sys::io_uring_sqe
 }
 
@@ -72,14 +69,13 @@ impl SubmissionQueue {
 
         // To keep it simple, map it directly to `sqes`.
         for i in 0..*ring_entries {
-            *array.add(i as usize) = i;
+            array.add(i as usize).write_volatile(i);
         }
 
         SubmissionQueue {
             head, tail,
             ring_mask, ring_entries,
             flags, dropped,
-            array,
             sqes
         }
     }
@@ -97,24 +93,26 @@ impl SubmissionQueue {
         }
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         unsafe {
             self.ring_entries.read_volatile() as usize
         }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
-        let head = unsafe { (*self.head).load(atomic::Ordering::Acquire) };
-        let tail = unsafe { unsync_load(self.tail) };
+        unsafe {
+            let head = (*self.head).load(atomic::Ordering::Acquire);
+            let tail = unsync_load(self.tail);
 
-        tail.wrapping_sub(head) as usize
+            tail.wrapping_sub(head) as usize
+        }
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        let head = unsafe { (*self.head).load(atomic::Ordering::Acquire) };
-        let tail = unsafe { unsync_load(self.tail) };
-
-        head == tail
+        self.len() == 0
     }
 
     #[inline]
@@ -145,18 +143,22 @@ impl AvailableQueue<'_> {
         }
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.ring_entries as usize
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.tail.wrapping_sub(self.head) as usize
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.head == self.tail
     }
 
+    #[inline]
     pub fn is_full(&self) -> bool {
         self.tail.wrapping_sub(self.head) == self.ring_entries
     }
@@ -169,7 +171,7 @@ impl AvailableQueue<'_> {
     /// Developers must ensure that parameters of the [Entry] (such as buffer) are valid,
     /// otherwise it may cause memory problems.
     pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
-        if self.len() < self.capacity() {
+        if !self.is_full() {
             *self.queue.sqes.add((self.tail & self.ring_mask) as usize)
                 = entry;
             self.tail = self.tail.wrapping_add(1);
