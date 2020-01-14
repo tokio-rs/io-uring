@@ -13,7 +13,7 @@ use common::Fd;
 
 #[test]
 fn test_eventfd() -> anyhow::Result<()> {
-    let mut io_uring = IoUring::new(1)?;
+    let mut ring = IoUring::new(1)?;
     let efd: Arc<Fd> = eventfd(0, EfdFlags::EFD_CLOEXEC)?
         .try_into()
         .map(Arc::new)
@@ -29,14 +29,14 @@ fn test_eventfd() -> anyhow::Result<()> {
 
     // push read eventfd
     unsafe {
-        io_uring
+        ring
             .submission()
             .available()
             .push(entry.build().user_data(0x42))
             .map_err(drop)
             .expect("queue is full");
     }
-    io_uring.submit()?;
+    ring.submit()?;
 
     let now = Instant::now();
     let efd2 = efd.clone();
@@ -50,11 +50,11 @@ fn test_eventfd() -> anyhow::Result<()> {
     });
 
     // wait
-    io_uring.submit_and_wait(1)?;
+    ring.submit_and_wait(1)?;
     let t = now.elapsed();
     assert_eq!(t.as_secs(), 1);
 
-    let entry = io_uring
+    let entry = ring
         .completion()
         .available()
         .next()

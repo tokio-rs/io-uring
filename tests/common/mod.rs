@@ -21,6 +21,6 @@ pub fn is_stable_kernel(ring: &IoUring) -> bool {
 }
 
 #[cfg(not(feature = "unstable"))]
-pub fn is_stable_kernel(ring: &IoUring) -> bool {
+pub fn is_stable_kernel(_ring: &IoUring) -> bool {
     true
 }
