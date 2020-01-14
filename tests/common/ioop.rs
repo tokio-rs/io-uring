@@ -1,6 +1,6 @@
 use std::io;
-use linux_io_uring::opcode::{ self, types };
-use linux_io_uring::{ squeue, IoUring };
+use io_uring::opcode::{ self, types };
+use io_uring::{ squeue, IoUring };
 
 
 const TEXT: &[u8] = b"hello world!";

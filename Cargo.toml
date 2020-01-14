@@ -1,12 +1,12 @@
 [package]
-name = "linux-io-uring"
-version = "0.1.0"
+name = "io-uring"
+version = "0.3.0"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
-repository = "https://github.com/quininer/linux-io-uring"
-homepage = "https://github.com/quininer/linux-io-uring"
-documentation = "https://docs.rs/linux-io-uring"
+repository = "https://github.com/quininer/io-uring"
+homepage = "https://github.com/quininer/io-uring"
+documentation = "https://docs.rs/io-uring"
 description = "The `io_uring` library for Rust."
 categories = [ "asynchronous", "network-programming", "filesystem" ]
 
@@ -36,6 +36,9 @@ lazy_static = "1"
 socket2 = "0.3"
 criterion = "0.3"
 iou = "0.2"
+
+[package.metadata.docs.rs]
+all-features = true
 
 [[bench]]
 name = "nop"

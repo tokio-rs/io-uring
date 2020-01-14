@@ -4,8 +4,8 @@ use std::{ io, mem };
 use std::os::unix::io::AsRawFd;
 use tempfile::tempfile;
 use nix::sys::eventfd::*;
-use linux_io_uring::opcode::{ self, types };
-use linux_io_uring::{ reg, unreg, IoUring };
+use io_uring::opcode::{ self, types };
+use io_uring::{ reg, unreg, IoUring };
 use common::{ Fd, do_write_read };
 
 
@@ -15,9 +15,7 @@ fn test_fixed_file() -> anyhow::Result<()> {
     let fd = tempfile()?;
 
     // register fd
-    unsafe {
-        ring.register(reg::Target::Files(&[fd.as_raw_fd()]))?;
-    }
+    ring.register(reg::Target::Files(&[fd.as_raw_fd()]))?;
 
     let fd = types::Target::Fixed(0);
 
@@ -87,9 +85,7 @@ fn test_reg_eventfd() -> anyhow::Result<()> {
     let efd = eventfd(0, EfdFlags::EFD_CLOEXEC | EfdFlags::EFD_NONBLOCK)?;
 
     // register eventfd
-    unsafe {
-        ring.register(reg::Target::EventFd(efd))?;
-    }
+    ring.register(reg::Target::EventFd(efd))?;
 
     let mut buf = [0; 8];
 

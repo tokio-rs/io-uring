@@ -6,8 +6,8 @@ use std::convert::TryInto;
 use std::time::{ Duration, Instant };
 use std::os::unix::io::AsRawFd;
 use nix::sys::eventfd::*;
-use linux_io_uring::opcode::{ self, types };
-use linux_io_uring::IoUring;
+use io_uring::opcode::{ self, types };
+use io_uring::IoUring;
 use common::Fd;
 
 

@@ -2,8 +2,8 @@
 
 mod ioop;
 
-use linux_io_uring::IoUring;
-use linux_io_uring::opcode::{ self, types };
+use io_uring::IoUring;
+use io_uring::opcode::{ self, types };
 pub use ioop::do_write_read;
 
 

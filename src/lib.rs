@@ -129,7 +129,7 @@ impl IoUring {
 
     /// Register files or user buffers for asynchronous I/O.
     #[inline]
-    pub unsafe fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
+    pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
         self.as_submit().register(target)
     }
 

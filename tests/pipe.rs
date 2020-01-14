@@ -3,8 +3,8 @@ mod common;
 use std::{ io, thread };
 use std::time::{ Instant, Duration };
 use std::os::unix::io::AsRawFd;
-use linux_io_uring::opcode::{ self, types };
-use linux_io_uring::IoUring;
+use io_uring::opcode::{ self, types };
+use io_uring::IoUring;
 use common::Fd;
 
 

@@ -1,5 +1,5 @@
 use criterion::{ criterion_main, criterion_group, Criterion, black_box };
-use linux_io_uring::{ opcode, IoUring };
+use io_uring::{ opcode, IoUring };
 
 
 struct TaskQueue(usize);

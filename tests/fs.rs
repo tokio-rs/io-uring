@@ -2,8 +2,8 @@ mod common;
 
 use std::os::unix::io::AsRawFd;
 use tempfile::tempfile;
-use linux_io_uring::opcode::types;
-use linux_io_uring::IoUring;
+use io_uring::opcode::types;
+use io_uring::IoUring;
 use common::do_write_read;
 
 

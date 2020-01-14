@@ -1,4 +1,4 @@
-use linux_io_uring::{ opcode, IoUring };
+use io_uring::{ opcode, IoUring };
 
 
 #[test]

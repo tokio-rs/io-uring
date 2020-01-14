@@ -5,8 +5,8 @@ use std::mem::MaybeUninit;
 use std::os::unix::io::AsRawFd;
 use std::net::{ SocketAddr, TcpListener, TcpStream };
 use lazy_static::lazy_static;
-use linux_io_uring::opcode::{ self, types };
-use linux_io_uring::{ squeue, reg, IoUring };
+use io_uring::opcode::{ self, types };
+use io_uring::{ squeue, reg, IoUring };
 use common::do_write_read;
 
 
@@ -60,9 +60,7 @@ fn test_tcp_sendmsg_and_recvmsg() -> anyhow::Result<()> {
     let mut bufs2 = [io::IoSliceMut::new(&mut buf2)];
 
     // reg fd
-    unsafe {
-        ring.register(reg::Target::Files(&[stream.as_raw_fd()]))?;
-    }
+    ring.register(reg::Target::Files(&[stream.as_raw_fd()]))?;
 
     // build sendmsg
     let mut msg = MaybeUninit::<libc::msghdr>::zeroed();

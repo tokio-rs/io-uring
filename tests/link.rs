@@ -6,8 +6,8 @@ use std::convert::TryInto;
 use std::time::{ Instant, Duration };
 use std::os::unix::io::AsRawFd;
 use nix::sys::eventfd::*;
-use linux_io_uring::opcode::{ self, types };
-use linux_io_uring::{ squeue, IoUring };
+use io_uring::opcode::{ self, types };
+use io_uring::{ squeue, IoUring };
 use common::{ Fd, is_stable_kernel };
 
 
