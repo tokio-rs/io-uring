@@ -205,28 +205,9 @@ impl Builder {
         self
     }
 
-    /// If this flag is set, the two SQ and CQ rings can be mapped with a single `mmap(2)` call.
-    /// The SQEs must still be allocated separately.
-    /// This brings the necessary `mmap(2)` calls down from three to two.
+    #[deprecated(since="0.3.1", note="unnecessary")]
     pub fn feature_single_mmap(&mut self) -> &mut Self {
         self.params.features |= sys::IORING_FEAT_SINGLE_MMAP;
-        self
-    }
-
-    /// If this flag is set, io_uring supports never dropping completion events. If a completion
-    /// event occurs and the CQ ring is full, the kernel stores the event internally until such a
-    /// time that the CQ ring has room for more entries.
-    #[cfg(feature = "unstable")]
-    pub fn feature_nodrop(&mut self) -> &mut Self {
-        self.params.features |= sys::IORING_FEAT_NODROP;
-        self
-    }
-
-    /// If this flag is set, applications can be certain that any data for async offload has been consumed
-    /// when the kernel has consumed the SQE
-    #[cfg(feature = "unstable")]
-    pub fn feature_submit_stable(&mut self) -> &mut Self {
-        self.params.features |= sys::IORING_FEAT_SUBMIT_STABLE;
         self
     }
 
@@ -290,11 +271,27 @@ impl Parameters {
         self.0.flags & sys::IORING_SETUP_SQPOLL != 0
     }
 
+    pub fn is_setup_iopoll(&self) -> bool {
+        self.0.flags & sys::IORING_SETUP_IOPOLL != 0
+    }
+
+    /// If this flag is set, the two SQ and CQ rings can be mapped with a single `mmap(2)` call.
+    /// The SQEs must still be allocated separately.
+    /// This brings the necessary `mmap(2)` calls down from three to two.
+    pub fn is_feature_single_mmap(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_SINGLE_MMAP != 0
+    }
+
+    /// If this flag is set, io_uring supports never dropping completion events. If a completion
+    /// event occurs and the CQ ring is full, the kernel stores the event internally until such a
+    /// time that the CQ ring has room for more entries.
     #[cfg(feature = "unstable")]
     pub fn is_feature_nodrop(&self) -> bool {
         self.0.features & sys::IORING_FEAT_NODROP != 0
     }
 
+    /// If this flag is set, applications can be certain that any data for async offload has been consumed
+    /// when the kernel has consumed the SQE
     #[cfg(feature = "unstable")]
     pub fn is_feature_submit_stable(&self) -> bool {
         self.0.features & sys::IORING_FEAT_SUBMIT_STABLE != 0
