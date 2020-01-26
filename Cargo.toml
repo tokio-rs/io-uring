@@ -38,7 +38,7 @@ criterion = "0.3"
 iou = "0.2"
 
 [package.metadata.docs.rs]
-all-features = true
+features = [ "concurrent", "unstable" ]
 
 [[bench]]
 name = "nop"

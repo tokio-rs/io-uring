@@ -7,7 +7,7 @@ const TEXT: &[u8] = b"hello world!";
 
 pub fn do_write_read(ring: &mut IoUring, target: types::Target) -> anyhow::Result<()> {
     let buf = TEXT.to_vec();
-    let mut buf2 = vec![0; TEXT.len()];
+    let mut buf2 = vec![0; TEXT.len() + 3];
     let bufs = [io::IoSlice::new(&buf)];
     let mut bufs2 = [io::IoSliceMut::new(&mut buf2)];
 
@@ -37,7 +37,7 @@ pub fn do_write_read(ring: &mut IoUring, target: types::Target) -> anyhow::Resul
     assert_eq!(cqes[0].result(), 12);
     assert_eq!(cqes[1].result(), 12);
 
-    assert_eq!(buf2, TEXT);
+    assert_eq!(&buf2[..cqes[1].result() as usize], TEXT);
 
     Ok(())
 }

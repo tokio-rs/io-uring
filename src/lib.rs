@@ -43,7 +43,10 @@ struct MemoryMap {
 
 /// IoUring build params
 #[derive(Clone, Default)]
-pub struct Builder(sys::io_uring_params);
+pub struct Builder {
+    dontfork: bool,
+    params: sys::io_uring_params
+}
 
 #[derive(Clone)]
 pub struct Parameters(sys::io_uring_params);
@@ -197,11 +200,16 @@ impl Drop for IoUring {
 }
 
 impl Builder {
+    pub fn dontfork(&mut self) -> &mut Self {
+        self.dontfork = true;
+        self
+    }
+
     /// If this flag is set, the two SQ and CQ rings can be mapped with a single `mmap(2)` call.
     /// The SQEs must still be allocated separately.
     /// This brings the necessary `mmap(2)` calls down from three to two.
     pub fn feature_single_mmap(&mut self) -> &mut Self {
-        self.0.features |= sys::IORING_FEAT_SINGLE_MMAP;
+        self.params.features |= sys::IORING_FEAT_SINGLE_MMAP;
         self
     }
 
@@ -210,7 +218,7 @@ impl Builder {
     /// time that the CQ ring has room for more entries.
     #[cfg(feature = "unstable")]
     pub fn feature_nodrop(&mut self) -> &mut Self {
-        self.0.features |= sys::IORING_FEAT_NODROP;
+        self.params.features |= sys::IORING_FEAT_NODROP;
         self
     }
 
@@ -218,14 +226,14 @@ impl Builder {
     /// when the kernel has consumed the SQE
     #[cfg(feature = "unstable")]
     pub fn feature_submit_stable(&mut self) -> &mut Self {
-        self.0.features |= sys::IORING_FEAT_SUBMIT_STABLE;
+        self.params.features |= sys::IORING_FEAT_SUBMIT_STABLE;
         self
     }
 
     /// Perform busy-waiting for an I/O completion,
     /// as opposed to getting notifications via an asynchronous IRQ (Interrupt Request).
     pub fn setup_iopoll(&mut self) -> &mut Self {
-        self.0.flags |= sys::IORING_SETUP_IOPOLL;
+        self.params.flags |= sys::IORING_SETUP_IOPOLL;
         self
     }
 
@@ -233,10 +241,10 @@ impl Builder {
     /// An io_uring instance configured in this way enables an application to issue I/O
     /// without ever context switching into the kernel.
     pub fn setup_sqpoll(&mut self, idle: impl Into<Option<u32>>) -> &mut Self {
-        self.0.flags |= sys::IORING_SETUP_SQPOLL;
+        self.params.flags |= sys::IORING_SETUP_SQPOLL;
 
         if let Some(n) = idle.into() {
-            self.0.sq_thread_idle = n;
+            self.params.sq_thread_idle = n;
         }
 
         self
@@ -246,8 +254,8 @@ impl Builder {
     /// then the poll thread will be bound to the cpu set in the value.
     /// This flag is only meaningful when [Builder::setup_sqpoll] is enabled.
     pub fn setup_sqpoll_cpu(&mut self, n: u32) -> &mut Self {
-        self.0.flags |= sys::IORING_SETUP_SQ_AFF;
-        self.0.sq_thread_cpu = n;
+        self.params.flags |= sys::IORING_SETUP_SQ_AFF;
+        self.params.sq_thread_cpu = n;
         self
     }
 
@@ -255,15 +263,25 @@ impl Builder {
     /// The value must be greater than entries, and may be rounded up to the next power-of-two.
     #[cfg(feature = "unstable")]
     pub fn setup_cqsize(&mut self, n: u32) -> &mut Self {
-        self.0.flags |= sys::IORING_SETUP_CQSIZE;
-        self.0.cq_entries = n;
+        self.params.flags |= sys::IORING_SETUP_CQSIZE;
+        self.params.cq_entries = n;
         self
     }
 
     /// Build a [IoUring].
     #[inline]
-    pub fn build(self, entries: u32) -> io::Result<IoUring> {
-        IoUring::with_params(entries, self.0)
+    pub fn build(&self, entries: u32) -> io::Result<IoUring> {
+        let ring = IoUring::with_params(entries, self.params.clone())?;
+
+        if self.dontfork {
+            ring.memory.sq_mmap.dontfork()?;
+            ring.memory.sqe_mmap.dontfork()?;
+            if let Some(cq_mmap) = ring.memory.cq_mmap.as_ref() {
+                cq_mmap.dontfork()?;
+            }
+        }
+
+        Ok(ring)
     }
 }
 

@@ -29,10 +29,12 @@ impl<'a> Submitter<'a> {
     }
 
     fn sq_len(&self) -> usize {
-        let head = unsafe { (*self.sq_head).load(atomic::Ordering::Acquire) };
-        let tail = unsafe { unsync_load(self.sq_tail) };
+        unsafe {
+            let head = (*self.sq_head).load(atomic::Ordering::Acquire);
+            let tail = unsync_load(self.sq_tail);
 
-        tail.wrapping_sub(head) as usize
+            tail.wrapping_sub(head) as usize
+        }
     }
 
     fn sq_need_wakeup(&self) -> bool {

@@ -43,6 +43,15 @@ impl Mmap {
         }
     }
 
+    pub fn dontfork(&self) -> io::Result<()> {
+        match unsafe {
+            libc::madvise(self.addr.as_ptr(), self.len, libc::MADV_DONTFORK)
+        } {
+            0 => Ok(()),
+            _ => Err(io::Error::last_os_error())
+        }
+    }
+
     pub fn as_mut_ptr(&self) -> *mut libc::c_void {
         self.addr.as_ptr()
     }
