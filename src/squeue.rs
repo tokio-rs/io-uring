@@ -96,7 +96,7 @@ impl SubmissionQueue {
     #[inline]
     pub fn capacity(&self) -> usize {
         unsafe {
-            self.ring_entries.read_volatile() as usize
+            self.ring_entries.read() as usize
         }
     }
 
@@ -126,8 +126,8 @@ impl SubmissionQueue {
             AvailableQueue {
                 head: (*self.head).load(atomic::Ordering::Acquire),
                 tail: unsync_load(self.tail),
-                ring_mask: self.ring_mask.read_volatile(),
-                ring_entries: self.ring_entries.read_volatile(),
+                ring_mask: self.ring_mask.read(),
+                ring_entries: self.ring_entries.read(),
                 queue: self
             }
         }

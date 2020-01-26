@@ -56,8 +56,8 @@ impl IoUring {
             SubmissionQueue {
                 queue: &self.ring.sq,
                 push_lock: &self.push_lock,
-                ring_mask: self.ring.sq.ring_mask.read_volatile(),
-                ring_entries: self.ring.sq.ring_entries.read_volatile(),
+                ring_mask: self.ring.sq.ring_mask.read(),
+                ring_entries: self.ring.sq.ring_entries.read(),
             }
         }
     }
@@ -67,8 +67,8 @@ impl IoUring {
         unsafe {
             CompletionQueue {
                 queue: &self.ring.cq,
-                ring_mask: self.ring.cq.ring_mask.read_volatile(),
-                ring_entries: self.ring.cq.ring_entries.read_volatile()
+                ring_mask: self.ring.cq.ring_mask.read(),
+                ring_entries: self.ring.cq.ring_entries.read()
             }
         }
     }

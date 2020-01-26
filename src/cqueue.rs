@@ -60,7 +60,7 @@ impl CompletionQueue {
     #[inline]
     pub fn capacity(&self) -> usize {
         unsafe {
-            self.ring_entries.read_volatile() as usize
+            self.ring_entries.read() as usize
         }
     }
 
@@ -90,8 +90,8 @@ impl CompletionQueue {
             AvailableQueue {
                 head: unsync_load(self.head),
                 tail: (*self.tail).load(atomic::Ordering::Acquire),
-                ring_mask: self.ring_mask.read_volatile(),
-                ring_entries: self.ring_entries.read_volatile(),
+                ring_mask: self.ring_mask.read(),
+                ring_entries: self.ring_entries.read(),
                 queue: self
             }
         }

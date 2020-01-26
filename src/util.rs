@@ -61,8 +61,6 @@ impl Drop for Mmap {
     fn drop(&mut self) {
         unsafe {
             libc::munmap(self.addr.as_ptr(), self.len);
-
-            // TODO log fail
         }
     }
 }
