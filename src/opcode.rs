@@ -466,6 +466,7 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    /// Attempt to remove an existing timeout operation.
     pub struct TimeoutRemove {
         user_data: u64,
         ;;
@@ -486,10 +487,11 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    /// Issue the equivalent of an `accept4 (2)` system call.
     pub struct Accept {
         fd: types::Target,
-        addr: *const libc::sockaddr,
-        addrlen: libc::socklen_t
+        addr: *mut libc::sockaddr,
+        addrlen: *mut libc::socklen_t
         ;;
         flags: u32 = 0
     }
@@ -501,7 +503,7 @@ opcode!(
         sqe.opcode = sys::IORING_OP_ACCEPT as _;
         assign_fd!(sqe.fd = fd);
         sqe.addr = addr as _;
-        sqe.__bindgen_anon_1.off = addrlen as _;
+        sqe.__bindgen_anon_1.addr2 = addrlen as _;
         sqe.__bindgen_anon_2.accept_flags = flags;
         Entry(sqe)
     }
@@ -509,26 +511,30 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    /// Attempt to cancel an already issued request.
     pub struct AsyncCancel {
         user_data: u64,
         ;;
-        flags: u32 = 0
+
+        // TODO flags
     }
 
     pub fn build(self) -> Entry {
-        let AsyncCancel { user_data, flags } = self;
+        let AsyncCancel { user_data } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = sys::IORING_OP_ASYNC_CANCEL as _;
         sqe.fd = -1;
         sqe.addr = user_data as _;
-        sqe.__bindgen_anon_2.timeout_flags = flags;
         Entry(sqe)
     }
 );
 
 #[cfg(feature = "unstable")]
 opcode!(
+    /// This request must be linked with
+    /// another request through [Flags::IO_LINK](crate::squeue::Flags::IO_LINK) which is described below.
+    /// Unlike [Timeout], [LinkTimeout] acts on the linked request, not the completion queue.
     pub struct LinkTimeout {
         timespec: *const types::Timespec,
         ;;
@@ -550,6 +556,7 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    /// Issue the equivalent of a `connect (2)` system call.
     pub struct Connect {
         fd: types::Target,
         addr: *const libc::sockaddr,

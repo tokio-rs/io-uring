@@ -29,7 +29,7 @@ fn test_pipe_part_read() -> anyhow::Result<()> {
             .submission()
             .available()
             .push(entry.build().user_data(0x42))
-            .map_err(drop)
+            .ok()
             .expect("queue is full");
     }
     ring.submit_and_wait(1)?;
@@ -55,7 +55,7 @@ fn test_pipe_part_read() -> anyhow::Result<()> {
             .submission()
             .available()
             .push(entry.build().user_data(0x43))
-            .map_err(drop)
+            .ok()
             .expect("queue is full");
     }
 

@@ -136,10 +136,6 @@ fn test_fail_link() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
     cqes.sort_by_key(|cqe| cqe.user_data());
 
-    if cfg!(feature = "unstable") {
-
-    }
-
     if is_stable_kernel(&ring) {
         assert_eq!(cqes.len(), 2);
         assert_eq!(cqes[0].result(), -libc::EBADF);
@@ -151,9 +147,6 @@ fn test_fail_link() -> anyhow::Result<()> {
         assert_eq!(cqes[0].result(), -libc::EBADF);
         assert_eq!(cqes[0].user_data(), 0x42);
     }
-
-    /*
-    */
 
     Ok(())
 }
