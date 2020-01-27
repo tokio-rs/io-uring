@@ -61,7 +61,6 @@ fn test_sq_full() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
 #[test]
 fn test_cq_overflow() -> anyhow::Result<()> {
     let mut ring = IoUring::new(4)?;

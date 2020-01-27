@@ -23,7 +23,6 @@ pub mod types {
 
     bitflags!{
         pub struct TimeoutFlags: u32 {
-            #[cfg(feature = "unstable")]
             const ABS = sys::IORING_TIMEOUT_ABS;
         }
     }
@@ -445,7 +444,6 @@ opcode!(
         /// `count` may contain a completion event count. If not set, this defaults to 1.
         count: u32 = 0,
 
-        #[cfg_attr(not(feature = "unstable"), allow(intra_doc_link_resolution_failure))]
         /// `flags` may contain [types::TimeoutFlags::ABS] for an absolutel timeout value, or 0 for a relative timeout.
         flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
@@ -464,7 +462,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Attempt to remove an existing timeout operation.
     pub struct TimeoutRemove {
@@ -485,7 +482,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Issue the equivalent of an `accept4 (2)` system call.
     pub struct Accept {
@@ -509,7 +505,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Attempt to cancel an already issued request.
     pub struct AsyncCancel {
@@ -530,7 +525,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// This request must be linked with
     /// another request through [Flags::IO_LINK](crate::squeue::Flags::IO_LINK) which is described below.
@@ -554,7 +548,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Issue the equivalent of a `connect (2)` system call.
     pub struct Connect {

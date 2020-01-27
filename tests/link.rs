@@ -8,7 +8,7 @@ use std::os::unix::io::AsRawFd;
 use nix::sys::eventfd::*;
 use io_uring::opcode::{ self, types };
 use io_uring::{ squeue, IoUring };
-use common::{ Fd, is_stable_kernel };
+use common::{ Fd, KernelSupport, check_kernel_support };
 
 
 #[test]
@@ -136,16 +136,20 @@ fn test_fail_link() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
     cqes.sort_by_key(|cqe| cqe.user_data());
 
-    if is_stable_kernel(&ring) {
-        assert_eq!(cqes.len(), 2);
-        assert_eq!(cqes[0].result(), -libc::EBADF);
-        assert_eq!(cqes[0].user_data(), 0x42);
-        assert_eq!(cqes[1].result(), 0);
-        assert_eq!(cqes[1].user_data(), 0x43);
-    } else {
-        assert_eq!(cqes.len(), 1);
-        assert_eq!(cqes[0].result(), -libc::EBADF);
-        assert_eq!(cqes[0].user_data(), 0x42);
+    match check_kernel_support(&ring) {
+        KernelSupport::Less => panic!("unsupported"),
+        KernelSupport::V54 => {
+            assert_eq!(cqes.len(), 2);
+            assert_eq!(cqes[0].result(), -libc::EBADF);
+            assert_eq!(cqes[0].user_data(), 0x42);
+            assert_eq!(cqes[1].result(), 0);
+            assert_eq!(cqes[1].user_data(), 0x43);
+        },
+        KernelSupport::V55 | _ => {
+            assert_eq!(cqes.len(), 1);
+            assert_eq!(cqes[0].result(), -libc::EBADF);
+            assert_eq!(cqes[0].user_data(), 0x42);
+        }
     }
 
     Ok(())

@@ -34,7 +34,6 @@ pub mod register {
         /// Register eventfd.
         EventFd(RawFd),
 
-        #[cfg(feature = "unstable")]
         FilesUpdate { offset: u32, fds: &'a [RawFd] }
     }
 
@@ -51,7 +50,6 @@ pub mod register {
                     execute(fd, sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _),
                 Target::EventFd(eventfd) =>
                     execute(fd, sys::IORING_REGISTER_EVENTFD, cast_ptr::<RawFd>(eventfd) as *const _, 1),
-                #[cfg(feature = "unstable")]
                 Target::FilesUpdate { offset, fds } => {
                     let fu = sys::io_uring_files_update {
                         offset: *offset,

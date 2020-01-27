@@ -3,24 +3,28 @@
 mod ioop;
 
 use io_uring::IoUring;
-use io_uring::opcode::{ self, types };
 pub use ioop::do_write_read;
 
 
 include!("../../src/util.rs");
 
-pub fn one_s() -> opcode::Timeout {
-    static ONE_S: types::Timespec = types::Timespec { tv_sec: 1, tv_nsec: 0 };
-
-    opcode::Timeout::new(&ONE_S)
+pub enum KernelSupport {
+    Less,
+    V54,
+    V55,
+    V56
 }
 
-#[cfg(feature = "unstable")]
-pub fn is_stable_kernel(ring: &IoUring) -> bool {
-    !ring.params().is_feature_nodrop()
-}
+pub fn check_kernel_support(ring: &IoUring) -> KernelSupport {
+    let p = ring.params();
 
-#[cfg(not(feature = "unstable"))]
-pub fn is_stable_kernel(_ring: &IoUring) -> bool {
-    true
+    if !p.is_feature_single_mmap() {
+        return KernelSupport::Less;
+    }
+
+    if !p.is_feature_nodrop() {
+        return KernelSupport::V54;
+    }
+
+    KernelSupport::V55
 }

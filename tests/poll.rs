@@ -3,7 +3,7 @@ mod common;
 use std::os::unix::io::AsRawFd;
 use io_uring::opcode::{ self, types };
 use io_uring::IoUring;
-use common::{ Fd, is_stable_kernel };
+use common::{ Fd, KernelSupport, check_kernel_support };
 
 
 #[test]
@@ -87,10 +87,10 @@ fn test_poll_remove() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
     cqes.sort_by_key(|cqe| cqe.user_data());
 
-    if is_stable_kernel(&ring) {
-        assert_eq!(cqes[0].result(), 0);
-    } else {
-        assert_eq!(cqes[0].result(), -libc::ECANCELED);
+    match check_kernel_support(&ring) {
+        KernelSupport::Less => panic!("unsupported"),
+        KernelSupport::V54 => assert_eq!(cqes[0].result(), 0),
+        KernelSupport::V55 | _ => assert_eq!(cqes[0].result(), -libc::ECANCELED)
     }
 
     assert_eq!(cqes[0].user_data(), token);

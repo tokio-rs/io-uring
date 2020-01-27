@@ -10,30 +10,6 @@ use io_uring::{ squeue, reg, IoUring };
 use common::do_write_read;
 
 
-#[cfg(not(feature = "unstable"))]
-pub fn echo_server() -> &'static SocketAddr {
-    lazy_static!{
-        static ref TEST_SERVER: SocketAddr = {
-            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
-            let addr = listener.local_addr().unwrap();
-
-            thread::spawn(move || {
-                for stream in listener.incoming() {
-                    let stream = stream.unwrap();
-                    let (mut r, mut w) = (&stream, &stream);
-                    io::copy(&mut r, &mut w).unwrap();
-                }
-            });
-
-            addr
-        };
-    }
-
-    &*TEST_SERVER
-}
-
-
-#[cfg(feature = "unstable")]
 pub fn echo_server() -> &'static SocketAddr {
     use std::mem;
     use std::os::unix::io::FromRawFd;
@@ -175,7 +151,6 @@ fn test_tcp_sendmsg_and_recvmsg() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
 #[test]
 fn test_tcp_connect() -> anyhow::Result<()> {
     use socket2::{ SockAddr, Socket, Domain, Type, Protocol };

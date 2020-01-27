@@ -242,7 +242,6 @@ impl Builder {
 
     /// Create the completion queue with struct `io_uring_params.cq_entries` entries.
     /// The value must be greater than entries, and may be rounded up to the next power-of-two.
-    #[cfg(feature = "unstable")]
     pub fn setup_cqsize(&mut self, n: u32) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_CQSIZE;
         self.params.cq_entries = n;
@@ -285,14 +284,12 @@ impl Parameters {
     /// If this flag is set, io_uring supports never dropping completion events. If a completion
     /// event occurs and the CQ ring is full, the kernel stores the event internally until such a
     /// time that the CQ ring has room for more entries.
-    #[cfg(feature = "unstable")]
     pub fn is_feature_nodrop(&self) -> bool {
         self.0.features & sys::IORING_FEAT_NODROP != 0
     }
 
     /// If this flag is set, applications can be certain that any data for async offload has been consumed
     /// when the kernel has consumed the SQE
-    #[cfg(feature = "unstable")]
     pub fn is_feature_submit_stable(&self) -> bool {
         self.0.features & sys::IORING_FEAT_SUBMIT_STABLE != 0
     }

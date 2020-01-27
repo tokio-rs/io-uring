@@ -48,7 +48,7 @@ bitflags!{
         /// That next SQE will not be started before this one completes.
         const IO_LINK = sys::IOSQE_IO_LINK as _;
 
-        #[cfg(feature = "unstable")]
+        /// Like [IO_LINK], but it doesn’t sever regardless of the completion result.
         const IO_HARDLINK = sys::IOSQE_IO_HARDLINK as _;
     }
 }

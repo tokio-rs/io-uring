@@ -226,7 +226,6 @@ fn test_timeout_park2() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
 #[test]
 fn test_timeout_remove() -> anyhow::Result<()> {
     let mut ring = IoUring::new(4)?;
@@ -274,7 +273,6 @@ fn test_timeout_remove() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
 #[test]
 fn test_timeout_remove_link() -> anyhow::Result<()> {
     let mut ring = IoUring::new(4)?;
@@ -331,7 +329,6 @@ fn test_timeout_remove_link() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
 #[test]
 fn test_link_timeout() -> anyhow::Result<()> {
     use nix::sys::eventfd::*;
@@ -396,7 +393,6 @@ fn test_link_timeout() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
 #[test]
 fn test_link_timeout_cancel() -> anyhow::Result<()> {
     use nix::sys::eventfd::*;
