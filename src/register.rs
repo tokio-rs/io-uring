@@ -53,7 +53,8 @@ pub mod register {
                 Target::FilesUpdate { offset, fds } => {
                     let fu = sys::io_uring_files_update {
                         offset: *offset,
-                        fds: fds.as_ptr() as *mut _
+                        resv: 0,
+                        fds: fds.as_ptr() as _
                     };
                     let fu = &fu as *const sys::io_uring_files_update;
 

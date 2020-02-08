@@ -2,7 +2,7 @@
 
 use std::sync::atomic;
 use crate::util::{ Mmap, unsync_load };
-use crate::{ sys, mmap_offset };
+use crate::sys;
 
 
 pub struct CompletionQueue {

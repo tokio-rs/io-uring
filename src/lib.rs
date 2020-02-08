@@ -3,6 +3,7 @@
 //! The crate only provides a summary of the parameters.
 //! For more detailed documentation, see manpage.
 
+#[macro_use]
 mod util;
 mod sys;
 mod register;
@@ -223,11 +224,7 @@ impl Builder {
     /// without ever context switching into the kernel.
     pub fn setup_sqpoll(&mut self, idle: impl Into<Option<u32>>) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SQPOLL;
-
-        if let Some(n) = idle.into() {
-            self.params.sq_thread_idle = n;
-        }
-
+        self.params.sq_thread_idle = idle.into().unwrap_or(0);
         self
     }
 

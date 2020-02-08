@@ -1,6 +1,6 @@
 [package]
 name = "io-uring"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -36,6 +36,7 @@ lazy_static = "1"
 socket2 = "0.3"
 criterion = "0.3"
 iou = "0.2"
+slab = "0.4"
 
 [package.metadata.docs.rs]
 features = [ "concurrent", "unstable" ]

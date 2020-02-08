@@ -4,13 +4,11 @@ use std::convert::TryFrom;
 use std::os::unix::io::{ AsRawFd, IntoRawFd, FromRawFd, RawFd };
 
 
-#[doc(hidden)]
-#[macro_export(local_inner_macros)]
 macro_rules! mmap_offset {
     ( $mmap:ident + $offset:expr => $ty:ty ) => {
         $mmap.as_mut_ptr().add($offset as _) as $ty
     };
-    ( $( let $val:ident = $mmap:ident + $offset:expr => $ty:ty );+ $(;)? ) => {
+    ( $( let $val:ident = $mmap:ident + $offset:expr => $ty:ty );+ ; ) => {
         $(
             let $val = mmap_offset!($mmap + $offset => $ty);
         )*
@@ -52,6 +50,7 @@ impl Mmap {
         }
     }
 
+    #[inline]
     pub fn as_mut_ptr(&self) -> *mut libc::c_void {
         self.addr.as_ptr()
     }
@@ -70,6 +69,7 @@ pub struct Fd(pub RawFd);
 impl TryFrom<RawFd> for Fd {
     type Error = ();
 
+    #[inline]
     fn try_from(value: RawFd) -> Result<Fd, Self::Error> {
         if value >= 0 {
             Ok(Fd(value))
@@ -80,12 +80,14 @@ impl TryFrom<RawFd> for Fd {
 }
 
 impl AsRawFd for Fd {
+    #[inline]
     fn as_raw_fd(&self) -> RawFd {
         self.0
     }
 }
 
 impl IntoRawFd for Fd {
+    #[inline]
     fn into_raw_fd(self) -> RawFd {
         let fd = self.0;
         mem::forget(self);
@@ -94,6 +96,7 @@ impl IntoRawFd for Fd {
 }
 
 impl FromRawFd for Fd {
+    #[inline]
     unsafe fn from_raw_fd(fd: RawFd) -> Fd {
         Fd(fd)
     }

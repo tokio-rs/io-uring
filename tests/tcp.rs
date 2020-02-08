@@ -1,7 +1,7 @@
 mod common;
 
 use std::{ io, thread };
-use std::mem::MaybeUninit;
+use std::mem::{ self, MaybeUninit };
 use std::os::unix::io::AsRawFd;
 use std::net::{ SocketAddr, TcpListener, TcpStream };
 use lazy_static::lazy_static;
@@ -11,7 +11,6 @@ use common::do_write_read;
 
 
 pub fn echo_server() -> &'static SocketAddr {
-    use std::mem;
     use std::os::unix::io::FromRawFd;
 
     lazy_static!{
@@ -24,7 +23,7 @@ pub fn echo_server() -> &'static SocketAddr {
 
                 loop {
                     let mut sockaddr: libc::sockaddr = unsafe { mem::zeroed() };
-                    let mut addrlen: libc::socklen_t = 0;
+                    let mut addrlen: libc::socklen_t = mem::size_of::<libc::sockaddr>();
 
                     let accept_e = opcode::Accept::new(
                         types::Target::Fd(listener.as_raw_fd()),

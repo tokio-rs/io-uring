@@ -800,10 +800,11 @@ fn bindgen_test_layout_io_uring_params() {
     );
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct io_uring_files_update {
     pub offset: __u32,
-    pub fds: *mut __s32,
+    pub resv: __u32,
+    pub fds: __u64,
 }
 #[test]
 fn bindgen_test_layout_io_uring_files_update() {
@@ -828,6 +829,16 @@ fn bindgen_test_layout_io_uring_files_update() {
         )
     );
     assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_files_update>())).resv as *const _ as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_files_update),
+            "::",
+            stringify!(resv)
+        )
+    );
+    assert_eq!(
         unsafe { &(*(::core::ptr::null::<io_uring_files_update>())).fds as *const _ as usize },
         8usize,
         concat!(
@@ -837,9 +848,4 @@ fn bindgen_test_layout_io_uring_files_update() {
             stringify!(fds)
         )
     );
-}
-impl Default for io_uring_files_update {
-    fn default() -> Self {
-        unsafe { ::core::mem::zeroed() }
-    }
 }
