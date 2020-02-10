@@ -78,7 +78,11 @@ fn main() -> anyhow::Result<()> {
     accept.push(&mut sq.available());
 
     loop {
-        submitter.submit_and_wait(1)?;
+        match submitter.submit_and_wait(1) {
+            Ok(_) => (),
+            Err(ref err) if err.raw_os_error() == Some(libc::EBUSY) => (),
+            Err(err) => return Err(err.into())
+        }
 
         let mut sq = sq.available();
         let mut iter =  backlog.drain(..);
@@ -113,8 +117,7 @@ fn main() -> anyhow::Result<()> {
             if ret >= 0 {
                 let token = token_alloc.get_mut(token_index)
                     .ok_or_else(|| anyhow::format_err!("not found token"))?;
-                let token_clone = token.clone();
-                match token_clone {
+                match token.clone() {
                     Token::Accept => {
                         println!("accept");
 
