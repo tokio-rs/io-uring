@@ -34,6 +34,15 @@ pub mod register {
         /// Register eventfd.
         EventFd(RawFd),
 
+        #[cfg(features = "unstable")]
+        EventFdAsync(RawFd),
+
+        #[cfg(features = "unstable")]
+        Probe(&mut [Probe]),
+
+        #[cfg(features = "unstable")]
+        Personality(()),
+
         FilesUpdate { offset: u32, fds: &'a [RawFd] }
     }
 
@@ -59,7 +68,9 @@ pub mod register {
                     let fu = &fu as *const sys::io_uring_files_update;
 
                     execute(fd, sys::IORING_REGISTER_FILES_UPDATE, fu as *const _, fds.len() as _)
-                }
+                },
+                #[cfg(features = "unstable")]
+                _ => todo!()
             }
         }
     }
@@ -79,6 +90,9 @@ pub mod unregister {
 
         /// Unregister eventfd.
         EventFd,
+
+        #[cfg(features = "unstable")]
+        Personality
     }
 
     impl Target {
@@ -86,10 +100,15 @@ pub mod unregister {
             let opcode = match self {
                 Target::Buffers => sys::IORING_UNREGISTER_BUFFERS,
                 Target::Files => sys::IORING_UNREGISTER_FILES,
-                Target::EventFd => sys::IORING_UNREGISTER_EVENTFD
+                Target::EventFd => sys::IORING_UNREGISTER_EVENTFD,
+                #[cfg(features = "unstable")]
+                _ => todo!()
             };
 
             execute(fd, opcode, ptr::null(), 0)
         }
     }
 }
+
+#[cfg(features = "unstable")]
+pub struct Probe(*mut sys::io_uring_probe);

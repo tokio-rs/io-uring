@@ -60,6 +60,8 @@ macro_rules! opcode {
             ),* $(,)?
         }
 
+        pub const CODE = $opcode:expr;
+
         pub fn build($self:ident) -> Entry $build_block:block
     ) => {
         $( #[$outer] )*
@@ -76,6 +78,8 @@ macro_rules! opcode {
                     $( $opt_field: $default, )*
                 }
             }
+
+            pub const CODE: u8 = $opcode as _;
 
             $(
                 $( #[$opt_meta] )*
@@ -103,6 +107,8 @@ opcode!(
     #[derive(Debug)]
     pub struct Nop { ;; }
 
+    pub const CODE = sys::IORING_OP_NOP;
+
     pub fn build(self) -> Entry {
         let Nop {} = self;
 
@@ -129,6 +135,8 @@ opcode!(
         /// as described in the `preadv2 (2)` man page.
         rw_flags: types::RwFlags = 0
     }
+
+    pub const CODE = sys::IORING_OP_READV;
 
     pub fn build(self) -> Entry {
         let Readv {
@@ -166,6 +174,8 @@ opcode!(
         rw_flags: types::RwFlags = 0
     }
 
+    pub const CODE = sys::IORING_OP_WRITEV;
+
     pub fn build(self) -> Entry {
         let Writev {
             fd,
@@ -200,6 +210,8 @@ opcode!(
         flags: types::FsyncFlags = types::FsyncFlags::empty()
     }
 
+    pub const CODE = sys::IORING_OP_FSYNC;
+
     pub fn build(self) -> Entry {
         let Fsync { fd, flags } = self;
 
@@ -231,6 +243,8 @@ opcode!(
         rw_flags: types::RwFlags = 0
     }
 
+    pub const CODE = sys::IORING_OP_READ_FIXED;
+
     pub fn build(self) -> Entry {
         let ReadFixed {
             fd,
@@ -247,7 +261,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_2.rw_flags = rw_flags;
-        sqe.__bindgen_anon_3.buf_index = buf_index;
+        sqe.__bindgen_anon_3.__bindgen_anon_1.buf_index = buf_index;
         Entry(sqe)
     }
 );
@@ -272,6 +286,8 @@ opcode!(
         rw_flags: types::RwFlags = 0
     }
 
+    pub const CODE = sys::IORING_OP_WRITE_FIXED;
+
     pub fn build(self) -> Entry {
         let WriteFixed {
             fd,
@@ -288,7 +304,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_2.rw_flags = rw_flags;
-        sqe.__bindgen_anon_3.buf_index = buf_index;
+        sqe.__bindgen_anon_3.__bindgen_anon_1.buf_index = buf_index;
         Entry(sqe)
     }
 );
@@ -306,6 +322,8 @@ opcode!(
         flags: libc::c_short,
         ;;
     }
+
+    pub const CODE = sys::IORING_OP_POLL_ADD;
 
     pub fn build(self) -> Entry {
         let PollAdd { fd, flags } = self;
@@ -328,6 +346,8 @@ opcode!(
         user_data: u64
         ;;
     }
+
+    pub const CODE = sys::IORING_OP_POLL_REMOVE;
 
     pub fn build(self) -> Entry {
         let PollRemove { user_data } = self;
@@ -354,6 +374,8 @@ opcode!(
         /// the flags method holds the flags for the command
         flags: u32 = 0
     }
+
+    pub const CODE = sys::IORING_OP_SYNC_FILE_RANGE;
 
     pub fn build(self) -> Entry {
         let SyncFileRange {
@@ -387,6 +409,8 @@ opcode!(
         flags: u32 = 0
     }
 
+    pub const CODE = sys::IORING_OP_SENDMSG;
+
     pub fn build(self) -> Entry {
         let SendMsg { fd, msg, ioprio, flags } = self;
 
@@ -413,6 +437,8 @@ opcode!(
         ioprio: u16 = 0,
         flags: u32 = 0
     }
+
+    pub const CODE = sys::IORING_OP_RECVMSG;
 
     pub fn build(self) -> Entry {
         let RecvMsg { fd, msg, ioprio, flags } = self;
@@ -448,6 +474,8 @@ opcode!(
         flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
 
+    pub const CODE = sys::IORING_OP_TIMEOUT;
+
     pub fn build(self) -> Entry {
         let Timeout { timespec, count, flags } = self;
 
@@ -462,6 +490,8 @@ opcode!(
     }
 );
 
+// === 5.5 ===
+
 opcode!(
     /// Attempt to remove an existing timeout operation.
     pub struct TimeoutRemove {
@@ -469,6 +499,8 @@ opcode!(
         ;;
         flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
+
+    pub const CODE = sys::IORING_OP_TIMEOUT_REMOVE;
 
     pub fn build(self) -> Entry {
         let TimeoutRemove { user_data, flags } = self;
@@ -492,6 +524,8 @@ opcode!(
         flags: u32 = 0
     }
 
+    pub const CODE = sys::IORING_OP_ACCEPT;
+
     pub fn build(self) -> Entry {
         let Accept { fd, addr, addrlen, flags } = self;
 
@@ -514,6 +548,8 @@ opcode!(
         // TODO flags
     }
 
+    pub const CODE = sys::IORING_OP_ASYNC_CANCEL;
+
     pub fn build(self) -> Entry {
         let AsyncCancel { user_data } = self;
 
@@ -534,6 +570,8 @@ opcode!(
         ;;
         flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
+
+    pub const CODE = sys::IORING_OP_LINK_TIMEOUT;
 
     pub fn build(self) -> Entry {
         let LinkTimeout { timespec, flags } = self;
@@ -557,6 +595,8 @@ opcode!(
         ;;
     }
 
+    pub const CODE = sys::IORING_OP_CONNECT;
+
     pub fn build(self) -> Entry {
         let Connect { fd, addr, addrlen } = self;
 
@@ -568,3 +608,20 @@ opcode!(
         Entry(sqe)
     }
 );
+
+// === 5.6 ===
+
+// TODO
+//	IORING_OP_FALLOCATE,
+//	IORING_OP_OPENAT,
+//	IORING_OP_CLOSE,
+//	IORING_OP_FILES_UPDATE,
+//	IORING_OP_STATX,
+//	IORING_OP_READ,
+//	IORING_OP_WRITE,
+//	IORING_OP_FADVISE,
+//	IORING_OP_MADVISE,
+//	IORING_OP_SEND,
+//	IORING_OP_RECV,
+//	IORING_OP_OPENAT2,
+//	IORING_OP_EPOLL_CTL,

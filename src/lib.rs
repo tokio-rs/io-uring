@@ -25,6 +25,8 @@ pub use squeue::SubmissionQueue;
 pub use cqueue::CompletionQueue;
 pub use register::{ register as reg, unregister as unreg };
 
+#[cfg(features = "unstable")]
+pub use register::Probe;
 
 /// IoUring instance
 pub struct IoUring {
@@ -245,6 +247,19 @@ impl Builder {
         self
     }
 
+    #[cfg(features = "unstable")]
+    pub fn setup_clamp(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_CLAMP;
+        self
+    }
+
+    #[cfg(features = "unstable")]
+    pub fn setup_attach_wq(&mut self, fd: RawFd) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_ATTACH_WQ;
+        self.params.wq_fd = fd as _;
+        self
+    }
+
     /// Build a [IoUring].
     #[inline]
     pub fn build(&self, entries: u32) -> io::Result<IoUring> {
@@ -289,6 +304,16 @@ impl Parameters {
     /// when the kernel has consumed the SQE
     pub fn is_feature_submit_stable(&self) -> bool {
         self.0.features & sys::IORING_FEAT_SUBMIT_STABLE != 0
+    }
+
+    #[cfg(features = "unstable")]
+    pub fn is_feature_rw_cur_pos(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_RW_CUR_POS != 0
+    }
+
+    #[cfg(features = "unstable")]
+    pub fn is_feature_cur_personality(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_CUR_PERSONALITY != 0
     }
 
     pub fn sq_entries(&self) -> u32 {

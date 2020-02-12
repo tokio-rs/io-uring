@@ -26,12 +26,12 @@ bitflags = "1"
 parking_lot = { version = "0.10", optional = true }
 
 [build-dependencies]
-bindgen = { version = "0.52", optional = true }
+bindgen = { version = "0.53", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
 anyhow = "1"
-nix = "0.16"
+nix = "0.17"
 lazy_static = "1"
 socket2 = "0.3"
 criterion = "0.3"

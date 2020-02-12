@@ -36,20 +36,23 @@ bitflags!{
         /// When this flag is specified,
         /// `fd` is an index into the files array registered with the io_uring instance.
         #[doc(hidden)]
-        const FIXED_FILE = sys::IOSQE_FIXED_FILE as _;
+        const FIXED_FILE = sys::IOSQE_FIXED_FILE_BIT as _;
 
         /// When this flag is specified,
         /// the SQE will not be started before previously submitted SQEs have completed,
         /// and new SQEs will not be started before this one completes.
-        const IO_DRAIN = sys::IOSQE_IO_DRAIN as _;
+        const IO_DRAIN = sys::IOSQE_IO_DRAIN_BIT as _;
 
         /// When this flag is specified,
         /// it forms a link with the next SQE in the submission ring.
         /// That next SQE will not be started before this one completes.
-        const IO_LINK = sys::IOSQE_IO_LINK as _;
+        const IO_LINK = sys::IOSQE_IO_LINK_BIT as _;
 
         /// Like [IO_LINK], but it doesn’t sever regardless of the completion result.
-        const IO_HARDLINK = sys::IOSQE_IO_HARDLINK as _;
+        const IO_HARDLINK = sys::IOSQE_IO_HARDLINK_BIT as _;
+
+        #[cfg(features = "unstable")]
+        const ASYNC = sys::IOSQE_ASYNC_BIT as _;
     }
 }
 
