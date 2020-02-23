@@ -23,7 +23,7 @@ pub fn echo_server() -> &'static SocketAddr {
 
                 loop {
                     let mut sockaddr: libc::sockaddr = unsafe { mem::zeroed() };
-                    let mut addrlen: libc::socklen_t = mem::size_of::<libc::sockaddr>();
+                    let mut addrlen: libc::socklen_t = mem::size_of::<libc::sockaddr>() as _;
 
                     let accept_e = opcode::Accept::new(
                         types::Target::Fd(listener.as_raw_fd()),

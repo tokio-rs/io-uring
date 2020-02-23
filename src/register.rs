@@ -34,16 +34,16 @@ pub mod register {
         /// Register eventfd.
         EventFd(RawFd),
 
-        #[cfg(features = "unstable")]
+        FilesUpdate { offset: u32, fds: &'a [RawFd] },
+
+        #[cfg(feature = "unstable")]
         EventFdAsync(RawFd),
 
-        #[cfg(features = "unstable")]
-        Probe(&mut [Probe]),
+        #[cfg(feature = "unstable")]
+        Probe(&'a mut Probe),
 
-        #[cfg(features = "unstable")]
-        Personality(()),
-
-        FilesUpdate { offset: u32, fds: &'a [RawFd] }
+        #[cfg(feature = "unstable")]
+        Personality
     }
 
     impl Target<'_> {
@@ -69,8 +69,15 @@ pub mod register {
 
                     execute(fd, sys::IORING_REGISTER_FILES_UPDATE, fu as *const _, fds.len() as _)
                 },
-                #[cfg(features = "unstable")]
-                _ => todo!()
+                #[cfg(feature = "unstable")]
+                Target::EventFdAsync(eventfd) =>
+                    execute(fd, sys::IORING_REGISTER_EVENTFD_ASYNC, cast_ptr::<RawFd>(eventfd) as *const _, 1),
+                #[cfg(feature = "unstable")]
+                Target::Probe(probe) =>
+                    execute(fd, sys::IORING_REGISTER_PROBE, probe.0 as *const _, 256),
+                #[cfg(feature = "unstable")]
+                Target::Personality =>
+                    execute(fd, sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)
             }
         }
     }
@@ -91,7 +98,7 @@ pub mod unregister {
         /// Unregister eventfd.
         EventFd,
 
-        #[cfg(features = "unstable")]
+        #[cfg(feature = "unstable")]
         Personality
     }
 
@@ -101,8 +108,8 @@ pub mod unregister {
                 Target::Buffers => sys::IORING_UNREGISTER_BUFFERS,
                 Target::Files => sys::IORING_UNREGISTER_FILES,
                 Target::EventFd => sys::IORING_UNREGISTER_EVENTFD,
-                #[cfg(features = "unstable")]
-                _ => todo!()
+                #[cfg(feature = "unstable")]
+                Target::Personality => sys::IORING_UNREGISTER_PERSONALITY
             };
 
             execute(fd, opcode, ptr::null(), 0)
@@ -110,5 +117,52 @@ pub mod unregister {
     }
 }
 
-#[cfg(features = "unstable")]
+#[cfg(feature = "unstable")]
+use std::mem;
+
+#[cfg(feature = "unstable")]
 pub struct Probe(*mut sys::io_uring_probe);
+
+#[cfg(feature = "unstable")]
+impl Probe {
+    const SIZE: usize =
+        mem::size_of::<sys::io_uring_probe>() + 256 * mem::size_of::<sys::io_uring_probe_op>();
+
+    pub fn new() -> Probe {
+        use std::alloc::{ alloc_zeroed, Layout };
+
+        let probe_align = Layout::new::<sys::io_uring_probe>().align();
+        let ptr = unsafe {
+            let probe_layout = Layout::from_size_align_unchecked(Probe::SIZE, probe_align);
+            alloc_zeroed(probe_layout)
+        };
+
+        Probe(ptr as *mut _)
+    }
+
+    pub fn is_supported(&self, opcode: u8) -> bool {
+        unsafe {
+            let probe = &*self.0;
+
+            if opcode <= probe.last_op {
+                let ops = probe.ops.as_slice(256);
+                ops[opcode as usize].flags & (sys::IO_URING_OP_SUPPORTED as u16) != 0
+            } else {
+                false
+            }
+        }
+    }
+}
+
+#[cfg(feature = "unstable")]
+impl Drop for Probe {
+    fn drop(&mut self) {
+        use std::alloc::{ dealloc, Layout };
+
+        let probe_align = Layout::new::<sys::io_uring_probe>().align();
+        unsafe {
+            let probe_layout = Layout::from_size_align_unchecked(Probe::SIZE, probe_align);
+            dealloc(self.0 as *mut _, probe_layout);
+        }
+    }
+}

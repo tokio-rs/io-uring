@@ -63,6 +63,7 @@ pub const IORING_REGISTER_EVENTFD_ASYNC: u32 = 7;
 pub const IORING_REGISTER_PROBE: u32 = 8;
 pub const IORING_REGISTER_PERSONALITY: u32 = 9;
 pub const IORING_UNREGISTER_PERSONALITY: u32 = 10;
+pub const IO_URING_OP_SUPPORTED: u32 = 1;
 pub type __u8 = libc::c_uchar;
 pub type __u16 = libc::c_ushort;
 pub type __s32 = libc::c_int;
