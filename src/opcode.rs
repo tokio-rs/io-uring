@@ -21,9 +21,15 @@ pub mod types {
     #[derive(Debug, Clone, Copy)]
     pub enum Target {
         Fd(RawFd),
-
         /// The index of registered fd.
         Fixed(u32)
+    }
+
+    impl From<RawFd> for Target {
+        #[inline]
+        fn from(fd: RawFd) -> Self {
+            Target::Fd(fd)
+        }
     }
 
     bitflags!{
@@ -45,14 +51,20 @@ pub mod types {
 
     #[cfg(feature = "unstable")]
     impl OpenHow {
-        #[inline]
-        pub fn flags(mut self, flags: u64) -> Self {
+        pub const fn new() -> Self {
+            OpenHow(sys::open_how {
+                flags: 0,
+                mode: 0,
+                resolve: 0
+            })
+        }
+
+        pub const fn flags(mut self, flags: u64) -> Self {
             self.0.flags = flags;
             self
         }
 
-        #[inline]
-        pub fn mode(mut self, mode: u64) -> Self {
+        pub const fn mode(mut self, mode: u64) -> Self {
             self.0.mode = mode;
             self
         }
@@ -928,7 +940,7 @@ opcode!(
 opcode!(
     pub struct Openat2 {
         dirfd: types::Target,
-        path: *const libc::c_char,
+        pathname: *const libc::c_char,
         how: *const types::OpenHow
         ;;
     }
@@ -936,12 +948,12 @@ opcode!(
     pub const CODE = sys::IORING_OP_OPENAT2;
 
     pub fn build(self) -> Entry {
-        let Openat2 { dirfd, path, how } = self;
+        let Openat2 { dirfd, pathname, how } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = dirfd);
-        sqe.addr = path as _;
+        sqe.addr = pathname as _;
         sqe.len = mem::size_of::<sys::open_how>() as _;
         sqe.__bindgen_anon_1.off = how as _;
         Entry(sqe)

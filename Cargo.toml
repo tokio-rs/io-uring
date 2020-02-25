@@ -44,3 +44,7 @@ features = [ "concurrent", "unstable" ]
 [[bench]]
 name = "nop"
 harness = false
+
+[[bench]]
+name = "iovec"
+harness = false
