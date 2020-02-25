@@ -113,7 +113,7 @@ opcode!(
         let Nop {} = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_NOP as _;
+        sqe.opcode = Self::CODE;
         sqe.fd = -1;
         Entry(sqe)
     }
@@ -146,7 +146,7 @@ opcode!(
         } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_READV as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
         sqe.addr = iovec as _;
@@ -184,7 +184,7 @@ opcode!(
         } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_WRITEV as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
         sqe.addr = iovec as _;
@@ -216,7 +216,7 @@ opcode!(
         let Fsync { fd, flags } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_FSYNC as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_2.fsync_flags = flags.bits();
         Entry(sqe)
@@ -254,7 +254,7 @@ opcode!(
         } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_READ_FIXED as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
         sqe.addr = buf as _;
@@ -297,7 +297,7 @@ opcode!(
         } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_WRITE_FIXED as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
         sqe.addr = buf as _;
@@ -329,7 +329,7 @@ opcode!(
         let PollAdd { fd, flags } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_POLL_ADD as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_2.poll_events = flags as _;
         Entry(sqe)
@@ -353,7 +353,7 @@ opcode!(
         let PollRemove { user_data } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_POLL_REMOVE as _;
+        sqe.opcode = Self::CODE;
         sqe.fd = -1;
         sqe.addr = user_data as _;
         Entry(sqe)
@@ -385,7 +385,7 @@ opcode!(
         } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_SYNC_FILE_RANGE as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
@@ -415,7 +415,7 @@ opcode!(
         let SendMsg { fd, msg, ioprio, flags } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_SENDMSG as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
         sqe.addr = msg as _;
@@ -444,7 +444,7 @@ opcode!(
         let RecvMsg { fd, msg, ioprio, flags } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_RECVMSG as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
         sqe.addr = msg as _;
@@ -480,7 +480,7 @@ opcode!(
         let Timeout { timespec, count, flags } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_TIMEOUT as _;
+        sqe.opcode = Self::CODE;
         sqe.fd = -1;
         sqe.addr = timespec as _;
         sqe.len = 1;
@@ -506,7 +506,7 @@ opcode!(
         let TimeoutRemove { user_data, flags } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_TIMEOUT_REMOVE as _;
+        sqe.opcode = Self::CODE;
         sqe.fd = -1;
         sqe.addr = user_data as _;
         sqe.__bindgen_anon_2.timeout_flags = flags.bits();
@@ -530,7 +530,7 @@ opcode!(
         let Accept { fd, addr, addrlen, flags } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_ACCEPT as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.addr = addr as _;
         sqe.__bindgen_anon_1.addr2 = addrlen as _;
@@ -554,7 +554,7 @@ opcode!(
         let AsyncCancel { user_data } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_ASYNC_CANCEL as _;
+        sqe.opcode = Self::CODE;
         sqe.fd = -1;
         sqe.addr = user_data as _;
         Entry(sqe)
@@ -577,7 +577,7 @@ opcode!(
         let LinkTimeout { timespec, flags } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_LINK_TIMEOUT as _;
+        sqe.opcode = Self::CODE;
         sqe.fd = -1;
         sqe.addr = timespec as _;
         sqe.len = 1;
@@ -601,7 +601,7 @@ opcode!(
         let Connect { fd, addr, addrlen } = self;
 
         let mut sqe = sqe_zeroed();
-        sqe.opcode = sys::IORING_OP_CONNECT as _;
+        sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.addr = addr as _;
         sqe.__bindgen_anon_1.off = addrlen as _;

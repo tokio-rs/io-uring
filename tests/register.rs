@@ -120,3 +120,20 @@ fn test_reg_eventfd() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+#[cfg(feature = "unstable")]
+fn test_probe() -> anyhow::Result<()> {
+    use io_uring::{ reg, opcode, IoUring, Probe };
+
+    let ring = IoUring::new(2)?;
+    let mut probe = Probe::new();
+    ring.register(reg::Target::Probe(&mut probe))?;
+
+    if ring.params().is_feature_cur_personality() {
+        assert!(probe.is_supported(opcode::Nop::CODE));
+        assert!(probe.is_supported(opcode::Connect::CODE));
+    }
+
+    Ok(())
+}

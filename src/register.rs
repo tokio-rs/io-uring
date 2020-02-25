@@ -36,12 +36,15 @@ pub mod register {
 
         FilesUpdate { offset: u32, fds: &'a [RawFd] },
 
+        /// 5.6 available
         #[cfg(feature = "unstable")]
         EventFdAsync(RawFd),
 
+        /// 5.6 available
         #[cfg(feature = "unstable")]
         Probe(&'a mut Probe),
 
+        /// 5.6 available
         #[cfg(feature = "unstable")]
         Personality
     }
@@ -98,6 +101,7 @@ pub mod unregister {
         /// Unregister eventfd.
         EventFd,
 
+        /// 5.6 available
         #[cfg(feature = "unstable")]
         Personality
     }
