@@ -2,6 +2,11 @@
 
 #![allow(clippy::new_without_default)]
 
+#[cfg(feature = "unstable")]
+use std::mem;
+#[cfg(feature = "unstable")]
+use std::os::unix::io::RawFd;
+
 use crate::squeue::Entry;
 use crate::sys;
 
@@ -30,6 +35,26 @@ pub mod types {
     bitflags!{
         pub struct FsyncFlags: u32 {
             const DATASYNC = sys::IORING_FSYNC_DATASYNC;
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    #[derive(Default, Debug, Clone, Copy)]
+    #[repr(transparent)]
+    pub struct OpenHow(sys::open_how);
+
+    #[cfg(feature = "unstable")]
+    impl OpenHow {
+        #[inline]
+        pub fn flags(mut self, flags: u64) -> Self {
+            self.0.flags = flags;
+            self
+        }
+
+        #[inline]
+        pub fn mode(mut self, mode: u64) -> Self {
+            self.0.mode = mode;
+            self
         }
     }
 }
@@ -236,8 +261,8 @@ opcode!(
         len: u32,
         buf_index: u16,
         ;;
-        ioprio: u16 = 0,
         offset: libc::off_t = 0,
+        ioprio: u16 = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2 (2)` man page.
         rw_flags: types::RwFlags = 0
@@ -370,7 +395,7 @@ opcode!(
         len: u32,
         ;;
         /// the offset method holds the offset in bytes
-        offset: libc::off_t = 0,
+        offset: libc::off64_t = 0,
         /// the flags method holds the flags for the command
         flags: u32 = 0
     }
@@ -387,7 +412,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.len = len;
+        sqe.len = len as _;
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_2.sync_range_flags = flags;
         Entry(sqe)
@@ -611,17 +636,339 @@ opcode!(
 
 // === 5.6 ===
 
-// TODO
-//	IORING_OP_FALLOCATE,
-//	IORING_OP_OPENAT,
-//	IORING_OP_CLOSE,
-//	IORING_OP_FILES_UPDATE,
-//	IORING_OP_STATX,
-//	IORING_OP_READ,
-//	IORING_OP_WRITE,
-//	IORING_OP_FADVISE,
-//	IORING_OP_MADVISE,
-//	IORING_OP_SEND,
-//	IORING_OP_RECV,
-//	IORING_OP_OPENAT2,
-//	IORING_OP_EPOLL_CTL,
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Fallocate {
+        fd: types::Target,
+        len: u32,
+        ;;
+        offset: libc::off_t = 0,
+        mode: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_FALLOCATE;
+
+    pub fn build(self) -> Entry {
+        let Fallocate { fd, len, offset, mode } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.addr = len as _;
+        sqe.len = mode as _;
+        sqe.__bindgen_anon_1.off = offset as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Openat {
+        dirfd: types::Target,
+        pathname: *const libc::c_char,
+        ;;
+        flags: i32 = 0,
+        mode: libc::mode_t = 0
+    }
+
+    pub const CODE = sys::IORING_OP_OPENAT;
+
+    pub fn build(self) -> Entry {
+        let Openat { dirfd, pathname, flags, mode } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = dirfd);
+        sqe.addr = pathname as _;
+        sqe.len = mode;
+        sqe.__bindgen_anon_2.open_flags = flags as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Close {
+        fd: types::Target,
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_CLOSE;
+
+    pub fn build(self) -> Entry {
+        let Close { fd } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct FilesUpdate {
+        fds: *const RawFd,
+        len: u32,
+        ;;
+        offset: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_FILES_UPDATE;
+
+    pub fn build(self) -> Entry {
+        let FilesUpdate { fds, len, offset } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = -1;
+        sqe.addr = fds as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_1.off = offset as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Statx {
+        dirfd: types::Target,
+        pathname: *const libc::c_char,
+        statxbuf: *mut libc::statx,
+        ;;
+        flags: i32 = 0,
+        mask: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_STATX;
+
+    pub fn build(self) -> Entry {
+        let Statx {
+            dirfd, pathname, statxbuf,
+            flags, mask
+        } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = dirfd);
+        sqe.addr = pathname as _;
+        sqe.len = mask;
+        sqe.__bindgen_anon_1.off = statxbuf as _;
+        sqe.__bindgen_anon_2.statx_flags = flags as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Read {
+        fd: types::Target,
+        buf: *mut u8,
+        len: u32,
+        ;;
+        offset: libc::off_t = 0,
+        ioprio: u16 = 0,
+        rw_flags: types::RwFlags = 0
+    }
+
+    pub const CODE = sys::IORING_OP_READ;
+
+    pub fn build(self) -> Entry {
+        let Read {
+            fd,
+            buf, len, offset,
+            ioprio, rw_flags
+        } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.addr = buf as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.rw_flags = rw_flags;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Write {
+        fd: types::Target,
+        buf: *const u8,
+        len: u32,
+        ;;
+        offset: libc::off_t = 0,
+        ioprio: u16 = 0,
+        rw_flags: types::RwFlags = 0
+    }
+
+    pub const CODE = sys::IORING_OP_WRITE;
+
+    pub fn build(self) -> Entry {
+        let Write {
+            fd,
+            buf, len, offset,
+            ioprio, rw_flags
+        } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.addr = buf as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.rw_flags = rw_flags;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Fadvise {
+        fd: types::Target,
+        len: libc::off_t,
+        advice: i32,
+        ;;
+        offset: libc::off_t = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_FADVISE;
+
+    pub fn build(self) -> Entry {
+        let Fadvise { fd, len, advice, offset } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.len = len as _;
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.fadvise_advice = advice as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Madvise {
+        addr: *const libc::c_void,
+        len: libc::off_t,
+        advice: i32
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_MADVISE;
+
+    pub fn build(self) -> Entry {
+        let Madvise { addr, len, advice } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = -1;
+        sqe.addr = addr as _;
+        sqe.len = len as _;
+        sqe.__bindgen_anon_2.fadvise_advice = advice as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Send {
+        fd: types::Target,
+        buf: *const u8,
+        len: u32,
+        ;;
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_SEND;
+
+    pub fn build(self) -> Entry {
+        let Send { fd, buf, len, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.addr = buf as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_2.msg_flags = flags as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Recv {
+        fd: types::Target,
+        buf: *mut u8,
+        len: u32,
+        ;;
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_RECV;
+
+    pub fn build(self) -> Entry {
+        let Recv { fd, buf, len, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.addr = buf as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_2.msg_flags = flags as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Openat2 {
+        dirfd: types::Target,
+        path: *const libc::c_char,
+        how: *const types::OpenHow
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_OPENAT2;
+
+    pub fn build(self) -> Entry {
+        let Openat2 { dirfd, path, how } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = dirfd);
+        sqe.addr = path as _;
+        sqe.len = mem::size_of::<sys::open_how>() as _;
+        sqe.__bindgen_anon_1.off = how as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct EpollCtl {
+        epfd: types::Target,
+        fd: RawFd,
+        op: i32,
+        ev: *const libc::epoll_event
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_EPOLL_CTL;
+
+    pub fn build(self) -> Entry {
+        let EpollCtl { epfd, fd, op, ev } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = epfd);
+        sqe.addr = ev as _;
+        sqe.len = op as _;
+        sqe.__bindgen_anon_1.off = fd as _;
+        Entry(sqe)
+    }
+);

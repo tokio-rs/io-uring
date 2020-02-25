@@ -109,6 +109,56 @@ fn bindgen_test_layout___kernel_timespec() {
         )
     );
 }
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct open_how {
+    pub flags: __u64,
+    pub mode: __u64,
+    pub resolve: __u64,
+}
+#[test]
+fn bindgen_test_layout_open_how() {
+    assert_eq!(
+        ::core::mem::size_of::<open_how>(),
+        24usize,
+        concat!("Size of: ", stringify!(open_how))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<open_how>(),
+        8usize,
+        concat!("Alignment of ", stringify!(open_how))
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<open_how>())).flags as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(open_how),
+            "::",
+            stringify!(flags)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<open_how>())).mode as *const _ as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(open_how),
+            "::",
+            stringify!(mode)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<open_how>())).resolve as *const _ as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(open_how),
+            "::",
+            stringify!(resolve)
+        )
+    );
+}
 pub type __kernel_rwf_t = libc::c_int;
 #[repr(C)]
 #[derive(Copy, Clone)]
