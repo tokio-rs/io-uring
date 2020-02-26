@@ -2,27 +2,29 @@ use std::io;
 use std::os::unix::io::AsRawFd;
 use tempfile::tempfile;
 use criterion::{ criterion_main, criterion_group, Criterion, black_box };
-use io_uring::{ opcode, IoUring };
+use io_uring::{ opcode, squeue, IoUring };
 
 
-fn bench_writev(c: &mut Criterion) {
+fn bench_iovec(c: &mut Criterion) {
     let mut ring = IoUring::new(16).unwrap();
-    let fd = tempfile().unwrap();
 
     let buf = vec![0x00; 32];
     let buf2 = vec![0x01; 33];
     let buf3 = vec![0x02; 34];
     let buf4 = vec![0x03; 35];
     let buf5 = vec![0x04; 36];
-    let bufs = [
-        io::IoSlice::new(&buf),
-        io::IoSlice::new(&buf2),
-        io::IoSlice::new(&buf3),
-        io::IoSlice::new(&buf4),
-        io::IoSlice::new(&buf5),
-    ];
 
-    c.bench_function("writev", |b| {
+    c.bench_function("writev-one", |b| {
+        let fd = tempfile().unwrap();
+
+        let bufs = [
+            io::IoSlice::new(&buf),
+            io::IoSlice::new(&buf2),
+            io::IoSlice::new(&buf3),
+            io::IoSlice::new(&buf4),
+            io::IoSlice::new(&buf5),
+        ];
+
         b.iter(|| {
             let bufs = black_box(&bufs);
 
@@ -48,30 +50,63 @@ fn bench_writev(c: &mut Criterion) {
                 .for_each(drop);
         });
     });
-}
 
-#[cfg(not(feature = "unstable"))]
-fn bench_writes(_: &mut Criterion) {}
+    // nop so slow :(
+    c.bench_function("writev-nop", |b| {
+        let fd = tempfile().unwrap();
 
-#[cfg(feature = "unstable")]
-fn bench_writes(c: &mut Criterion) {
-    let mut ring = IoUring::new(16).unwrap();
-    let fd = tempfile().unwrap();
+        let bufs = [
+            io::IoSlice::new(&buf),
+            io::IoSlice::new(&buf2),
+            io::IoSlice::new(&buf3),
+            io::IoSlice::new(&buf4),
+            io::IoSlice::new(&buf5),
+        ];
 
-    let buf = vec![0x00; 32];
-    let buf2 = vec![0x01; 33];
-    let buf3 = vec![0x02; 34];
-    let buf4 = vec![0x03; 35];
-    let buf5 = vec![0x04; 36];
-    let bufs = [
-        &buf[..],
-        &buf2[..],
-        &buf3[..],
-        &buf4[..],
-        &buf5[..],
-    ];
+        b.iter(|| {
+            let bufs = black_box(&bufs);
 
-    c.bench_function("one-submit", |b| {
+            let entry = opcode::Writev::new(
+                fd.as_raw_fd().into(),
+                bufs.as_ptr() as *const _,
+                bufs.len() as _
+            );
+
+            unsafe {
+                let mut queue = ring.submission().available();
+                queue
+                    .push(entry.build().flags(squeue::Flags::IO_LINK))
+                    .ok()
+                    .expect("queue is full");
+                for _ in 0..4 {
+                    let entry = opcode::Nop::new().build();
+                    queue.push(entry.flags(squeue::Flags::IO_LINK))
+                        .ok()
+                        .expect("queue is full");
+                }
+            }
+
+            ring.submit_and_wait(5).unwrap();
+            ring
+                .completion()
+                .available()
+                .map(black_box)
+                .for_each(drop);
+        });
+    });
+
+    #[cfg(feature = "unstable")]
+    c.bench_function("writes-one-submit", |b| {
+        let fd = tempfile().unwrap();
+
+        let bufs = [
+            &buf[..],
+            &buf2[..],
+            &buf3[..],
+            &buf4[..],
+            &buf5[..],
+        ];
+
         b.iter(|| {
             let mut queue = ring.submission().available();
             for buf in black_box(&bufs) {
@@ -83,7 +118,7 @@ fn bench_writes(c: &mut Criterion) {
 
                 unsafe {
                     queue
-                        .push(entry.build())
+                        .push(entry.build().flags(squeue::Flags::IO_LINK))
                         .ok()
                         .expect("queue is full");
                 }
@@ -100,7 +135,18 @@ fn bench_writes(c: &mut Criterion) {
         });
     });
 
-    c.bench_function("multi-submit", |b| {
+    #[cfg(feature = "unstable")]
+    c.bench_function("writes-multi-submit", |b| {
+        let fd = tempfile().unwrap();
+
+        let bufs = [
+            &buf[..],
+            &buf2[..],
+            &buf3[..],
+            &buf4[..],
+            &buf5[..],
+        ];
+
         b.iter(|| {
             for buf in black_box(&bufs) {
                 let entry = opcode::Write::new(
@@ -128,5 +174,5 @@ fn bench_writes(c: &mut Criterion) {
     });
 }
 
-criterion_group!(iovec, bench_writev, bench_writes);
+criterion_group!(iovec, bench_iovec);
 criterion_main!(iovec);
