@@ -77,7 +77,7 @@ pub mod register {
                     execute(fd, sys::IORING_REGISTER_EVENTFD_ASYNC, cast_ptr::<RawFd>(eventfd) as *const _, 1),
                 #[cfg(feature = "unstable")]
                 Target::Probe(probe) =>
-                    execute(fd, sys::IORING_REGISTER_PROBE, probe.0 as *const _, 256),
+                    execute(fd, sys::IORING_REGISTER_PROBE, probe.0.as_ptr() as *const _, 256),
                 #[cfg(feature = "unstable")]
                 Target::Personality =>
                     execute(fd, sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)
@@ -125,13 +125,15 @@ pub mod unregister {
 use std::mem;
 
 #[cfg(feature = "unstable")]
-pub struct Probe(*mut sys::io_uring_probe);
+pub struct Probe(ptr::NonNull<sys::io_uring_probe>);
 
 #[cfg(feature = "unstable")]
 impl Probe {
-    const SIZE: usize =
-        mem::size_of::<sys::io_uring_probe>() + 256 * mem::size_of::<sys::io_uring_probe_op>();
+    const COUNT: usize = 256;
+    const SIZE: usize = mem::size_of::<sys::io_uring_probe>()
+        + Self::COUNT * mem::size_of::<sys::io_uring_probe_op>();
 
+    #[allow(clippy::cast_ptr_alignment)]
     pub fn new() -> Probe {
         use std::alloc::{ alloc_zeroed, Layout };
 
@@ -141,20 +143,31 @@ impl Probe {
             alloc_zeroed(probe_layout)
         };
 
-        Probe(ptr as *mut _)
+        ptr::NonNull::new(ptr)
+            .map(ptr::NonNull::cast)
+            .map(Probe)
+            .expect("Probe alloc failed!")
     }
 
     pub fn is_supported(&self, opcode: u8) -> bool {
         unsafe {
-            let probe = &*self.0;
+            let probe = &*self.0.as_ptr();
 
             if opcode <= probe.last_op {
-                let ops = probe.ops.as_slice(256);
+                let ops = probe.ops.as_slice(Self::COUNT);
                 ops[opcode as usize].flags & (sys::IO_URING_OP_SUPPORTED as u16) != 0
             } else {
                 false
             }
         }
+    }
+}
+
+#[cfg(feature = "unstable")]
+impl Default for Probe {
+    #[inline]
+    fn default() -> Probe {
+        Probe::new()
     }
 }
 
@@ -166,7 +179,7 @@ impl Drop for Probe {
         let probe_align = Layout::new::<sys::io_uring_probe>().align();
         unsafe {
             let probe_layout = Layout::from_size_align_unchecked(Probe::SIZE, probe_align);
-            dealloc(self.0 as *mut _, probe_layout);
+            dealloc(self.0.as_ptr() as *mut _, probe_layout);
         }
     }
 }

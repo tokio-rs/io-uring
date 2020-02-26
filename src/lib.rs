@@ -265,7 +265,7 @@ impl Builder {
     /// Build a [IoUring].
     #[inline]
     pub fn build(&self, entries: u32) -> io::Result<IoUring> {
-        let ring = IoUring::with_params(entries, self.params.clone())?;
+        let ring = IoUring::with_params(entries, self.params)?;
 
         if self.dontfork {
             ring.memory.sq_mmap.dontfork()?;
