@@ -122,6 +122,27 @@ fn test_reg_eventfd() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_files_update() -> anyhow::Result<()> {
+    let mut ring = IoUring::new(256)?;
+
+    let fd = tempfile()?;
+    let fd2 = tempfile()?;
+    let fd3 = tempfile()?;
+    let fd4 = tempfile()?;
+    let fd5 = tempfile()?;
+
+    ring.register(reg::Target::Files(&[fd.as_raw_fd(), fd2.as_raw_fd(), fd3.as_raw_fd()]))?;
+    ring.register(reg::Target::FilesUpdate {
+        offset: 1,
+        fds: &[fd4.as_raw_fd(), fd5.as_raw_fd()]
+    })?;
+
+    ring.unregister(unreg::Target::Files)?;
+
+    Ok(())
+}
+
+#[test]
 #[cfg(feature = "unstable")]
 fn test_probe() -> anyhow::Result<()> {
     use io_uring::{ reg, opcode, IoUring, Probe };

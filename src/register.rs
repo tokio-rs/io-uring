@@ -7,10 +7,11 @@ fn execute(fd: RawFd, opcode: libc::c_uint, arg: *const libc::c_void, len: libc:
     -> io::Result<()>
 {
     unsafe {
-        if 0 == sys::io_uring_register(fd, opcode, arg, len) {
-           Ok(())
+        let ret = sys::io_uring_register(fd, opcode, arg, len);
+        if ret >= 0 {
+            Ok(())
         } else {
-           Err(io::Error::last_os_error())
+            Err(io::Error::last_os_error())
         }
     }
 }
