@@ -5,7 +5,7 @@ use std::os::unix::io::AsRawFd;
 use tempfile::tempfile;
 use nix::sys::eventfd::*;
 use io_uring::opcode::{ self, types };
-use io_uring::{ reg, unreg, IoUring };
+use io_uring::IoUring;
 use common::{ Fd, do_write_read };
 
 
@@ -15,14 +15,14 @@ fn test_fixed_file() -> anyhow::Result<()> {
     let fd = tempfile()?;
 
     // register fd
-    ring.register(reg::Target::Files(&[fd.as_raw_fd()]))?;
+    ring.submitter().register_files(&[fd.as_raw_fd()])?;
 
     let fd = types::Target::Fixed(0);
 
     do_write_read(&mut ring, fd)?;
 
     // unregister
-    ring.unregister(unreg::Target::Files)?;
+    ring.submitter().unregister_files()?;
 
     Ok(())
 }
@@ -40,7 +40,7 @@ fn test_fixed_buffer() -> anyhow::Result<()> {
     // register buffer
     unsafe {
         let buf = io::IoSliceMut::new(&mut buf);
-        ring.register(reg::Target::Buffers(&[mem::transmute(buf)]))?;
+        ring.submitter().register_buffers(&[mem::transmute(buf)])?;
     }
 
     nix::unistd::write(wp.as_raw_fd(), text)?;
@@ -73,7 +73,7 @@ fn test_fixed_buffer() -> anyhow::Result<()> {
     assert_eq!(buf, text);
 
     // unregister
-    ring.unregister(unreg::Target::Buffers)?;
+    ring.submitter().unregister_buffers()?;
 
     Ok(())
 }
@@ -85,7 +85,7 @@ fn test_reg_eventfd() -> anyhow::Result<()> {
     let efd = eventfd(0, EfdFlags::EFD_CLOEXEC | EfdFlags::EFD_NONBLOCK)?;
 
     // register eventfd
-    ring.register(reg::Target::EventFd(efd))?;
+    ring.submitter().register_eventfd(efd)?;
 
     let mut buf = [0; 8];
 
@@ -116,14 +116,14 @@ fn test_reg_eventfd() -> anyhow::Result<()> {
     nix::unistd::read(efd, &mut buf)?;
     assert_eq!(u64::from_le_bytes(buf), 0x01);
 
-    ring.unregister(unreg::Target::EventFd)?;
+    ring.submitter().unregister_eventfd()?;
 
     Ok(())
 }
 
 #[test]
 fn test_files_update() -> anyhow::Result<()> {
-    let mut ring = IoUring::new(256)?;
+    let ring = IoUring::new(256)?;
 
     let fd = tempfile()?;
     let fd2 = tempfile()?;
@@ -131,13 +131,12 @@ fn test_files_update() -> anyhow::Result<()> {
     let fd4 = tempfile()?;
     let fd5 = tempfile()?;
 
-    ring.register(reg::Target::Files(&[fd.as_raw_fd(), fd2.as_raw_fd(), fd3.as_raw_fd()]))?;
-    ring.register(reg::Target::FilesUpdate {
-        offset: 1,
-        fds: &[fd4.as_raw_fd(), fd5.as_raw_fd()]
-    })?;
+    let submitter = ring.submitter();
 
-    ring.unregister(unreg::Target::Files)?;
+    submitter.register_files(&[fd.as_raw_fd(), fd2.as_raw_fd(), fd3.as_raw_fd()])?;
+    submitter.register_files_update(1, &[fd4.as_raw_fd(), fd5.as_raw_fd()])?;
+
+    submitter.unregister_files()?;
 
     Ok(())
 }
@@ -145,11 +144,11 @@ fn test_files_update() -> anyhow::Result<()> {
 #[test]
 #[cfg(feature = "unstable")]
 fn test_probe() -> anyhow::Result<()> {
-    use io_uring::{ reg, opcode, IoUring, Probe };
+    use io_uring::{ opcode, IoUring, Probe };
 
     let ring = IoUring::new(2)?;
     let mut probe = Probe::new();
-    ring.register(reg::Target::Probe(&mut probe))?;
+    ring.submitter().register_probe(&mut probe)?;
 
     if ring.params().is_feature_cur_personality() {
         assert!(probe.is_supported(opcode::Nop::CODE));

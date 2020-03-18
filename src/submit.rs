@@ -1,10 +1,13 @@
 use std::{ io, ptr };
 use std::sync::atomic;
-use std::os::unix::io::AsRawFd;
-use crate::register::{ register as reg, unregister as unreg };
+use std::os::unix::io::{ AsRawFd, RawFd };
+use crate::register::{ register as reg, unregister as unreg, execute };
 use crate::squeue::SubmissionQueue;
 use crate::util::{ Fd, unsync_load };
 use crate::sys;
+
+#[cfg(feature = "unstable")]
+use crate::register::Probe;
 
 
 /// Submitter
@@ -46,12 +49,14 @@ impl<'a> Submitter<'a> {
 
     /// Register files or user buffers for asynchronous I/O.
     #[inline]
+    #[deprecated(since="0.3.5", note="please use `Submitter::register_*` instead")]
     pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
         target.execute(self.fd.as_raw_fd())
     }
 
     /// Unregister files or user buffers for asynchronous I/O.
     #[inline]
+    #[deprecated(since="0.3.5", note="please use `Submitter::unregister_*` instead")]
     pub fn unregister(&self, target: unreg::Target) -> io::Result<()> {
         target.execute(self.fd.as_raw_fd())
     }
@@ -102,4 +107,74 @@ impl<'a> Submitter<'a> {
             self.enter(len as _, want as _, flags, None)
         }
     }
+
+    pub fn register_buffers(&self, bufs: &[libc::iovec]) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _)?;
+        Ok(())
+    }
+
+    pub fn register_files(&self, fds: &[RawFd]) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _)?;
+        Ok(())
+    }
+
+    pub fn register_eventfd(&self, eventfd: RawFd) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_EVENTFD, cast_ptr::<RawFd>(&eventfd) as *const _, 1)?;
+        Ok(())
+    }
+
+    pub fn register_files_update(&self, offset: u32, fds: &[RawFd]) -> io::Result<usize> {
+        let fu = sys::io_uring_files_update {
+            offset,
+            resv: 0,
+            fds: fds.as_ptr() as _
+        };
+        let fu = cast_ptr::<sys::io_uring_files_update>(&fu);
+        let ret = execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_FILES_UPDATE, fu as *const _, fds.len() as _)?;
+        Ok(ret as _)
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn register_eventfd_async(&self, eventfd: RawFd) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_EVENTFD_ASYNC, cast_ptr::<RawFd>(&eventfd) as *const _, 1)?;
+        Ok(())
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn register_probe(&self, probe: &mut Probe) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_PROBE, probe.as_mut_ptr() as *const _, 256)?;
+        Ok(())
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn register_personality(&self) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)?;
+        Ok(())
+    }
+
+    pub fn unregister_buffers(&self) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_BUFFERS, ptr::null(), 0)?;
+        Ok(())
+    }
+
+    pub fn unregister_files(&self) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_FILES, ptr::null(), 0)?;
+        Ok(())
+    }
+
+    pub fn unregister_eventfd(&self) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_EVENTFD, ptr::null(), 0)?;
+        Ok(())
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn unregister_personality(&self) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_PERSONALITY, ptr::null(), 0)?;
+        Ok(())
+    }
+}
+
+#[inline]
+fn cast_ptr<T>(n: &T) -> *const T {
+    n as *const T
 }

@@ -126,7 +126,7 @@ impl IoUring {
     }
 
     #[inline]
-    const fn as_submit(&self) -> Submitter<'_> {
+    pub fn submitter(&self) -> Submitter<'_> {
         Submitter::new(&self.fd, self.params.0.flags, &self.sq)
     }
 
@@ -137,14 +137,18 @@ impl IoUring {
 
     /// Register files or user buffers for asynchronous I/O.
     #[inline]
+    #[deprecated(since="0.3.5", note="please use `Submitter::register_*` instead")]
     pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
-        self.as_submit().register(target)
+        #[allow(deprecated)]
+        self.submitter().register(target)
     }
 
     /// Unregister files or user buffers for asynchronous I/O.
     #[inline]
+    #[deprecated(since="0.3.5", note="please use `Submitter::unregister_*` instead")]
     pub fn unregister(&self, target: unreg::Target) -> io::Result<()> {
-        self.as_submit().unregister(target)
+        #[allow(deprecated)]
+        self.submitter().unregister(target)
     }
 
     /// Initiate and/or complete asynchronous I/O
@@ -156,19 +160,19 @@ impl IoUring {
     pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
         -> io::Result<usize>
     {
-        self.as_submit().enter(to_submit, min_complete, flag, sig)
+        self.submitter().enter(to_submit, min_complete, flag, sig)
     }
 
     /// Initiate asynchronous I/O.
     #[inline]
     pub fn submit(&self) -> io::Result<usize> {
-        self.as_submit().submit()
+        self.submitter().submit()
     }
 
     /// Initiate and/or complete asynchronous I/O
     #[inline]
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
-        self.as_submit().submit_and_wait(want)
+        self.submitter().submit_and_wait(want)
     }
 
     /// Get submitter and submission queue and completion queue

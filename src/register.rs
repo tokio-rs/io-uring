@@ -3,13 +3,13 @@ use std::os::unix::io::RawFd;
 use crate::sys;
 
 
-fn execute(fd: RawFd, opcode: libc::c_uint, arg: *const libc::c_void, len: libc::c_uint)
-    -> io::Result<()>
+pub(crate) fn execute(fd: RawFd, opcode: libc::c_uint, arg: *const libc::c_void, len: libc::c_uint)
+    -> io::Result<i32>
 {
     unsafe {
         let ret = sys::io_uring_register(fd, opcode, arg, len);
         if ret >= 0 {
-            Ok(())
+            Ok(ret)
         } else {
             Err(io::Error::last_os_error())
         }
@@ -58,11 +58,11 @@ pub mod register {
 
             match self {
                 Target::Buffers(bufs) =>
-                    execute(fd, sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _),
+                    execute(fd, sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _)?,
                 Target::Files(fds) =>
-                    execute(fd, sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _),
+                    execute(fd, sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _)?,
                 Target::EventFd(eventfd) =>
-                    execute(fd, sys::IORING_REGISTER_EVENTFD, cast_ptr::<RawFd>(eventfd) as *const _, 1),
+                    execute(fd, sys::IORING_REGISTER_EVENTFD, cast_ptr::<RawFd>(eventfd) as *const _, 1)?,
                 Target::FilesUpdate { offset, fds } => {
                     let fu = sys::io_uring_files_update {
                         offset: *offset,
@@ -71,18 +71,20 @@ pub mod register {
                     };
                     let fu = &fu as *const sys::io_uring_files_update;
 
-                    execute(fd, sys::IORING_REGISTER_FILES_UPDATE, fu as *const _, fds.len() as _)
+                    execute(fd, sys::IORING_REGISTER_FILES_UPDATE, fu as *const _, fds.len() as _)?
                 },
                 #[cfg(feature = "unstable")]
                 Target::EventFdAsync(eventfd) =>
-                    execute(fd, sys::IORING_REGISTER_EVENTFD_ASYNC, cast_ptr::<RawFd>(eventfd) as *const _, 1),
+                    execute(fd, sys::IORING_REGISTER_EVENTFD_ASYNC, cast_ptr::<RawFd>(eventfd) as *const _, 1)?,
                 #[cfg(feature = "unstable")]
                 Target::Probe(probe) =>
-                    execute(fd, sys::IORING_REGISTER_PROBE, probe.0.as_ptr() as *const _, 256),
+                    execute(fd, sys::IORING_REGISTER_PROBE, probe.0.as_ptr() as *const _, 256)?,
                 #[cfg(feature = "unstable")]
                 Target::Personality =>
-                    execute(fd, sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)
-            }
+                    execute(fd, sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)?
+            };
+
+            Ok(())
         }
     }
 }
@@ -117,7 +119,9 @@ pub mod unregister {
                 Target::Personality => sys::IORING_UNREGISTER_PERSONALITY
             };
 
-            execute(fd, opcode, ptr::null(), 0)
+            execute(fd, opcode, ptr::null(), 0)?;
+
+            Ok(())
         }
     }
 }
@@ -148,6 +152,11 @@ impl Probe {
             .map(ptr::NonNull::cast)
             .map(Probe)
             .expect("Probe alloc failed!")
+    }
+
+    #[inline]
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut sys::io_uring_probe {
+        self.0.as_ptr()
     }
 
     pub fn is_supported(&self, opcode: u8) -> bool {
