@@ -649,6 +649,7 @@ opcode!(
 // === 5.6 ===
 
 opcode!(
+    /// Issue the equivalent of a `fallocate(2)` system call.
     pub struct Fallocate {
         fd: types::Target,
         len: u32,
@@ -673,6 +674,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `posix_fadvise(2)` system call.
     pub struct Openat {
         dirfd: types::Target,
         pathname: *const libc::c_char,
@@ -697,6 +699,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `close(2)` system call.
     pub struct Close {
         fd: types::Target,
         ;;
@@ -715,6 +718,8 @@ opcode!(
 );
 
 opcode!(
+    /// This command is an alternative to using [crate::Submitter::register_files_update]
+    /// which then works in an async fashion, like the rest of the io_uring commands.
     pub struct FilesUpdate {
         fds: *const RawFd,
         len: u32,
@@ -738,6 +743,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `statx(2)` system call.
     pub struct Statx {
         dirfd: types::Target,
         pathname: *const libc::c_char,
@@ -767,6 +773,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `read(2)` system call.
     pub struct Read {
         fd: types::Target,
         buf: *mut u8,
@@ -799,6 +806,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `write(2)` system call.
     pub struct Write {
         fd: types::Target,
         buf: *const u8,
@@ -831,6 +839,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `posix_fadvise(2)` system call.
     pub struct Fadvise {
         fd: types::Target,
         len: libc::off_t,
@@ -855,6 +864,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `madvise(2)` system call.
     pub struct Madvise {
         addr: *const libc::c_void,
         len: libc::off_t,
@@ -878,6 +888,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `send(2)` system call.
     pub struct Send {
         fd: types::Target,
         buf: *const u8,
@@ -902,6 +913,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `recv(2) system call.
     pub struct Recv {
         fd: types::Target,
         buf: *mut u8,
@@ -926,6 +938,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `openat2(2) system call.
     pub struct Openat2 {
         dirfd: types::Target,
         pathname: *const libc::c_char,
@@ -949,6 +962,7 @@ opcode!(
 );
 
 opcode!(
+    /// Issue the equivalent of a `epoll_ctl(2) system call.
     pub struct EpollCtl {
         epfd: types::Target,
         fd: RawFd,

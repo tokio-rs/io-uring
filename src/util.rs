@@ -114,3 +114,8 @@ impl Drop for Fd {
 pub unsafe fn unsync_load(u: *const atomic::AtomicU32) -> u32 {
     u.cast::<u32>().read()
 }
+
+#[inline]
+pub fn cast_ptr<T>(n: &T) -> *const T {
+    n as *const T
+}

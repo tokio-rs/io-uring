@@ -102,8 +102,8 @@ pub mod unregister {
 pub struct Probe(ptr::NonNull<sys::io_uring_probe>);
 
 impl Probe {
-    const COUNT: usize = 256;
-    const SIZE: usize = mem::size_of::<sys::io_uring_probe>()
+    pub(crate) const COUNT: usize = 256;
+    pub(crate) const SIZE: usize = mem::size_of::<sys::io_uring_probe>()
         + Self::COUNT * mem::size_of::<sys::io_uring_probe_op>();
 
     #[allow(clippy::cast_ptr_alignment)]

@@ -3,7 +3,7 @@ use std::sync::atomic;
 use std::os::unix::io::{ AsRawFd, RawFd };
 use crate::register::{ register as reg, unregister as unreg, execute };
 use crate::squeue::SubmissionQueue;
-use crate::util::{ Fd, unsync_load };
+use crate::util::{ Fd, unsync_load, cast_ptr };
 use crate::register::Probe;
 use crate::sys;
 
@@ -106,21 +106,27 @@ impl<'a> Submitter<'a> {
         }
     }
 
+    /// Register buffers.
     pub fn register_buffers(&self, bufs: &[libc::iovec]) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _)?;
-        Ok(())
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_BUFFERS, bufs.as_ptr() as *const _, bufs.len() as _)
+            .map(drop)
     }
 
+    /// Register files for I/O.
     pub fn register_files(&self, fds: &[RawFd]) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _)?;
-        Ok(())
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_FILES, fds.as_ptr() as *const _, fds.len() as _)
+            .map(drop)
     }
 
+    /// It’s possible to use `eventfd(2)` to get notified of completion events on an io_uring instance.
     pub fn register_eventfd(&self, eventfd: RawFd) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_EVENTFD, cast_ptr::<RawFd>(&eventfd) as *const _, 1)?;
-        Ok(())
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_EVENTFD, cast_ptr::<RawFd>(&eventfd) as *const _, 1)
+            .map(drop)
     }
 
+    /// This operation replaces existing files in the registered file set with new ones,
+    /// either turning a sparse entry (one where fd is equal to -1) into a real one, removing an existing entry (new one is set to -1),
+    /// or replacing an existing entry with a new existing entry.
     pub fn register_files_update(&self, offset: u32, fds: &[RawFd]) -> io::Result<usize> {
         let fu = sys::io_uring_files_update {
             offset,
@@ -132,43 +138,47 @@ impl<'a> Submitter<'a> {
         Ok(ret as _)
     }
 
+    /// This works just like [Submitter::register_eventfd],
+    /// except notifications are only posted for events that complete in an async manner.
     pub fn register_eventfd_async(&self, eventfd: RawFd) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_EVENTFD_ASYNC, cast_ptr::<RawFd>(&eventfd) as *const _, 1)?;
-        Ok(())
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_EVENTFD_ASYNC, cast_ptr::<RawFd>(&eventfd) as *const _, 1)
+            .map(drop)
     }
 
+    /// This operation returns a structure `Probe`,
+    /// which contains information about the opcodes supported by io_uring on the running kernel.
     pub fn register_probe(&self, probe: &mut Probe) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_PROBE, probe.as_mut_ptr() as *const _, 256)?;
-        Ok(())
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_PROBE, probe.as_mut_ptr() as *const _, Probe::COUNT as _)
+            .map(drop)
     }
 
-    pub fn register_personality(&self) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)?;
-        Ok(())
+    /// This operation registers credentials of the running application with io_uring,
+    /// and returns an id associated with these credentials.
+    pub fn register_personality(&self) -> io::Result<i32> {
+        execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)
     }
 
+    /// Unregister buffers.
     pub fn unregister_buffers(&self) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_BUFFERS, ptr::null(), 0)?;
-        Ok(())
+        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_BUFFERS, ptr::null(), 0)
+            .map(drop)
     }
 
+    /// Unregister files.
     pub fn unregister_files(&self) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_FILES, ptr::null(), 0)?;
-        Ok(())
+        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_FILES, ptr::null(), 0)
+            .map(drop)
     }
 
+    /// Unregister an eventfd file descriptor to stop notifications.
     pub fn unregister_eventfd(&self) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_EVENTFD, ptr::null(), 0)?;
-        Ok(())
+        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_EVENTFD, ptr::null(), 0)
+            .map(drop)
     }
 
-    pub fn unregister_personality(&self) -> io::Result<()> {
-        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_PERSONALITY, ptr::null(), 0)?;
-        Ok(())
+    /// This operation unregisters a previously registered personality with io_uring.
+    pub fn unregister_personality(&self, id: i32) -> io::Result<()> {
+        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_PERSONALITY, ptr::null(), id as _)
+            .map(drop)
     }
-}
-
-#[inline]
-fn cast_ptr<T>(n: &T) -> *const T {
-    n as *const T
 }

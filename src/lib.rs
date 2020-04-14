@@ -308,10 +308,25 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_SUBMIT_STABLE != 0
     }
 
+    /// If this flag is set, applications can specify offset == -1 with
+    /// `IORING_OP_{READV,WRITEV}`, `IORING_OP_{READ,WRITE}_FIXED`, and `IORING_OP_{READ,WRITE}`
+    /// to mean current file position, which behaves like `preadv2(2)` and `pwritev2(2)` with offset == -1.
+    /// It’ll use (and update) the current file position.
+    ///
+    /// This obviously comes with the caveat that if the application has multiple reads or writes in flight,
+    /// then the end result will not be as expected.
+    /// This is similar to threads sharing a file descriptor and doing IO using the current file position.
     pub fn is_feature_rw_cur_pos(&self) -> bool {
         self.0.features & sys::IORING_FEAT_RW_CUR_POS != 0
     }
 
+    /// If this flag is set, then io_uring guarantees that both sync and async execution of
+    /// a request assumes the credentials of the task that called `io_uring_enter(2)` to queue the requests.
+    /// If this flag isn’t set, then requests are issued with the credentials of the task that originally registered the io_uring.
+    /// If only one task is using a ring, then this flag doesn’t matter as the credentials will always be the same.
+    /// Note that this is the default behavior,
+    /// tasks can still register different personalities through
+    /// `io_uring_register(2)` with `IORING_REGISTER_PERSONALITY` and specify the personality to use in the sqe.
     pub fn is_feature_cur_personality(&self) -> bool {
         self.0.features & sys::IORING_FEAT_CUR_PERSONALITY != 0
     }
