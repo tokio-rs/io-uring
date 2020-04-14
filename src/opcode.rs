@@ -2,9 +2,7 @@
 
 #![allow(clippy::new_without_default)]
 
-#[cfg(feature = "unstable")]
 use std::mem;
-#[cfg(feature = "unstable")]
 use std::os::unix::io::RawFd;
 
 use crate::squeue::Entry;
@@ -44,12 +42,10 @@ pub mod types {
         }
     }
 
-    #[cfg(feature = "unstable")]
     #[derive(Default, Debug, Clone, Copy)]
     #[repr(transparent)]
     pub struct OpenHow(sys::open_how);
 
-    #[cfg(feature = "unstable")]
     impl OpenHow {
         pub const fn new() -> Self {
             OpenHow(sys::open_how {
@@ -99,6 +95,7 @@ macro_rules! opcode {
 
         pub const CODE = $opcode:expr;
 
+        $( #[$build_meta:meta] )*
         pub fn build($self:ident) -> Entry $build_block:block
     ) => {
         $( #[$outer] )*
@@ -109,6 +106,7 @@ macro_rules! opcode {
 
         impl $name {
             $( #[$new_meta] )*
+            #[inline]
             pub const fn new( $( $field : $tname ),* ) -> Self {
                 $name {
                     $( $field , )*
@@ -120,12 +118,14 @@ macro_rules! opcode {
 
             $(
                 $( #[$opt_meta] )*
+                #[inline]
                 pub const fn $opt_field(mut self, $opt_field: $opt_tname) -> Self {
                     self.$opt_field = $opt_field;
                     self
                 }
             )*
 
+            $( #[$build_meta] )*
             pub fn build($self) -> Entry $build_block
         }
     }
@@ -186,10 +186,10 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.addr = iovec as _;
+        sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
-        sqe.__bindgen_anon_2.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
@@ -224,10 +224,10 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.addr = iovec as _;
+        sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
-        sqe.__bindgen_anon_2.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
@@ -255,7 +255,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_2.fsync_flags = flags.bits();
+        sqe.__bindgen_anon_3.fsync_flags = flags.bits();
         Entry(sqe)
     }
 );
@@ -294,11 +294,11 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.addr = buf as _;
+        sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
-        sqe.__bindgen_anon_2.rw_flags = rw_flags;
-        sqe.__bindgen_anon_3.__bindgen_anon_1.buf_index = buf_index;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_index = buf_index;
         Entry(sqe)
     }
 );
@@ -337,11 +337,11 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.addr = buf as _;
+        sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
-        sqe.__bindgen_anon_2.rw_flags = rw_flags;
-        sqe.__bindgen_anon_3.__bindgen_anon_1.buf_index = buf_index;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_index = buf_index;
         Entry(sqe)
     }
 );
@@ -368,7 +368,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_2.poll_events = flags as _;
+        sqe.__bindgen_anon_3.poll_events = flags as _;
         Entry(sqe)
     }
 );
@@ -392,7 +392,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.addr = user_data as _;
+        sqe.__bindgen_anon_2.addr = user_data as _;
         Entry(sqe)
     }
 );
@@ -426,7 +426,7 @@ opcode!(
         assign_fd!(sqe.fd = fd);
         sqe.len = len as _;
         sqe.__bindgen_anon_1.off = offset as _;
-        sqe.__bindgen_anon_2.sync_range_flags = flags;
+        sqe.__bindgen_anon_3.sync_range_flags = flags;
         Entry(sqe)
     }
 );
@@ -455,9 +455,9 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.addr = msg as _;
+        sqe.__bindgen_anon_2.addr = msg as _;
         sqe.len = 1;
-        sqe.__bindgen_anon_2.msg_flags = flags;
+        sqe.__bindgen_anon_3.msg_flags = flags;
         Entry(sqe)
     }
 );
@@ -484,9 +484,9 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.addr = msg as _;
+        sqe.__bindgen_anon_2.addr = msg as _;
         sqe.len = 1;
-        sqe.__bindgen_anon_2.msg_flags = flags;
+        sqe.__bindgen_anon_3.msg_flags = flags;
         Entry(sqe)
     }
 );
@@ -519,10 +519,10 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.addr = timespec as _;
+        sqe.__bindgen_anon_2.addr = timespec as _;
         sqe.len = 1;
         sqe.__bindgen_anon_1.off = count as _;
-        sqe.__bindgen_anon_2.timeout_flags = flags.bits();
+        sqe.__bindgen_anon_3.timeout_flags = flags.bits();
         Entry(sqe)
     }
 );
@@ -545,8 +545,8 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.addr = user_data as _;
-        sqe.__bindgen_anon_2.timeout_flags = flags.bits();
+        sqe.__bindgen_anon_2.addr = user_data as _;
+        sqe.__bindgen_anon_3.timeout_flags = flags.bits();
         Entry(sqe)
     }
 );
@@ -569,9 +569,9 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.addr = addr as _;
+        sqe.__bindgen_anon_2.addr = addr as _;
         sqe.__bindgen_anon_1.addr2 = addrlen as _;
-        sqe.__bindgen_anon_2.accept_flags = flags;
+        sqe.__bindgen_anon_3.accept_flags = flags;
         Entry(sqe)
     }
 );
@@ -593,7 +593,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.addr = user_data as _;
+        sqe.__bindgen_anon_2.addr = user_data as _;
         Entry(sqe)
     }
 );
@@ -616,9 +616,9 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.addr = timespec as _;
+        sqe.__bindgen_anon_2.addr = timespec as _;
         sqe.len = 1;
-        sqe.__bindgen_anon_2.timeout_flags = flags.bits();
+        sqe.__bindgen_anon_3.timeout_flags = flags.bits();
         Entry(sqe)
     }
 );
@@ -640,7 +640,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.addr = addr as _;
+        sqe.__bindgen_anon_2.addr = addr as _;
         sqe.__bindgen_anon_1.off = addrlen as _;
         Entry(sqe)
     }
@@ -648,7 +648,6 @@ opcode!(
 
 // === 5.6 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Fallocate {
         fd: types::Target,
@@ -666,14 +665,13 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.addr = len as _;
+        sqe.__bindgen_anon_2.addr = len as _;
         sqe.len = mode as _;
         sqe.__bindgen_anon_1.off = offset as _;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Openat {
         dirfd: types::Target,
@@ -691,14 +689,13 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = dirfd);
-        sqe.addr = pathname as _;
+        sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mode;
-        sqe.__bindgen_anon_2.open_flags = flags as _;
+        sqe.__bindgen_anon_3.open_flags = flags as _;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Close {
         fd: types::Target,
@@ -717,7 +714,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct FilesUpdate {
         fds: *const RawFd,
@@ -734,14 +730,13 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.addr = fds as _;
+        sqe.__bindgen_anon_2.addr = fds as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Statx {
         dirfd: types::Target,
@@ -763,15 +758,14 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = dirfd);
-        sqe.addr = pathname as _;
+        sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mask;
         sqe.__bindgen_anon_1.off = statxbuf as _;
-        sqe.__bindgen_anon_2.statx_flags = flags as _;
+        sqe.__bindgen_anon_3.statx_flags = flags as _;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Read {
         fd: types::Target,
@@ -796,15 +790,14 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.addr = buf as _;
+        sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
-        sqe.__bindgen_anon_2.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Write {
         fd: types::Target,
@@ -829,15 +822,14 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.addr = buf as _;
+        sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
-        sqe.__bindgen_anon_2.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Fadvise {
         fd: types::Target,
@@ -857,12 +849,11 @@ opcode!(
         assign_fd!(sqe.fd = fd);
         sqe.len = len as _;
         sqe.__bindgen_anon_1.off = offset as _;
-        sqe.__bindgen_anon_2.fadvise_advice = advice as _;
+        sqe.__bindgen_anon_3.fadvise_advice = advice as _;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Madvise {
         addr: *const libc::c_void,
@@ -879,14 +870,13 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.addr = addr as _;
+        sqe.__bindgen_anon_2.addr = addr as _;
         sqe.len = len as _;
-        sqe.__bindgen_anon_2.fadvise_advice = advice as _;
+        sqe.__bindgen_anon_3.fadvise_advice = advice as _;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Send {
         fd: types::Target,
@@ -904,14 +894,13 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.addr = buf as _;
+        sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_2.msg_flags = flags as _;
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Recv {
         fd: types::Target,
@@ -929,14 +918,13 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.addr = buf as _;
+        sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_2.msg_flags = flags as _;
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Openat2 {
         dirfd: types::Target,
@@ -953,14 +941,13 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = dirfd);
-        sqe.addr = pathname as _;
+        sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mem::size_of::<sys::open_how>() as _;
         sqe.__bindgen_anon_1.off = how as _;
         Entry(sqe)
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct EpollCtl {
         epfd: types::Target,
@@ -978,7 +965,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = epfd);
-        sqe.addr = ev as _;
+        sqe.__bindgen_anon_2.addr = ev as _;
         sqe.len = op as _;
         sqe.__bindgen_anon_1.off = fd as _;
         Entry(sqe)

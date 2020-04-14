@@ -51,7 +51,6 @@ bitflags!{
         /// Like [IO_LINK], but it doesn’t sever regardless of the completion result.
         const IO_HARDLINK = 1 << sys::IOSQE_IO_HARDLINK_BIT;
 
-        #[cfg(features = "unstable")]
         const ASYNC = 1 << sys::IOSQE_ASYNC_BIT;
     }
 }

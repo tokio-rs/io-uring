@@ -4,10 +4,8 @@ use std::os::unix::io::{ AsRawFd, RawFd };
 use crate::register::{ register as reg, unregister as unreg, execute };
 use crate::squeue::SubmissionQueue;
 use crate::util::{ Fd, unsync_load };
-use crate::sys;
-
-#[cfg(feature = "unstable")]
 use crate::register::Probe;
+use crate::sys;
 
 
 /// Submitter
@@ -134,19 +132,16 @@ impl<'a> Submitter<'a> {
         Ok(ret as _)
     }
 
-    #[cfg(feature = "unstable")]
     pub fn register_eventfd_async(&self, eventfd: RawFd) -> io::Result<()> {
         execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_EVENTFD_ASYNC, cast_ptr::<RawFd>(&eventfd) as *const _, 1)?;
         Ok(())
     }
 
-    #[cfg(feature = "unstable")]
     pub fn register_probe(&self, probe: &mut Probe) -> io::Result<()> {
         execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_PROBE, probe.as_mut_ptr() as *const _, 256)?;
         Ok(())
     }
 
-    #[cfg(feature = "unstable")]
     pub fn register_personality(&self) -> io::Result<()> {
         execute(self.fd.as_raw_fd(), sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)?;
         Ok(())
@@ -167,7 +162,6 @@ impl<'a> Submitter<'a> {
         Ok(())
     }
 
-    #[cfg(feature = "unstable")]
     pub fn unregister_personality(&self) -> io::Result<()> {
         execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_PERSONALITY, ptr::null(), 0)?;
         Ok(())

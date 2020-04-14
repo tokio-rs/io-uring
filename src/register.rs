@@ -1,4 +1,4 @@
-use std::{ io, ptr };
+use std::{ io, ptr, mem };
 use std::os::unix::io::RawFd;
 use crate::sys;
 
@@ -36,18 +36,6 @@ pub mod register {
         EventFd(RawFd),
 
         FilesUpdate { offset: u32, fds: &'a [RawFd] },
-
-        /// 5.6 available
-        #[cfg(feature = "unstable")]
-        EventFdAsync(RawFd),
-
-        /// 5.6 available
-        #[cfg(feature = "unstable")]
-        Probe(&'a mut Probe),
-
-        /// 5.6 available
-        #[cfg(feature = "unstable")]
-        Personality
     }
 
     impl Target<'_> {
@@ -73,15 +61,6 @@ pub mod register {
 
                     execute(fd, sys::IORING_REGISTER_FILES_UPDATE, fu as *const _, fds.len() as _)?
                 },
-                #[cfg(feature = "unstable")]
-                Target::EventFdAsync(eventfd) =>
-                    execute(fd, sys::IORING_REGISTER_EVENTFD_ASYNC, cast_ptr::<RawFd>(eventfd) as *const _, 1)?,
-                #[cfg(feature = "unstable")]
-                Target::Probe(probe) =>
-                    execute(fd, sys::IORING_REGISTER_PROBE, probe.0.as_ptr() as *const _, 256)?,
-                #[cfg(feature = "unstable")]
-                Target::Personality =>
-                    execute(fd, sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)?
             };
 
             Ok(())
@@ -103,10 +82,6 @@ pub mod unregister {
 
         /// Unregister eventfd.
         EventFd,
-
-        /// 5.6 available
-        #[cfg(feature = "unstable")]
-        Personality
     }
 
     impl Target {
@@ -115,8 +90,6 @@ pub mod unregister {
                 Target::Buffers => sys::IORING_UNREGISTER_BUFFERS,
                 Target::Files => sys::IORING_UNREGISTER_FILES,
                 Target::EventFd => sys::IORING_UNREGISTER_EVENTFD,
-                #[cfg(feature = "unstable")]
-                Target::Personality => sys::IORING_UNREGISTER_PERSONALITY
             };
 
             execute(fd, opcode, ptr::null(), 0)?;
@@ -126,13 +99,8 @@ pub mod unregister {
     }
 }
 
-#[cfg(feature = "unstable")]
-use std::mem;
-
-#[cfg(feature = "unstable")]
 pub struct Probe(ptr::NonNull<sys::io_uring_probe>);
 
-#[cfg(feature = "unstable")]
 impl Probe {
     const COUNT: usize = 256;
     const SIZE: usize = mem::size_of::<sys::io_uring_probe>()
@@ -173,7 +141,6 @@ impl Probe {
     }
 }
 
-#[cfg(feature = "unstable")]
 impl Default for Probe {
     #[inline]
     fn default() -> Probe {
@@ -181,7 +148,6 @@ impl Default for Probe {
     }
 }
 
-#[cfg(feature = "unstable")]
 impl Drop for Probe {
     fn drop(&mut self) {
         use std::alloc::{ dealloc, Layout };

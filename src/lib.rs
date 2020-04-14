@@ -24,8 +24,6 @@ pub use submit::Submitter;
 pub use squeue::SubmissionQueue;
 pub use cqueue::CompletionQueue;
 pub use register::{ register as reg, unregister as unreg };
-
-#[cfg(feature = "unstable")]
 pub use register::Probe;
 
 /// IoUring instance
@@ -253,13 +251,11 @@ impl Builder {
         self
     }
 
-    #[cfg(feature = "unstable")]
     pub fn setup_clamp(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_CLAMP;
         self
     }
 
-    #[cfg(feature = "unstable")]
     pub fn setup_attach_wq(&mut self, fd: RawFd) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_ATTACH_WQ;
         self.params.wq_fd = fd as _;
@@ -312,12 +308,10 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_SUBMIT_STABLE != 0
     }
 
-    #[cfg(feature = "unstable")]
     pub fn is_feature_rw_cur_pos(&self) -> bool {
         self.0.features & sys::IORING_FEAT_RW_CUR_POS != 0
     }
 
-    #[cfg(feature = "unstable")]
     pub fn is_feature_cur_personality(&self) -> bool {
         self.0.features & sys::IORING_FEAT_CUR_PERSONALITY != 0
     }

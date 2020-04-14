@@ -142,7 +142,6 @@ fn test_files_update() -> anyhow::Result<()> {
 }
 
 #[test]
-#[cfg(feature = "unstable")]
 fn test_probe() -> anyhow::Result<()> {
     use io_uring::{ opcode, IoUring, Probe };
 

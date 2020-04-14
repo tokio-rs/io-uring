@@ -95,7 +95,6 @@ fn bench_iovec(c: &mut Criterion) {
         });
     });
 
-    #[cfg(feature = "unstable")]
     c.bench_function("writes-one-submit", |b| {
         let fd = tempfile().unwrap();
 
@@ -135,7 +134,6 @@ fn bench_iovec(c: &mut Criterion) {
         });
     });
 
-    #[cfg(feature = "unstable")]
     c.bench_function("writes-multi-submit", |b| {
         let fd = tempfile().unwrap();
 

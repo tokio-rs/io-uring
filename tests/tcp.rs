@@ -78,6 +78,7 @@ fn test_tcp_write_then_read() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_tcp_sendmsg_and_recvmsg() -> anyhow::Result<()> {
     let addr = echo_server();
