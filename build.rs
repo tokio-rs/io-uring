@@ -28,7 +28,7 @@ fn main() {
         .generate_comments(true)
         .use_core()
         .whitelist_type("io_uring_.*|io_.qring_.*|__kernel_timespec|open_how")
-        .whitelist_var("__NR_io_uring.*|IOSQE_.*|IORING_.*|IO_URING_.*")
+        .whitelist_var("__NR_io_uring.*|IOSQE_.*|IORING_.*|IO_URING_.*|SPLICE_F_FD_IN_FIXED")
         .generate().unwrap()
         .write_to_file(outdir.join("sys.rs")).unwrap();
 }

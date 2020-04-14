@@ -331,6 +331,11 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_CUR_PERSONALITY != 0
     }
 
+    #[cfg(feature = "unstable")]
+    pub fn is_feature_fast_poll(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_FAST_POLL != 0
+    }
+
     pub fn sq_entries(&self) -> u32 {
         self.0.sq_entries
     }

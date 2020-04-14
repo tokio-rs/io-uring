@@ -51,7 +51,16 @@ bitflags!{
         /// Like [IO_LINK], but it doesn’t sever regardless of the completion result.
         const IO_HARDLINK = 1 << sys::IOSQE_IO_HARDLINK_BIT;
 
+        /// Normal operation for io_uring is to try and issue an sqe as non-blocking first,
+        /// and if that fails, execute it in an async manner.
+        ///
+        /// To support more efficient overlapped operation of requests
+        /// that the application knows/assumes will always (or most of the time) block,
+        /// the application can ask for an sqe to be issued async from the start.
         const ASYNC = 1 << sys::IOSQE_ASYNC_BIT;
+
+        #[cfg(feature = "unstable")]
+        const BUFFER_SELECT = 1 << sys::IOSQE_BUFFER_SELECT_BIT;
     }
 }
 

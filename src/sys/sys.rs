@@ -41,6 +41,7 @@ pub const IORING_SETUP_CLAMP: u32 = 16;
 pub const IORING_SETUP_ATTACH_WQ: u32 = 32;
 pub const IORING_FSYNC_DATASYNC: u32 = 1;
 pub const IORING_TIMEOUT_ABS: u32 = 1;
+pub const SPLICE_F_FD_IN_FIXED: u32 = 2147483648;
 pub const IORING_CQE_F_BUFFER: u32 = 1;
 pub const IORING_OFF_SQ_RING: u32 = 0;
 pub const IORING_OFF_CQ_RING: u32 = 134217728;

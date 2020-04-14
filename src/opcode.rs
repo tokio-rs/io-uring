@@ -676,7 +676,7 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `posix_fadvise(2)` system call.
     pub struct Openat {
-        dirfd: types::Target,
+        dirfd: RawFd,
         pathname: *const libc::c_char,
         ;;
         flags: i32 = 0,
@@ -690,7 +690,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
-        assign_fd!(sqe.fd = dirfd);
+        sqe.fd = dirfd;
         sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mode;
         sqe.__bindgen_anon_3.open_flags = flags as _;
@@ -701,7 +701,7 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `close(2)` system call.
     pub struct Close {
-        fd: types::Target,
+        fd: RawFd,
         ;;
     }
 
@@ -712,7 +712,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
-        assign_fd!(sqe.fd = fd);
+        sqe.fd = fd;
         Entry(sqe)
     }
 );
@@ -745,7 +745,7 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `statx(2)` system call.
     pub struct Statx {
-        dirfd: types::Target,
+        dirfd: RawFd,
         pathname: *const libc::c_char,
         statxbuf: *mut libc::statx,
         ;;
@@ -763,7 +763,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
-        assign_fd!(sqe.fd = dirfd);
+        sqe.fd = dirfd;
         sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mask;
         sqe.__bindgen_anon_1.off = statxbuf as _;
@@ -940,7 +940,7 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `openat2(2) system call.
     pub struct Openat2 {
-        dirfd: types::Target,
+        dirfd: RawFd,
         pathname: *const libc::c_char,
         how: *const types::OpenHow
         ;;
@@ -953,7 +953,7 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
-        assign_fd!(sqe.fd = dirfd);
+        sqe.fd = dirfd;
         sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mem::size_of::<sys::open_how>() as _;
         sqe.__bindgen_anon_1.off = how as _;
@@ -982,6 +982,93 @@ opcode!(
         sqe.__bindgen_anon_2.addr = ev as _;
         sqe.len = op as _;
         sqe.__bindgen_anon_1.off = fd as _;
+        Entry(sqe)
+    }
+);
+
+// === 5.7 ===
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Splice {
+        fd_in: types::Target,
+        off_in: libc::loff_t,
+        fd_out: types::Target,
+        off_out: libc::loff_t,
+        len: u32,
+        ;;
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_SPLICE;
+
+    pub fn build(self) -> Entry {
+        let Splice { fd_in, off_in, fd_out, off_out, len, mut flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd_out);
+        sqe.len = len;
+        sqe.__bindgen_anon_1.off = off_out as _;
+
+        sqe.__bindgen_anon_4.__bindgen_anon_1.splice_fd_in = match fd_in {
+            types::Target::Fd(fd) => fd,
+            types::Target::Fixed(i) => {
+                flags |= sys::SPLICE_F_FD_IN_FIXED;
+                i as _
+            }
+        };
+
+        sqe.__bindgen_anon_2.splice_off_in = off_in as _;
+        sqe.__bindgen_anon_3.splice_flags = flags;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct ProvideBuffers {
+        addr: *mut libc::c_void,
+        len: i32,
+        nbufs: u16,
+        bgid: u16,
+        bid: u16
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_PROVIDE_BUFFERS;
+
+    pub fn build(self) -> Entry {
+        let ProvideBuffers { addr, len, nbufs, bgid, bid } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = nbufs as _;
+        sqe.__bindgen_anon_2.addr = addr as _;
+        sqe.len = len as _;
+        sqe.__bindgen_anon_1.off = bid as _;
+        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_group = bgid;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct RemoveBuffers {
+        nbufs: u16,
+        bgid: u16
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_REMOVE_BUFFERS;
+
+    pub fn build(self) -> Entry {
+        let RemoveBuffers { nbufs, bgid } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = nbufs as _;
+        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_group = bgid;
         Entry(sqe)
     }
 );
