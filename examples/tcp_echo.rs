@@ -13,12 +13,10 @@ enum Token {
     Read {
         fd: RawFd,
         buf_index: usize,
-        bufv_index: usize
     },
     Write {
         fd: RawFd,
         buf_index: usize,
-        bufv_index: usize,
         offset: usize,
         len: usize
     }
@@ -62,7 +60,6 @@ fn main() -> anyhow::Result<()> {
     let mut backlog = Vec::new();
     let mut bufpool = Vec::with_capacity(64);
     let mut buf_alloc = Slab::with_capacity(64);
-    let mut bufv_alloc = Slab::with_capacity(64);
     let mut token_alloc = Slab::with_capacity(64);
 
     println!("listen {}", listener.local_addr()?);
@@ -114,153 +111,116 @@ fn main() -> anyhow::Result<()> {
             let ret = cqe.result();
             let token_index = cqe.user_data() as usize;
 
-            if ret >= 0 {
-                let token = token_alloc.get_mut(token_index)
-                    .ok_or_else(|| anyhow::format_err!("not found token"))?;
-                match token.clone() {
-                    Token::Accept => {
-                        println!("accept");
+            if ret < 0 {
+                eprintln!("token {:?} error: {:?}", token_alloc.get(token_index), io::Error::from_raw_os_error(-ret));
+                continue
+            }
 
-                        accept.count += 1;
+            let token = &mut token_alloc[token_index];
+            match token.clone() {
+                Token::Accept => {
+                    println!("accept");
 
-                        let fd = ret;
-                        let poll_token = token_alloc.insert(Token::Poll { fd });
+                    accept.count += 1;
 
-                        let poll_e = opcode::PollAdd::new(types::Target::Fd(fd), libc::POLLIN)
+                    let fd = ret;
+                    let poll_token = token_alloc.insert(Token::Poll { fd });
+
+                    let poll_e = opcode::PollAdd::new(types::Target::Fd(fd), libc::POLLIN)
+                        .build()
+                        .user_data(poll_token as _);
+
+                    unsafe {
+                        if let Err(entry) = sq.push(poll_e) {
+                            backlog.push(entry);
+                        }
+                    }
+                },
+                Token::Poll { fd } => {
+                    let (buf_index, buf) = match bufpool.pop() {
+                        Some(buf_index) => (buf_index, &mut buf_alloc[buf_index]),
+                        None => {
+                            let buf = vec![0u8; 2048].into_boxed_slice();
+                            let buf_entry = buf_alloc.vacant_entry();
+                            let buf_index = buf_entry.key();
+                            (buf_index, buf_entry.insert(buf))
+                        }
+                    };
+
+                    let read_token =
+                        token_alloc.insert(Token::Read { fd, buf_index });
+
+                    let read_e =
+                        opcode::Read::new(types::Target::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
                             .build()
-                            .user_data(poll_token as _);
+                            .user_data(read_token as _);
 
-                        unsafe {
-                            if let Err(entry) = sq.push(poll_e) {
-                                backlog.push(entry);
-                            }
+                    unsafe {
+                        if let Err(entry) = sq.push(read_e) {
+                            backlog.push(entry);
                         }
-                    },
-                    Token::Poll { fd } => {
-                        let (buf_index, _, bufv_index, bufv) = match bufpool.pop() {
-                            Some((buf_index, bufv_index)) => {
-                                let buf = buf_alloc.get_mut(buf_index)
-                                    .ok_or_else(|| anyhow::format_err!("not found buf"))?;
-                                let bufv = bufv_alloc.get_mut(bufv_index)
-                                    .ok_or_else(|| anyhow::format_err!("not found bufv"))?;
-                                (buf_index, buf, bufv_index, bufv)
-                            },
-                            None => {
-                                let (buf_index, buf) = {
-                                    let buf = vec![0u8; 2048].into_boxed_slice();
-                                    let buf_entry = buf_alloc.vacant_entry();
-                                    let buf_index = buf_entry.key();
-                                    (buf_index, buf_entry.insert(buf))
-                                };
+                    }
+                },
+                Token::Read { fd, buf_index } => if ret == 0 {
+                    bufpool.push(buf_index);
+                    token_alloc.remove(token_index);
 
-                                let (bufv_index, bufv) = {
-                                    let bufv = io::IoSliceMut::new(&mut buf[..]);
-                                    let bufv_entry = bufv_alloc.vacant_entry();
-                                    let bufv_index = bufv_entry.key();
-                                    (bufv_index, bufv_entry.insert(as_iovec_mut(bufv)))
-                                };
+                    println!("shutdown");
 
-                                (buf_index, buf, bufv_index, bufv)
-                            }
-                        };
+                    unsafe {
+                        libc::close(fd);
+                    }
+                } else {
+                    let len = ret as usize;
+                    let buf = &buf_alloc[buf_index];
 
-                        let read_token =
-                            token_alloc.insert(Token::Read { fd, buf_index, bufv_index });
+                    *token = Token::Write {
+                        fd, buf_index, len,
+                        offset: 0
+                    };
 
-                        let read_e =
-                            opcode::Readv::new(types::Target::Fd(fd), bufv, 1)
-                                .build()
-                                .user_data(read_token as _);
+                    let write_e =
+                        opcode::Write::new(types::Target::Fd(fd), buf.as_ptr(), len as _)
+                            .build()
+                            .user_data(token_index as _);
 
-                        unsafe {
-                            if let Err(entry) = sq.push(read_e) {
-                                backlog.push(entry);
-                            }
+                    unsafe {
+                        if let Err(entry) = sq.push(write_e) {
+                            backlog.push(entry);
                         }
-                    },
-                    Token::Read { fd, buf_index, bufv_index } => if ret == 0 {
-                        bufpool.push((buf_index, bufv_index));
-                        token_alloc.remove(token_index);
+                    }
+                },
+                Token::Write { fd, buf_index, offset, len } => {
+                    let write_len = ret as usize;
 
-                        println!("shutdown");
+                    let entry = if offset + write_len >= len {
+                        bufpool.push(buf_index);
 
-                        unsafe {
-                            libc::close(fd);
-                        }
+                        *token = Token::Poll { fd };
+
+                        opcode::PollAdd::new(types::Target::Fd(fd), libc::POLLIN)
+                            .build()
+                            .user_data(token_index as _)
                     } else {
-                        let len = ret as usize;
-                        let buf = buf_alloc.get(buf_index)
-                            .ok_or_else(|| anyhow::format_err!("not found buf"))?;
-                        let bufv = bufv_alloc.get_mut(bufv_index)
-                            .ok_or_else(|| anyhow::format_err!("not found bufv"))?;
+                        let offset = offset + write_len;
+                        let len = len - offset;
 
-                        *bufv = as_iovec(io::IoSlice::new(&buf[..len]));
-                        *token = Token::Write {
-                            fd, buf_index, bufv_index, len,
-                            offset: 0
-                        };
+                        let buf = &buf_alloc[buf_index][offset..];
 
-                        let write_e =
-                            opcode::Writev::new(types::Target::Fd(fd), bufv, 1)
-                                .build()
-                                .user_data(token_index as _);
+                        *token = Token::Write { fd, buf_index, offset, len };
 
-                        unsafe {
-                            if let Err(entry) = sq.push(write_e) {
-                                backlog.push(entry);
-                            }
-                        }
-                    },
-                    Token::Write { fd, buf_index, bufv_index, offset, len } => {
-                        let write_len = ret as usize;
+                        opcode::Write::new(types::Target::Fd(fd), buf.as_ptr(), len as _)
+                            .build()
+                            .user_data(token_index as _)
+                    };
 
-                        let entry = if offset + write_len >= len {
-                            bufpool.push((buf_index, bufv_index));
-
-                            *token = Token::Poll { fd };
-
-                            opcode::PollAdd::new(types::Target::Fd(fd), libc::POLLIN)
-                                .build()
-                                .user_data(token_index as _)
-                        } else {
-                            let buf = buf_alloc.get(buf_index)
-                                .ok_or_else(|| anyhow::format_err!("not found buf"))?;
-                            let bufv = bufv_alloc.get_mut(bufv_index)
-                                .ok_or_else(|| anyhow::format_err!("not found bufv"))?;
-
-                            let offset = offset + write_len;
-                            let len = len - offset;
-
-                            *bufv = as_iovec(io::IoSlice::new(&buf[offset..][..len]));
-                            *token = Token::Write { fd, buf_index, bufv_index, offset, len };
-
-                            opcode::Writev::new(types::Target::Fd(fd), bufv, 1)
-                                .build()
-                                .user_data(token_index as _)
-                        };
-
-                        unsafe {
-                            if let Err(entry) = sq.push(entry) {
-                                backlog.push(entry);
-                            }
+                    unsafe {
+                        if let Err(entry) = sq.push(entry) {
+                            backlog.push(entry);
                         }
                     }
                 }
-            } else {
-                eprintln!("token {:?} error: {:?}", token_alloc.get(token_index), io::Error::from_raw_os_error(-ret));
             }
         }
-    }
-}
-
-fn as_iovec(bufv: io::IoSlice<'_>) -> libc::iovec {
-    unsafe {
-        std::mem::transmute(bufv)
-    }
-}
-
-fn as_iovec_mut(bufv: io::IoSliceMut<'_>) -> libc::iovec {
-    unsafe {
-        std::mem::transmute(bufv)
     }
 }
