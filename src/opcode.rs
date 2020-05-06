@@ -64,6 +64,11 @@ pub mod types {
             self.0.mode = mode;
             self
         }
+
+        pub const fn resolve(mut self, resolve: u64) -> Self {
+            self.0.resolve = resolve;
+            self
+        }
     }
 }
 
