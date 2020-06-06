@@ -23,7 +23,7 @@ pub struct Mmap {
 impl Mmap {
     pub fn new(fd: &Fd, offset: i64, len: usize) -> io::Result<Mmap> {
         unsafe {
-            match libc::mmap(
+            match libc::mmap64(
                 ptr::null_mut(),
                 len,
                 libc::PROT_READ | libc::PROT_WRITE,
