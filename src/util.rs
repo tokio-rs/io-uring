@@ -21,7 +21,7 @@ pub struct Mmap {
 }
 
 impl Mmap {
-    pub fn new(fd: &Fd, offset: i64, len: usize) -> io::Result<Mmap> {
+    pub fn new(fd: &Fd, offset: libc::off_t, len: usize) -> io::Result<Mmap> {
         unsafe {
             match libc::mmap(
                 ptr::null_mut(),
