@@ -1077,3 +1077,40 @@ opcode!(
         Entry(sqe)
     }
 );
+
+// === 5.8 ===
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Tee {
+        fd_in: types::Target,
+        fd_out: types::Target,
+        len: u32,
+        ;;
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_TEE;
+
+    pub fn build(self) -> Entry {
+        let Tee { fd_in, fd_out, len, mut flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+
+        assign_fd!(sqe.fd = fd_out);
+        sqe.len = len;
+
+        sqe.__bindgen_anon_4.__bindgen_anon_1.splice_fd_in = match fd_in {
+            types::Target::Fd(fd) => fd,
+            types::Target::Fixed(i) => {
+                flags |= sys::SPLICE_F_FD_IN_FIXED;
+                i as _
+            }
+        };
+
+        sqe.__bindgen_anon_3.splice_flags = flags;
+
+        Entry(sqe)
+    }
+);
