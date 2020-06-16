@@ -13,7 +13,9 @@ pub struct CompletionQueue {
 
     overflow: *const atomic::AtomicU32,
 
-    pub(crate) cqes: *const sys::io_uring_cqe
+    pub(crate) cqes: *const sys::io_uring_cqe,
+
+    flags: *const atomic::AtomicU32
 }
 
 /// Completion Entry
@@ -39,13 +41,15 @@ impl CompletionQueue {
             let ring_entries    = cq_mmap + p.cq_off.ring_entries   => *const u32;
             let overflow        = cq_mmap + p.cq_off.overflow       => *const atomic::AtomicU32;
             let cqes            = cq_mmap + p.cq_off.cqes           => *const sys::io_uring_cqe;
+            let flags           = cq_mmap + p.cq_off.flags          => *const atomic::AtomicU32;
         }
 
         CompletionQueue {
             head, tail,
             ring_mask, ring_entries,
             overflow,
-            cqes
+            cqes,
+            flags
         }
     }
 
@@ -54,6 +58,14 @@ impl CompletionQueue {
     pub fn overflow(&self) -> u32 {
         unsafe {
             (*self.overflow).load(atomic::Ordering::Acquire)
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn eventfd_disabled(&self) -> bool {
+        unsafe {
+            (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_CQ_EVENTFD_DISABLED
+                != 0
         }
     }
 
