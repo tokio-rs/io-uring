@@ -67,8 +67,10 @@ impl<T: Copy> Ring<T> {
                 atomic::Ordering::Relaxed
             ) {
                 Ok(_) => return Some(t),
-                Err(_) => continue
+                Err(_) => ()
             }
+
+            atomic::spin_loop_hint();
         }
     }
 }

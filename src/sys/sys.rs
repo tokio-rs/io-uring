@@ -47,6 +47,7 @@ pub const IORING_OFF_SQ_RING: u32 = 0;
 pub const IORING_OFF_CQ_RING: u32 = 134217728;
 pub const IORING_OFF_SQES: u32 = 268435456;
 pub const IORING_SQ_NEED_WAKEUP: u32 = 1;
+pub const IORING_CQ_EVENTFD_DISABLED: u32 = 1;
 pub const IORING_ENTER_GETEVENTS: u32 = 1;
 pub const IORING_ENTER_SQ_WAKEUP: u32 = 2;
 pub const IORING_FEAT_SINGLE_MMAP: u32 = 1;
@@ -728,7 +729,8 @@ pub const IORING_OP_EPOLL_CTL: _bindgen_ty_5 = 29;
 pub const IORING_OP_SPLICE: _bindgen_ty_5 = 30;
 pub const IORING_OP_PROVIDE_BUFFERS: _bindgen_ty_5 = 31;
 pub const IORING_OP_REMOVE_BUFFERS: _bindgen_ty_5 = 32;
-pub const IORING_OP_LAST: _bindgen_ty_5 = 33;
+pub const IORING_OP_TEE: _bindgen_ty_5 = 33;
+pub const IORING_OP_LAST: _bindgen_ty_5 = 34;
 pub type _bindgen_ty_5 = u32;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -907,7 +909,9 @@ pub struct io_cqring_offsets {
     pub ring_entries: __u32,
     pub overflow: __u32,
     pub cqes: __u32,
-    pub resv: [__u64; 2usize],
+    pub flags: __u32,
+    pub resv1: __u32,
+    pub resv2: __u64,
 }
 #[test]
 fn bindgen_test_layout_io_cqring_offsets() {
@@ -982,13 +986,33 @@ fn bindgen_test_layout_io_cqring_offsets() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::core::ptr::null::<io_cqring_offsets>())).resv as *const _ as usize },
+        unsafe { &(*(::core::ptr::null::<io_cqring_offsets>())).flags as *const _ as usize },
         24usize,
         concat!(
             "Offset of field: ",
             stringify!(io_cqring_offsets),
             "::",
-            stringify!(resv)
+            stringify!(flags)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_cqring_offsets>())).resv1 as *const _ as usize },
+        28usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_cqring_offsets),
+            "::",
+            stringify!(resv1)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_cqring_offsets>())).resv2 as *const _ as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_cqring_offsets),
+            "::",
+            stringify!(resv2)
         )
     );
 }
