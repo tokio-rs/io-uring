@@ -1,5 +1,5 @@
 use std::mem::MaybeUninit;
-use loom::cell::CausalCell;
+use loom::cell::UnsafeCell;
 use loom::sync::{ atomic, Mutex };
 
 const LENGTH: u32 = 8;
@@ -7,7 +7,7 @@ const MASK: u32 = LENGTH - 1;
 
 
 pub struct Ring<T> {
-    buf: Box<[CausalCell<MaybeUninit<T>>]>,
+    buf: Box<[UnsafeCell<MaybeUninit<T>>]>,
     head: atomic::AtomicU32,
     tail: atomic::AtomicU32,
     push_lock: Mutex<()>
@@ -18,7 +18,7 @@ impl<T: Copy> Ring<T> {
         let mut buf = Vec::with_capacity(LENGTH as usize);
 
         for _ in 0..LENGTH {
-            buf.push(CausalCell::new(MaybeUninit::uninit()));
+            buf.push(UnsafeCell::new(MaybeUninit::uninit()));
         }
 
         Ring {
@@ -69,8 +69,6 @@ impl<T: Copy> Ring<T> {
                 Ok(_) => return Some(t),
                 Err(_) => ()
             }
-
-            atomic::spin_loop_hint();
         }
     }
 }
