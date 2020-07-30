@@ -786,7 +786,8 @@ opcode!(
         ;;
         offset: libc::off_t = 0,
         ioprio: u16 = 0,
-        rw_flags: types::RwFlags = 0
+        rw_flags: types::RwFlags = 0,
+        buf_group: u16 = 0
     }
 
     pub const CODE = sys::IORING_OP_READ;
@@ -795,7 +796,8 @@ opcode!(
         let Read {
             fd,
             buf, len, offset,
-            ioprio, rw_flags
+            ioprio, rw_flags,
+            buf_group
         } = self;
 
         let mut sqe = sqe_zeroed();
@@ -806,6 +808,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_group = buf_group;
         Entry(sqe)
     }
 );
@@ -924,13 +927,14 @@ opcode!(
         buf: *mut u8,
         len: u32,
         ;;
-        flags: i32 = 0
+        flags: i32 = 0,
+        buf_group: u16 = 0
     }
 
     pub const CODE = sys::IORING_OP_RECV;
 
     pub fn build(self) -> Entry {
-        let Recv { fd, buf, len, flags } = self;
+        let Recv { fd, buf, len, flags, buf_group } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -938,6 +942,7 @@ opcode!(
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_group = buf_group;
         Entry(sqe)
     }
 );
