@@ -5,7 +5,7 @@
 
 #[macro_use]
 mod util;
-mod sys;
+pub mod sys;
 mod register;
 mod submit;
 pub mod squeue;
