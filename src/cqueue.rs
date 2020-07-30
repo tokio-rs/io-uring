@@ -161,4 +161,9 @@ impl Entry {
     pub fn user_data(&self) -> u64 {
         self.0.user_data
     }
+
+    /// Flags
+    pub fn flags(&self) -> u32 {
+        self.0.flags
+    }
 }
