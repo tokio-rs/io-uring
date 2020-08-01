@@ -104,6 +104,14 @@ impl SubmissionQueue {
         }
     }
 
+    #[cfg(feature = "unstable")]
+    pub fn cq_overflow(&self) -> bool {
+        unsafe {
+            (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW
+                != 0
+        }
+    }
+
     #[inline]
     pub fn capacity(&self) -> usize {
         unsafe {

@@ -11,4 +11,4 @@ path = "main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-loom = "0.2"
+loom = "0.3"
