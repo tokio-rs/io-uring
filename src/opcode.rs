@@ -8,6 +8,46 @@ use std::os::unix::io::RawFd;
 use crate::squeue::Entry;
 use crate::sys;
 
+mod sealed {
+    use std::os::unix::io::RawFd;
+    use super::types::{ Fd, Fixed };
+
+    #[derive(Debug)]
+    pub enum Target {
+        Fd(RawFd),
+        Fixed(u32)
+    }
+
+    pub trait UseFd: Sized {
+        fn into(self) -> RawFd;
+    }
+
+    pub trait UseFixed: Sized {
+        fn into(self) -> Target;
+    }
+
+    impl UseFd for Fd {
+        #[inline]
+        fn into(self) -> RawFd {
+            self.0
+        }
+    }
+
+    impl UseFixed for Fd {
+        #[inline]
+        fn into(self) -> Target {
+            Target::Fd(self.0)
+        }
+    }
+
+    impl UseFixed for Fixed {
+        #[inline]
+        fn into(self) -> Target {
+            Target::Fixed(self.0)
+        }
+    }
+}
+
 pub mod types {
     use std::os::unix::io::RawFd;
     use bitflags::bitflags;
@@ -21,19 +61,11 @@ pub mod types {
     #[repr(transparent)]
     pub struct Statx(sys::statx);
 
-    #[derive(Debug, Clone, Copy)]
-    pub enum Target {
-        Fd(RawFd),
-        /// The index of registered fd.
-        Fixed(u32)
-    }
+    #[repr(transparent)]
+    pub struct Fd(pub RawFd);
 
-    impl From<RawFd> for Target {
-        #[inline]
-        fn from(fd: RawFd) -> Self {
-            Target::Fd(fd)
-        }
-    }
+    #[repr(transparent)]
+    pub struct Fixed(pub u32);
 
     bitflags!{
         pub struct TimeoutFlags: u32 {
@@ -81,8 +113,8 @@ pub mod types {
 macro_rules! assign_fd {
     ( $sqe:ident . fd = $opfd:expr ) => {
         match $opfd {
-            types::Target::Fd(fd) => $sqe.fd = fd,
-            types::Target::Fixed(i) => {
+            sealed::Target::Fd(fd) => $sqe.fd = fd,
+            sealed::Target::Fixed(i) => {
                 $sqe.fd = i as _;
                 $sqe.flags |= crate::squeue::Flags::FIXED_FILE.bits();
             }
@@ -91,16 +123,32 @@ macro_rules! assign_fd {
 }
 
 macro_rules! opcode {
+    (@type impl sealed::UseFixed ) => {
+        sealed::Target
+    };
+    (@type impl sealed::UseFd ) => {
+        RawFd
+    };
+    (@type $name:ty ) => {
+        $name
+    };
     (
         $( #[$outer:meta] )*
         pub struct $name:ident {
             $( #[$new_meta:meta] )*
-            $( $field:ident : $tname:ty ),* $(,)?
+
+            $( $field:ident : { $( $tnt:tt )+ } ),*
+
+            $(,)?
+
             ;;
+
             $(
                 $( #[$opt_meta:meta] )*
                 $opt_field:ident : $opt_tname:ty = $default:expr
-            ),* $(,)?
+            ),*
+
+            $(,)?
         }
 
         pub const CODE = $opcode:expr;
@@ -110,16 +158,16 @@ macro_rules! opcode {
     ) => {
         $( #[$outer] )*
         pub struct $name {
-            $( $field : $tname, )*
+            $( $field : opcode!(@type $( $tnt )*), )*
             $( $opt_field : $opt_tname, )*
         }
 
         impl $name {
             $( #[$new_meta] )*
             #[inline]
-            pub const fn new( $( $field : $tname ),* ) -> Self {
+            pub fn new($( $field : $( $tnt )* ),*) -> Self {
                 $name {
-                    $( $field , )*
+                    $( $field: $field.into(), )*
                     $( $opt_field: $default, )*
                 }
             }
@@ -136,6 +184,7 @@ macro_rules! opcode {
             )*
 
             $( #[$build_meta] )*
+            #[inline]
             pub fn build($self) -> Entry $build_block
         }
     }
@@ -172,9 +221,9 @@ opcode!(
     /// The return values match those documented in the `preadv2 (2)` man pages.
     #[derive(Debug)]
     pub struct Readv {
-        fd: types::Target,
-        iovec: *mut libc::iovec,
-        len: u32,
+        fd: { impl sealed::UseFixed },
+        iovec: { *mut libc::iovec },
+        len: { u32 },
         ;;
         ioprio: u16 = 0,
         offset: libc::off_t = 0,
@@ -210,9 +259,9 @@ opcode!(
     /// The return values match those documented in the `pwritev2 (2)` man pages.
     #[derive(Debug)]
     pub struct Writev {
-        fd: types::Target,
-        iovec: *const libc::iovec,
-        len: u32,
+        fd: { impl sealed::UseFixed },
+        iovec: { *const libc::iovec },
+        len: { u32 },
         ;;
         ioprio: u16 = 0,
         offset: libc::off_t = 0,
@@ -249,7 +298,7 @@ opcode!(
     /// For example, an application which places a write I/O followed by an fsync in the submission queue cannot expect the fsync to apply to the write. The two operations execute in parallel, so the fsync may complete before the write is issued to the storage. The same is also true for previously issued writes that have not completed prior to the fsync.
     #[derive(Debug)]
     pub struct Fsync {
-        fd: types::Target,
+        fd: { impl sealed::UseFixed },
         ;;
         /// The `flags` bit mask may contain either 0, for a normal file integrity sync,
         /// or [types::FsyncFlags::DATASYNC] to provide data sync only semantics.
@@ -278,10 +327,10 @@ opcode!(
     pub struct ReadFixed {
         /// The `buf_index` is an index into an array of fixed buffers,
         /// and is only valid if fixed buffers were registered.
-        fd: types::Target,
-        buf: *mut u8,
-        len: u32,
-        buf_index: u16,
+        fd: { impl sealed::UseFixed },
+        buf: { *mut u8 },
+        len: { u32 },
+        buf_index: { u16 },
         ;;
         offset: libc::off_t = 0,
         ioprio: u16 = 0,
@@ -321,10 +370,10 @@ opcode!(
     pub struct WriteFixed {
         /// The `buf_index` is an index into an array of fixed buffers,
         /// and is only valid if fixed buffers were registered.
-        fd: types::Target,
-        buf: *const u8,
-        len: u32,
-        buf_index: u16,
+        fd: { impl sealed::UseFixed },
+        buf: { *const u8 },
+        len: { u32 },
+        buf_index: { u16 },
         ;;
         ioprio: u16 = 0,
         offset: libc::off_t = 0,
@@ -365,8 +414,8 @@ opcode!(
     pub struct PollAdd {
         /// The bits that may be set in `flags` are defined in `<poll.h>`,
         /// and documented in `poll (2)`.
-        fd: types::Target,
-        flags: libc::c_short,
+        fd: { impl sealed::UseFixed },
+        flags: { libc::c_short }
         ;;
     }
 
@@ -390,7 +439,7 @@ opcode!(
     /// If not found, `result` will return `-libc::ENOENT`.
     #[derive(Debug)]
     pub struct PollRemove {
-        user_data: u64
+        user_data: { u64 }
         ;;
     }
 
@@ -413,8 +462,8 @@ opcode!(
     /// See also `sync_file_range (2)`. for the general description of the related system call.
     #[derive(Debug)]
     pub struct SyncFileRange {
-        fd: types::Target,
-        len: u32,
+        fd: { impl sealed::UseFixed },
+        len: { u32 },
         ;;
         /// the offset method holds the offset in bytes
         offset: libc::off64_t = 0,
@@ -449,8 +498,8 @@ opcode!(
     /// See also `sendmsg (2)`. for the general description of the related system call.
     #[derive(Debug)]
     pub struct SendMsg {
-        fd: types::Target,
-        msg: *const libc::msghdr,
+        fd: { impl sealed::UseFixed },
+        msg: { *const libc::msghdr },
         ;;
         ioprio: u16 = 0,
         flags: u32 = 0
@@ -478,8 +527,8 @@ opcode!(
     /// See the description of [SendMsg].
     #[derive(Debug)]
     pub struct RecvMsg {
-        fd: types::Target,
-        msg: *mut libc::msghdr,
+        fd: { impl sealed::UseFixed },
+        msg: { *mut libc::msghdr },
         ;;
         ioprio: u16 = 0,
         flags: u32 = 0
@@ -512,7 +561,7 @@ opcode!(
     /// If the timeout was cancelled before it expired, the request will complete with `-ECANCELED`.
     #[derive(Debug)]
     pub struct Timeout {
-        timespec: *const types::Timespec,
+        timespec: { *const types::Timespec },
         ;;
         /// `count` may contain a completion event count. If not set, this defaults to 1.
         count: u32 = 0,
@@ -542,7 +591,7 @@ opcode!(
 opcode!(
     /// Attempt to remove an existing timeout operation.
     pub struct TimeoutRemove {
-        user_data: u64,
+        user_data: { u64 },
         ;;
         flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
@@ -564,9 +613,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of an `accept4 (2)` system call.
     pub struct Accept {
-        fd: types::Target,
-        addr: *mut libc::sockaddr,
-        addrlen: *mut libc::socklen_t
+        fd: { impl sealed::UseFixed },
+        addr: { *mut libc::sockaddr },
+        addrlen: { *mut libc::socklen_t },
         ;;
         flags: u32 = 0
     }
@@ -589,7 +638,7 @@ opcode!(
 opcode!(
     /// Attempt to cancel an already issued request.
     pub struct AsyncCancel {
-        user_data: u64,
+        user_data: { u64 }
         ;;
 
         // TODO flags
@@ -613,7 +662,7 @@ opcode!(
     /// another request through [Flags::IO_LINK](crate::squeue::Flags::IO_LINK) which is described below.
     /// Unlike [Timeout], [LinkTimeout] acts on the linked request, not the completion queue.
     pub struct LinkTimeout {
-        timespec: *const types::Timespec,
+        timespec: { *const types::Timespec },
         ;;
         flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
@@ -636,9 +685,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `connect (2)` system call.
     pub struct Connect {
-        fd: types::Target,
-        addr: *const libc::sockaddr,
-        addrlen: libc::socklen_t
+        fd: { impl sealed::UseFixed },
+        addr: { *const libc::sockaddr },
+        addrlen: { libc::socklen_t }
         ;;
     }
 
@@ -661,8 +710,8 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `fallocate(2)` system call.
     pub struct Fallocate {
-        fd: types::Target,
-        len: u32,
+        fd: { impl sealed::UseFixed },
+        len: { libc::off_t },
         ;;
         offset: libc::off_t = 0,
         mode: i32 = 0
@@ -686,8 +735,8 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `posix_fadvise(2)` system call.
     pub struct Openat {
-        dirfd: RawFd,
-        pathname: *const libc::c_char,
+        dirfd: { impl sealed::UseFd },
+        pathname: { *const libc::c_char },
         ;;
         flags: i32 = 0,
         mode: libc::mode_t = 0
@@ -711,7 +760,7 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `close(2)` system call.
     pub struct Close {
-        fd: RawFd,
+        fd: { impl sealed::UseFd }
         ;;
     }
 
@@ -731,8 +780,8 @@ opcode!(
     /// This command is an alternative to using [crate::Submitter::register_files_update]
     /// which then works in an async fashion, like the rest of the io_uring commands.
     pub struct FilesUpdate {
-        fds: *const RawFd,
-        len: u32,
+        fds: { *const RawFd },
+        len: { u32 },
         ;;
         offset: i32 = 0
     }
@@ -755,9 +804,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `statx(2)` system call.
     pub struct Statx {
-        dirfd: RawFd,
-        pathname: *const libc::c_char,
-        statxbuf: *mut types::Statx,
+        dirfd: { impl sealed::UseFd },
+        pathname: { *const libc::c_char },
+        statxbuf: { *mut types::Statx },
         ;;
         flags: i32 = 0,
         mask: u32 = 0
@@ -785,9 +834,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `read(2)` system call.
     pub struct Read {
-        fd: types::Target,
-        buf: *mut u8,
-        len: u32,
+        fd: { impl sealed::UseFixed },
+        buf: { *mut u8 },
+        len: { u32 },
         ;;
         offset: libc::off_t = 0,
         ioprio: u16 = 0,
@@ -821,9 +870,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `write(2)` system call.
     pub struct Write {
-        fd: types::Target,
-        buf: *const u8,
-        len: u32,
+        fd: { impl sealed::UseFixed },
+        buf: { *const u8 },
+        len: { u32 },
         ;;
         offset: libc::off_t = 0,
         ioprio: u16 = 0,
@@ -854,9 +903,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `posix_fadvise(2)` system call.
     pub struct Fadvise {
-        fd: types::Target,
-        len: libc::off_t,
-        advice: i32,
+        fd: { impl sealed::UseFixed },
+        len: { libc::off_t },
+        advice: { i32 },
         ;;
         offset: libc::off_t = 0,
     }
@@ -879,9 +928,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `madvise(2)` system call.
     pub struct Madvise {
-        addr: *const libc::c_void,
-        len: libc::off_t,
-        advice: i32
+        addr: { *const libc::c_void },
+        len: { libc::off_t },
+        advice: { i32 },
         ;;
     }
 
@@ -903,9 +952,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `send(2)` system call.
     pub struct Send {
-        fd: types::Target,
-        buf: *const u8,
-        len: u32,
+        fd: { impl sealed::UseFixed },
+        buf: { *const u8 },
+        len: { u32 },
         ;;
         flags: i32 = 0
     }
@@ -928,9 +977,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `recv(2) system call.
     pub struct Recv {
-        fd: types::Target,
-        buf: *mut u8,
-        len: u32,
+        fd: { impl sealed::UseFixed },
+        buf: { *mut u8 },
+        len: { u32 },
         ;;
         flags: i32 = 0,
         buf_group: u16 = 0
@@ -955,9 +1004,9 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `openat2(2) system call.
     pub struct Openat2 {
-        dirfd: RawFd,
-        pathname: *const libc::c_char,
-        how: *const types::OpenHow
+        dirfd: { impl sealed::UseFd },
+        pathname: { *const libc::c_char },
+        how: { *const types::OpenHow }
         ;;
     }
 
@@ -979,10 +1028,10 @@ opcode!(
 opcode!(
     /// Issue the equivalent of a `epoll_ctl(2) system call.
     pub struct EpollCtl {
-        epfd: types::Target,
-        fd: RawFd,
-        op: i32,
-        ev: *const libc::epoll_event
+        epfd: { impl sealed::UseFixed },
+        fd: { impl sealed::UseFd },
+        op: { i32 },
+        ev: { *const libc::epoll_event },
         ;;
     }
 
@@ -1006,11 +1055,11 @@ opcode!(
 #[cfg(feature = "unstable")]
 opcode!(
     pub struct Splice {
-        fd_in: types::Target,
-        off_in: libc::loff_t,
-        fd_out: types::Target,
-        off_out: libc::loff_t,
-        len: u32,
+        fd_in: { impl sealed::UseFixed },
+        off_in: { u64 },
+        fd_out: { impl sealed::UseFixed },
+        off_out: { u64 },
+        len: { u32 },
         ;;
         flags: u32 = 0
     }
@@ -1027,8 +1076,8 @@ opcode!(
         sqe.__bindgen_anon_1.off = off_out as _;
 
         sqe.__bindgen_anon_4.__bindgen_anon_1.splice_fd_in = match fd_in {
-            types::Target::Fd(fd) => fd,
-            types::Target::Fixed(i) => {
+            sealed::Target::Fd(fd) => fd,
+            sealed::Target::Fixed(i) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;
                 i as _
             }
@@ -1043,11 +1092,11 @@ opcode!(
 #[cfg(feature = "unstable")]
 opcode!(
     pub struct ProvideBuffers {
-        addr: *mut libc::c_void,
-        len: i32,
-        nbufs: u16,
-        bgid: u16,
-        bid: u16
+        addr: { *mut libc::c_void },
+        len: { i32 },
+        nbufs: { u16 },
+        bgid: { u16 },
+        bid: { u16 }
         ;;
     }
 
@@ -1070,8 +1119,8 @@ opcode!(
 #[cfg(feature = "unstable")]
 opcode!(
     pub struct RemoveBuffers {
-        nbufs: u16,
-        bgid: u16
+        nbufs: { u16 },
+        bgid: { u16 }
         ;;
     }
 
@@ -1093,9 +1142,9 @@ opcode!(
 #[cfg(feature = "unstable")]
 opcode!(
     pub struct Tee {
-        fd_in: types::Target,
-        fd_out: types::Target,
-        len: u32,
+        fd_in: { impl sealed::UseFixed },
+        fd_out: { impl sealed::UseFixed },
+        len: { u32 }
         ;;
         flags: u32 = 0
     }
@@ -1112,8 +1161,8 @@ opcode!(
         sqe.len = len;
 
         sqe.__bindgen_anon_4.__bindgen_anon_1.splice_fd_in = match fd_in {
-            types::Target::Fd(fd) => fd,
-            types::Target::Fixed(i) => {
+            sealed::Target::Fd(fd) => fd,
+            sealed::Target::Fixed(i) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;
                 i as _
             }
