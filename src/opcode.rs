@@ -19,7 +19,7 @@ pub mod types {
     /// Opaque types, you should use `libc::statx` instead.
     #[derive(Default)]
     #[repr(transparent)]
-    pub struct statx(sys::statx);
+    pub struct Statx(sys::statx);
 
     #[derive(Debug, Clone, Copy)]
     pub enum Target {
@@ -757,7 +757,7 @@ opcode!(
     pub struct Statx {
         dirfd: RawFd,
         pathname: *const libc::c_char,
-        statxbuf: *mut libc::statx,
+        statxbuf: *mut types::Statx,
         ;;
         flags: i32 = 0,
         mask: u32 = 0
