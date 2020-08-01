@@ -23,7 +23,6 @@ use util::{ Fd, Mmap };
 pub use submit::Submitter;
 pub use squeue::SubmissionQueue;
 pub use cqueue::CompletionQueue;
-pub use register::{ register as reg, unregister as unreg };
 pub use register::Probe;
 
 /// IoUring instance
@@ -133,22 +132,6 @@ impl IoUring {
         &self.params
     }
 
-    /// Register files or user buffers for asynchronous I/O.
-    #[inline]
-    #[deprecated(since="0.3.5", note="please use `Submitter::register_*` instead")]
-    pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
-        #[allow(deprecated)]
-        self.submitter().register(target)
-    }
-
-    /// Unregister files or user buffers for asynchronous I/O.
-    #[inline]
-    #[deprecated(since="0.3.5", note="please use `Submitter::unregister_*` instead")]
-    pub fn unregister(&self, target: unreg::Target) -> io::Result<()> {
-        #[allow(deprecated)]
-        self.submitter().unregister(target)
-    }
-
     /// Initiate and/or complete asynchronous I/O
     ///
     /// # Safety
@@ -209,12 +192,6 @@ impl Drop for IoUring {
 impl Builder {
     pub fn dontfork(&mut self) -> &mut Self {
         self.dontfork = true;
-        self
-    }
-
-    #[deprecated(since="0.3.1", note="unnecessary")]
-    pub fn feature_single_mmap(&mut self) -> &mut Self {
-        self.params.features |= sys::IORING_FEAT_SINGLE_MMAP;
         self
     }
 

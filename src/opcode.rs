@@ -16,6 +16,11 @@ pub mod types {
     pub use sys::__kernel_timespec as Timespec;
     pub use sys::__kernel_rwf_t as RwFlags;
 
+    /// Opaque types, you should use `libc::statx` instead.
+    #[derive(Default)]
+    #[repr(transparent)]
+    pub struct statx(sys::statx);
+
     #[derive(Debug, Clone, Copy)]
     pub enum Target {
         Fd(RawFd),

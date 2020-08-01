@@ -15,6 +15,7 @@ pub struct CompletionQueue {
 
     pub(crate) cqes: *const sys::io_uring_cqe,
 
+    #[allow(dead_code)]
     flags: *const atomic::AtomicU32
 }
 

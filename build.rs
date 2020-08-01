@@ -10,6 +10,7 @@ fn main() {
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <linux/time_types.h>
+#include <linux/stat.h>
 #include <linux/openat2.h>
 #include <linux/io_uring.h>
     "#;
@@ -27,7 +28,7 @@ fn main() {
         .derive_default(true)
         .generate_comments(true)
         .use_core()
-        .whitelist_type("io_uring_.*|io_.qring_.*|__kernel_timespec|open_how")
+        .whitelist_type("io_uring_.*|io_.qring_.*|__kernel_timespec|open_how|statx")
         .whitelist_var("__NR_io_uring.*|IOSQE_.*|IORING_.*|IO_URING_.*|SPLICE_F_FD_IN_FIXED")
         .generate().unwrap()
         .write_to_file(outdir.join("sys.rs")).unwrap();

@@ -1,7 +1,7 @@
 use std::{ io, ptr };
 use std::sync::atomic;
 use std::os::unix::io::{ AsRawFd, RawFd };
-use crate::register::{ register as reg, unregister as unreg, execute };
+use crate::register::execute;
 use crate::squeue::SubmissionQueue;
 use crate::util::{ Fd, unsync_load, cast_ptr };
 use crate::register::Probe;
@@ -43,20 +43,6 @@ impl<'a> Submitter<'a> {
             (*self.sq_flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP
                 != 0
         }
-    }
-
-    /// Register files or user buffers for asynchronous I/O.
-    #[inline]
-    #[deprecated(since="0.3.5", note="please use `Submitter::register_*` instead")]
-    pub fn register(&self, target: reg::Target<'_>) -> io::Result<()> {
-        target.execute(self.fd.as_raw_fd())
-    }
-
-    /// Unregister files or user buffers for asynchronous I/O.
-    #[inline]
-    #[deprecated(since="0.3.5", note="please use `Submitter::unregister_*` instead")]
-    pub fn unregister(&self, target: unreg::Target) -> io::Result<()> {
-        target.execute(self.fd.as_raw_fd())
     }
 
     /// Initiate and/or complete asynchronous I/O
