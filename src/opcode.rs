@@ -57,9 +57,16 @@ pub mod types {
     pub use sys::__kernel_rwf_t as RwFlags;
 
     /// Opaque types, you should use `libc::statx` instead.
-    #[derive(Default)]
-    #[repr(transparent)]
-    pub struct Statx(sys::statx);
+    #[repr(C)]
+    pub struct statx {
+        _priv: ()
+    }
+
+    /// Opaque types, you should use `libc::epoll_event` instead.
+    #[repr(C)]
+    pub struct epoll_event {
+        _priv: ()
+    }
 
     #[repr(transparent)]
     pub struct Fd(pub RawFd);
@@ -806,7 +813,7 @@ opcode!(
     pub struct Statx {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
-        statxbuf: { *mut types::Statx },
+        statxbuf: { *mut types::statx },
         ;;
         flags: i32 = 0,
         mask: u32 = 0
@@ -1031,7 +1038,7 @@ opcode!(
         epfd: { impl sealed::UseFixed },
         fd: { impl sealed::UseFd },
         op: { i32 },
-        ev: { *const libc::epoll_event },
+        ev: { *const types::epoll_event },
         ;;
     }
 
