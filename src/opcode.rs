@@ -229,7 +229,7 @@ opcode!(
     #[derive(Debug)]
     pub struct Readv {
         fd: { impl sealed::UseFixed },
-        iovec: { *mut libc::iovec },
+        iovec: { *const libc::iovec },
         len: { u32 },
         ;;
         ioprio: u16 = 0,
@@ -570,7 +570,7 @@ opcode!(
     pub struct Timeout {
         timespec: { *const types::Timespec },
         ;;
-        /// `count` may contain a completion event count. If not set, this defaults to 1.
+        /// `count` may contain a completion event count.
         count: u32 = 0,
 
         /// `flags` may contain [types::TimeoutFlags::ABS] for an absolutel timeout value, or 0 for a relative timeout.
@@ -1099,7 +1099,7 @@ opcode!(
 #[cfg(feature = "unstable")]
 opcode!(
     pub struct ProvideBuffers {
-        addr: { *mut libc::c_void },
+        addr: { *mut u8 },
         len: { i32 },
         nbufs: { u16 },
         bgid: { u16 },

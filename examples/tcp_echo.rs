@@ -31,7 +31,7 @@ impl AcceptCount {
     fn new(fd: RawFd, token: usize, count: usize) -> AcceptCount {
         AcceptCount {
             entry: opcode::Accept::new(
-                types::Target::Fd(fd),
+                types::Fd(fd),
                 ptr::null_mut(), ptr::null_mut()
             )
                 .build()
@@ -126,7 +126,7 @@ fn main() -> anyhow::Result<()> {
                     let fd = ret;
                     let poll_token = token_alloc.insert(Token::Poll { fd });
 
-                    let poll_e = opcode::PollAdd::new(types::Target::Fd(fd), libc::POLLIN)
+                    let poll_e = opcode::PollAdd::new(types::Fd(fd), libc::POLLIN)
                         .build()
                         .user_data(poll_token as _);
 
@@ -151,7 +151,7 @@ fn main() -> anyhow::Result<()> {
                         token_alloc.insert(Token::Read { fd, buf_index });
 
                     let read_e =
-                        opcode::Read::new(types::Target::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
+                        opcode::Read::new(types::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
                             .build()
                             .user_data(read_token as _);
 
@@ -180,7 +180,7 @@ fn main() -> anyhow::Result<()> {
                     };
 
                     let write_e =
-                        opcode::Write::new(types::Target::Fd(fd), buf.as_ptr(), len as _)
+                        opcode::Write::new(types::Fd(fd), buf.as_ptr(), len as _)
                             .build()
                             .user_data(token_index as _);
 
@@ -198,7 +198,7 @@ fn main() -> anyhow::Result<()> {
 
                         *token = Token::Poll { fd };
 
-                        opcode::PollAdd::new(types::Target::Fd(fd), libc::POLLIN)
+                        opcode::PollAdd::new(types::Fd(fd), libc::POLLIN)
                             .build()
                             .user_data(token_index as _)
                     } else {
@@ -209,7 +209,7 @@ fn main() -> anyhow::Result<()> {
 
                         *token = Token::Write { fd, buf_index, offset, len };
 
-                        opcode::Write::new(types::Target::Fd(fd), buf.as_ptr(), len as _)
+                        opcode::Write::new(types::Fd(fd), buf.as_ptr(), len as _)
                             .build()
                             .user_data(token_index as _)
                     };
