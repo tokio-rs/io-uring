@@ -1,15 +1,17 @@
-use std::{ io, ptr };
-use std::os::unix::io::{ AsRawFd, RawFd };
 use std::net::TcpListener;
-use slab::Slab;
-use io_uring::opcode::{ self, types };
-use io_uring::{ squeue, IoUring };
+use std::os::unix::io::{AsRawFd, RawFd};
+use std::{io, ptr};
 
+use io_uring::opcode::{self, types};
+use io_uring::{squeue, IoUring};
+use slab::Slab;
 
 #[derive(Clone, Debug)]
 enum Token {
     Accept,
-    Poll { fd: RawFd },
+    Poll {
+        fd: RawFd,
+    },
     Read {
         fd: RawFd,
         buf_index: usize,
@@ -18,25 +20,22 @@ enum Token {
         fd: RawFd,
         buf_index: usize,
         offset: usize,
-        len: usize
-    }
+        len: usize,
+    },
 }
 
 pub struct AcceptCount {
     entry: squeue::Entry,
-    count: usize
+    count: usize,
 }
 
 impl AcceptCount {
     fn new(fd: RawFd, token: usize, count: usize) -> AcceptCount {
         AcceptCount {
-            entry: opcode::Accept::new(
-                types::Fd(fd),
-                ptr::null_mut(), ptr::null_mut()
-            )
+            entry: opcode::Accept::new(types::Fd(fd), ptr::null_mut(), ptr::null_mut())
                 .build()
                 .user_data(token as _),
-            count
+            count,
         }
     }
 
@@ -45,13 +44,12 @@ impl AcceptCount {
             unsafe {
                 match sq.push(self.entry.clone()) {
                     Ok(_) => self.count -= 1,
-                    Err(_) => break
+                    Err(_) => break,
                 }
             }
         }
     }
 }
-
 
 fn main() -> anyhow::Result<()> {
     let mut ring = IoUring::new(256)?;
@@ -66,11 +64,7 @@ fn main() -> anyhow::Result<()> {
 
     let (submitter, sq, cq) = ring.split();
 
-    let mut accept = AcceptCount::new(
-        listener.as_raw_fd(),
-        token_alloc.insert(Token::Accept),
-        3
-    );
+    let mut accept = AcceptCount::new(listener.as_raw_fd(), token_alloc.insert(Token::Accept), 3);
 
     accept.push(&mut sq.available());
 
@@ -78,11 +72,11 @@ fn main() -> anyhow::Result<()> {
         match submitter.submit_and_wait(1) {
             Ok(_) => (),
             Err(ref err) if err.raw_os_error() == Some(libc::EBUSY) => (),
-            Err(err) => return Err(err.into())
+            Err(err) => return Err(err.into()),
         }
 
         let mut sq = sq.available();
-        let mut iter =  backlog.drain(..);
+        let mut iter = backlog.drain(..);
 
         // clean backlog
         loop {
@@ -90,7 +84,7 @@ fn main() -> anyhow::Result<()> {
                 match submitter.submit() {
                     Ok(_) => (),
                     Err(ref err) if err.raw_os_error() == Some(libc::EBUSY) => break,
-                    Err(err) => return Err(err.into())
+                    Err(err) => return Err(err.into()),
                 }
                 sq.sync();
             }
@@ -99,7 +93,7 @@ fn main() -> anyhow::Result<()> {
                 Some(sqe) => unsafe {
                     let _ = sq.push(sqe);
                 },
-                None => break
+                None => break,
             }
         }
 
@@ -112,8 +106,12 @@ fn main() -> anyhow::Result<()> {
             let token_index = cqe.user_data() as usize;
 
             if ret < 0 {
-                eprintln!("token {:?} error: {:?}", token_alloc.get(token_index), io::Error::from_raw_os_error(-ret));
-                continue
+                eprintln!(
+                    "token {:?} error: {:?}",
+                    token_alloc.get(token_index),
+                    io::Error::from_raw_os_error(-ret)
+                );
+                continue;
             }
 
             let token = &mut token_alloc[token_index];
@@ -135,7 +133,7 @@ fn main() -> anyhow::Result<()> {
                             backlog.push(entry);
                         }
                     }
-                },
+                }
                 Token::Poll { fd } => {
                     let (buf_index, buf) = match bufpool.pop() {
                         Some(buf_index) => (buf_index, &mut buf_alloc[buf_index]),
@@ -147,50 +145,56 @@ fn main() -> anyhow::Result<()> {
                         }
                     };
 
-                    let read_token =
-                        token_alloc.insert(Token::Read { fd, buf_index });
+                    let read_token = token_alloc.insert(Token::Read { fd, buf_index });
 
-                    let read_e =
-                        opcode::Read::new(types::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
-                            .build()
-                            .user_data(read_token as _);
+                    let read_e = opcode::Read::new(types::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
+                        .build()
+                        .user_data(read_token as _);
 
                     unsafe {
                         if let Err(entry) = sq.push(read_e) {
                             backlog.push(entry);
                         }
                     }
-                },
-                Token::Read { fd, buf_index } => if ret == 0 {
-                    bufpool.push(buf_index);
-                    token_alloc.remove(token_index);
+                }
+                Token::Read { fd, buf_index } => {
+                    if ret == 0 {
+                        bufpool.push(buf_index);
+                        token_alloc.remove(token_index);
 
-                    println!("shutdown");
+                        println!("shutdown");
 
-                    unsafe {
-                        libc::close(fd);
-                    }
-                } else {
-                    let len = ret as usize;
-                    let buf = &buf_alloc[buf_index];
+                        unsafe {
+                            libc::close(fd);
+                        }
+                    } else {
+                        let len = ret as usize;
+                        let buf = &buf_alloc[buf_index];
 
-                    *token = Token::Write {
-                        fd, buf_index, len,
-                        offset: 0
-                    };
+                        *token = Token::Write {
+                            fd,
+                            buf_index,
+                            len,
+                            offset: 0,
+                        };
 
-                    let write_e =
-                        opcode::Write::new(types::Fd(fd), buf.as_ptr(), len as _)
+                        let write_e = opcode::Write::new(types::Fd(fd), buf.as_ptr(), len as _)
                             .build()
                             .user_data(token_index as _);
 
-                    unsafe {
-                        if let Err(entry) = sq.push(write_e) {
-                            backlog.push(entry);
+                        unsafe {
+                            if let Err(entry) = sq.push(write_e) {
+                                backlog.push(entry);
+                            }
                         }
                     }
-                },
-                Token::Write { fd, buf_index, offset, len } => {
+                }
+                Token::Write {
+                    fd,
+                    buf_index,
+                    offset,
+                    len,
+                } => {
                     let write_len = ret as usize;
 
                     let entry = if offset + write_len >= len {
@@ -207,7 +211,12 @@ fn main() -> anyhow::Result<()> {
 
                         let buf = &buf_alloc[buf_index][offset..];
 
-                        *token = Token::Write { fd, buf_index, offset, len };
+                        *token = Token::Write {
+                            fd,
+                            buf_index,
+                            offset,
+                            len,
+                        };
 
                         opcode::Write::new(types::Fd(fd), buf.as_ptr(), len as _)
                             .build()

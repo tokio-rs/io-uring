@@ -1,9 +1,9 @@
 use std::io;
 use std::os::unix::io::AsRawFd;
-use tempfile::tempfile;
-use criterion::{ criterion_main, criterion_group, Criterion, black_box };
-use io_uring::{ opcode, squeue, IoUring };
 
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use io_uring::{opcode, squeue, IoUring};
+use tempfile::tempfile;
 
 fn bench_iovec(c: &mut Criterion) {
     let mut ring = IoUring::new(16).unwrap();
@@ -31,7 +31,7 @@ fn bench_iovec(c: &mut Criterion) {
             let entry = opcode::Writev::new(
                 opcode::types::Fd(fd.as_raw_fd()),
                 bufs.as_ptr() as *const _,
-                bufs.len() as _
+                bufs.len() as _,
             );
 
             unsafe {
@@ -43,11 +43,7 @@ fn bench_iovec(c: &mut Criterion) {
             }
 
             ring.submit_and_wait(1).unwrap();
-            ring
-                .completion()
-                .available()
-                .map(black_box)
-                .for_each(drop);
+            ring.completion().available().map(black_box).for_each(drop);
         });
     });
 
@@ -69,7 +65,7 @@ fn bench_iovec(c: &mut Criterion) {
             let entry = opcode::Writev::new(
                 opcode::types::Fd(fd.as_raw_fd()),
                 bufs.as_ptr() as *const _,
-                bufs.len() as _
+                bufs.len() as _,
             );
 
             unsafe {
@@ -80,31 +76,22 @@ fn bench_iovec(c: &mut Criterion) {
                     .expect("queue is full");
                 for _ in 0..4 {
                     let entry = opcode::Nop::new().build();
-                    queue.push(entry.flags(squeue::Flags::IO_LINK))
+                    queue
+                        .push(entry.flags(squeue::Flags::IO_LINK))
                         .ok()
                         .expect("queue is full");
                 }
             }
 
             ring.submit_and_wait(5).unwrap();
-            ring
-                .completion()
-                .available()
-                .map(black_box)
-                .for_each(drop);
+            ring.completion().available().map(black_box).for_each(drop);
         });
     });
 
     c.bench_function("writes-one-submit", |b| {
         let fd = tempfile().unwrap();
 
-        let bufs = [
-            &buf[..],
-            &buf2[..],
-            &buf3[..],
-            &buf4[..],
-            &buf5[..],
-        ];
+        let bufs = [&buf[..], &buf2[..], &buf3[..], &buf4[..], &buf5[..]];
 
         b.iter(|| {
             let mut queue = ring.submission().available();
@@ -112,7 +99,7 @@ fn bench_iovec(c: &mut Criterion) {
                 let entry = opcode::Write::new(
                     opcode::types::Fd(fd.as_raw_fd()),
                     buf.as_ptr(),
-                    buf.len() as _
+                    buf.len() as _,
                 );
 
                 unsafe {
@@ -126,31 +113,21 @@ fn bench_iovec(c: &mut Criterion) {
             drop(queue);
 
             ring.submit_and_wait(bufs.len()).unwrap();
-            ring
-                .completion()
-                .available()
-                .map(black_box)
-                .for_each(drop);
+            ring.completion().available().map(black_box).for_each(drop);
         });
     });
 
     c.bench_function("writes-multi-submit", |b| {
         let fd = tempfile().unwrap();
 
-        let bufs = [
-            &buf[..],
-            &buf2[..],
-            &buf3[..],
-            &buf4[..],
-            &buf5[..],
-        ];
+        let bufs = [&buf[..], &buf2[..], &buf3[..], &buf4[..], &buf5[..]];
 
         b.iter(|| {
             for buf in black_box(&bufs) {
                 let entry = opcode::Write::new(
                     opcode::types::Fd(fd.as_raw_fd()),
                     buf.as_ptr(),
-                    buf.len() as _
+                    buf.len() as _,
                 );
 
                 unsafe {
@@ -162,11 +139,7 @@ fn bench_iovec(c: &mut Criterion) {
                 }
 
                 ring.submit_and_wait(1).unwrap();
-                ring
-                    .completion()
-                    .available()
-                    .map(black_box)
-                    .for_each(drop);
+                ring.completion().available().map(black_box).for_each(drop);
             }
         });
     });

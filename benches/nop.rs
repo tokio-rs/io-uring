@@ -1,6 +1,5 @@
-use criterion::{ criterion_main, criterion_group, Criterion, black_box };
-use io_uring::{ opcode, IoUring };
-
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use io_uring::{opcode, IoUring};
 
 struct TaskQueue(usize);
 
@@ -28,7 +27,7 @@ fn bench_normal(c: &mut Criterion) {
                         unsafe {
                             match sq.push(black_box(opcode::Nop::new()).build()) {
                                 Ok(_) => queue.pop(),
-                                Err(_) => break
+                                Err(_) => break,
                             }
                         }
                     }
@@ -45,7 +44,6 @@ fn bench_normal(c: &mut Criterion) {
         });
     });
 }
-
 
 #[cfg(not(feature = "concurrent"))]
 fn bench_concurrent(_: &mut Criterion) {}
@@ -65,7 +63,7 @@ fn bench_concurrent(c: &mut Criterion) {
                     unsafe {
                         match sq.push(black_box(opcode::Nop::new()).build()) {
                             Ok(_) => queue.pop(),
-                            Err(_) => break
+                            Err(_) => break,
                         }
                     }
                 }
@@ -98,8 +96,8 @@ fn bench_iou(c: &mut Criterion) {
                             Some(sqe) => {
                                 unsafe { black_box(sqe).prep_nop() };
                                 queue.pop();
-                            },
-                            None => break
+                            }
+                            None => break,
                         }
                     }
                 }

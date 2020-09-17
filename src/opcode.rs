@@ -9,13 +9,13 @@ use crate::squeue::Entry;
 use crate::sys;
 
 mod sealed {
+    use super::types::{Fd, Fixed};
     use std::os::unix::io::RawFd;
-    use super::types::{ Fd, Fixed };
 
     #[derive(Debug)]
     pub enum Target {
         Fd(RawFd),
-        Fixed(u32)
+        Fixed(u32),
     }
 
     pub trait UseFd: Sized {
@@ -49,23 +49,23 @@ mod sealed {
 }
 
 pub mod types {
-    use std::os::unix::io::RawFd;
-    use bitflags::bitflags;
     use crate::sys;
+    use bitflags::bitflags;
+    use std::os::unix::io::RawFd;
 
-    pub use sys::__kernel_timespec as Timespec;
     pub use sys::__kernel_rwf_t as RwFlags;
+    pub use sys::__kernel_timespec as Timespec;
 
     /// Opaque types, you should use `libc::statx` instead.
     #[repr(C)]
     pub struct statx {
-        _priv: ()
+        _priv: (),
     }
 
     /// Opaque types, you should use `libc::epoll_event` instead.
     #[repr(C)]
     pub struct epoll_event {
-        _priv: ()
+        _priv: (),
     }
 
     #[repr(transparent)]
@@ -74,13 +74,13 @@ pub mod types {
     #[repr(transparent)]
     pub struct Fixed(pub u32);
 
-    bitflags!{
+    bitflags! {
         pub struct TimeoutFlags: u32 {
             const ABS = sys::IORING_TIMEOUT_ABS;
         }
     }
 
-    bitflags!{
+    bitflags! {
         pub struct FsyncFlags: u32 {
             const DATASYNC = sys::IORING_FSYNC_DATASYNC;
         }
@@ -95,7 +95,7 @@ pub mod types {
             OpenHow(sys::open_how {
                 flags: 0,
                 mode: 0,
-                resolve: 0
+                resolve: 0,
             })
         }
 
@@ -116,7 +116,6 @@ pub mod types {
     }
 }
 
-
 macro_rules! assign_fd {
     ( $sqe:ident . fd = $opfd:expr ) => {
         match $opfd {
@@ -126,7 +125,7 @@ macro_rules! assign_fd {
                 $sqe.flags |= crate::squeue::Flags::FIXED_FILE.bits();
             }
         }
-    }
+    };
 }
 
 macro_rules! opcode {

@@ -1,14 +1,15 @@
 use std::sync::atomic;
-use parking_lot::Mutex;
-use crate::util::unsync_load;
-use crate::squeue::{ self, Entry };
 
+use crate::squeue::{self, Entry};
+use crate::util::unsync_load;
+
+use parking_lot::Mutex;
 
 pub struct SubmissionQueue<'a> {
     pub(crate) queue: &'a squeue::SubmissionQueue,
     pub(crate) push_lock: &'a Mutex<()>,
     pub(crate) ring_mask: u32,
-    pub(crate) ring_entries: u32
+    pub(crate) ring_entries: u32,
 }
 
 impl SubmissionQueue<'_> {
@@ -64,8 +65,7 @@ impl SubmissionQueue<'_> {
             return Err(Entry(entry));
         }
 
-        *self.queue.sqes.add((tail & self.ring_mask) as usize)
-            = entry;
+        *self.queue.sqes.add((tail & self.ring_mask) as usize) = entry;
 
         (*self.queue.tail).store(tail.wrapping_add(1), atomic::Ordering::Release);
 

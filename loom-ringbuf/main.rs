@@ -4,7 +4,6 @@ use loom::sync::Arc;
 use loom::thread;
 use ring::Ring;
 
-
 fn main() {
     loom::model(|| {
         let ring = Arc::new(Ring::<u32>::new());

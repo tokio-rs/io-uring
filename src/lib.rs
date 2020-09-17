@@ -5,25 +5,26 @@
 
 #[macro_use]
 mod util;
-mod sys;
-mod register;
-mod submit;
-pub mod squeue;
 pub mod cqueue;
 pub mod opcode;
+mod register;
+pub mod squeue;
+mod submit;
+mod sys;
 
 #[cfg(feature = "concurrent")]
 pub mod concurrent;
 
-use std::{ io, cmp, mem };
 use std::convert::TryInto;
-use std::os::unix::io::{ AsRawFd, RawFd };
 use std::mem::ManuallyDrop;
-use util::{ Fd, Mmap };
-pub use submit::Submitter;
-pub use squeue::SubmissionQueue;
+use std::os::unix::io::{AsRawFd, RawFd};
+use std::{cmp, io, mem};
+
 pub use cqueue::CompletionQueue;
 pub use register::Probe;
+pub use squeue::SubmissionQueue;
+pub use submit::Submitter;
+use util::{Fd, Mmap};
 
 /// IoUring instance
 pub struct IoUring {
@@ -31,21 +32,21 @@ pub struct IoUring {
     params: Parameters,
     memory: ManuallyDrop<MemoryMap>,
     sq: SubmissionQueue,
-    cq: CompletionQueue
+    cq: CompletionQueue,
 }
 
 #[allow(dead_code)]
 struct MemoryMap {
     sq_mmap: Mmap,
     sqe_mmap: Mmap,
-    cq_mmap: Option<Mmap>
+    cq_mmap: Option<Mmap>,
 }
 
 /// IoUring build params
 #[derive(Clone, Default)]
 pub struct Builder {
     dontfork: bool,
-    params: sys::io_uring_params
+    params: sys::io_uring_params,
 }
 
 #[derive(Clone)]
@@ -70,25 +71,26 @@ impl IoUring {
         //
         // I really hope that Rust can safely use self-reference types.
         #[inline]
-        unsafe fn setup_queue(fd: &Fd, p: &sys::io_uring_params)
-            -> io::Result<(MemoryMap, SubmissionQueue, CompletionQueue)>
-        {
-            let sq_len = p.sq_off.array as usize
-                + p.sq_entries as usize * mem::size_of::<u32>();
+        unsafe fn setup_queue(
+            fd: &Fd,
+            p: &sys::io_uring_params,
+        ) -> io::Result<(MemoryMap, SubmissionQueue, CompletionQueue)> {
+            let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
             let cq_len = p.cq_off.cqes as usize
                 + p.cq_entries as usize * mem::size_of::<sys::io_uring_cqe>();
             let sqe_len = p.sq_entries as usize * mem::size_of::<sys::io_uring_sqe>();
             let sqe_mmap = Mmap::new(fd, sys::IORING_OFF_SQES as _, sqe_len)?;
 
             if p.features & sys::IORING_FEAT_SINGLE_MMAP != 0 {
-                let scq_mmap = Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, cmp::max(sq_len, cq_len))?;
+                let scq_mmap =
+                    Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, cmp::max(sq_len, cq_len))?;
 
                 let sq = SubmissionQueue::new(&scq_mmap, &sqe_mmap, p);
                 let cq = CompletionQueue::new(&scq_mmap, p);
                 let mm = MemoryMap {
                     sq_mmap: scq_mmap,
                     cq_mmap: None,
-                    sqe_mmap
+                    sqe_mmap,
                 };
 
                 Ok((mm, sq, cq))
@@ -100,7 +102,8 @@ impl IoUring {
                 let cq = CompletionQueue::new(&cq_mmap, p);
                 let mm = MemoryMap {
                     cq_mmap: Some(cq_mmap),
-                    sq_mmap, sqe_mmap
+                    sq_mmap,
+                    sqe_mmap,
                 };
 
                 Ok((mm, sq, cq))
@@ -116,9 +119,11 @@ impl IoUring {
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
         Ok(IoUring {
-            fd, sq, cq,
+            fd,
+            sq,
+            cq,
             params: Parameters(p),
-            memory: ManuallyDrop::new(mm)
+            memory: ManuallyDrop::new(mm),
         })
     }
 
@@ -138,9 +143,13 @@ impl IoUring {
     ///
     /// This provides a raw interface so developer must ensure that parameters are correct.
     #[inline]
-    pub unsafe fn enter(&self, to_submit: u32, min_complete: u32, flag: u32, sig: Option<&libc::sigset_t>)
-        -> io::Result<usize>
-    {
+    pub unsafe fn enter(
+        &self,
+        to_submit: u32,
+        min_complete: u32,
+        flag: u32,
+        sig: Option<&libc::sigset_t>,
+    ) -> io::Result<usize> {
         self.submitter().enter(to_submit, min_complete, flag, sig)
     }
 
@@ -157,9 +166,7 @@ impl IoUring {
     }
 
     /// Get submitter and submission queue and completion queue
-    pub fn split(&mut self)
-        -> (Submitter<'_>, &mut SubmissionQueue, &mut CompletionQueue)
-    {
+    pub fn split(&mut self) -> (Submitter<'_>, &mut SubmissionQueue, &mut CompletionQueue) {
         let submit = Submitter::new(&self.fd, self.params.0.flags, &self.sq);
         (submit, &mut self.sq, &mut self.cq)
     }

@@ -19,8 +19,7 @@ fn main() {
     let outdir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     #[cfg(feature = "overwrite")]
-    let outdir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("src/sys");
+    let outdir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("src/sys");
 
     bindgen::Builder::default()
         .header_contents("include-file.h", INCLUDE)
@@ -30,6 +29,8 @@ fn main() {
         .use_core()
         .whitelist_type("io_uring_.*|io_.qring_.*|__kernel_timespec|open_how")
         .whitelist_var("__NR_io_uring.*|IOSQE_.*|IORING_.*|IO_URING_.*|SPLICE_F_FD_IN_FIXED")
-        .generate().unwrap()
-        .write_to_file(outdir.join("sys.rs")).unwrap();
+        .generate()
+        .unwrap()
+        .write_to_file(outdir.join("sys.rs"))
+        .unwrap();
 }
