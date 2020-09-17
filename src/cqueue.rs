@@ -1,9 +1,9 @@
 //! Completion Queue
 
 use std::sync::atomic;
-use crate::util::{ Mmap, unsync_load };
-use crate::sys;
 
+use crate::sys;
+use crate::util::{unsync_load, Mmap};
 
 pub struct CompletionQueue {
     pub(crate) head: *const atomic::AtomicU32,
@@ -16,7 +16,7 @@ pub struct CompletionQueue {
     pub(crate) cqes: *const sys::io_uring_cqe,
 
     #[allow(dead_code)]
-    flags: *const atomic::AtomicU32
+    flags: *const atomic::AtomicU32,
 }
 
 /// Completion Entry
@@ -30,12 +30,12 @@ pub struct AvailableQueue<'a> {
     ring_mask: u32,
     ring_entries: u32,
 
-    queue: &'a mut CompletionQueue
+    queue: &'a mut CompletionQueue,
 }
 
 impl CompletionQueue {
     pub(crate) unsafe fn new(cq_mmap: &Mmap, p: &sys::io_uring_params) -> CompletionQueue {
-        mmap_offset!{
+        mmap_offset! {
             let head            = cq_mmap + p.cq_off.head           => *const atomic::AtomicU32;
             let tail            = cq_mmap + p.cq_off.tail           => *const atomic::AtomicU32;
             let ring_mask       = cq_mmap + p.cq_off.ring_mask      => *const u32;
@@ -46,35 +46,32 @@ impl CompletionQueue {
         }
 
         CompletionQueue {
-            head, tail,
-            ring_mask, ring_entries,
+            head,
+            tail,
+            ring_mask,
+            ring_entries,
             overflow,
             cqes,
-            flags
+            flags,
         }
     }
 
     /// If queue is full, the new event maybe dropped.
     /// This value records number of dropped events.
     pub fn overflow(&self) -> u32 {
-        unsafe {
-            (*self.overflow).load(atomic::Ordering::Acquire)
-        }
+        unsafe { (*self.overflow).load(atomic::Ordering::Acquire) }
     }
 
     #[cfg(feature = "unstable")]
     pub fn eventfd_disabled(&self) -> bool {
         unsafe {
-            (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_CQ_EVENTFD_DISABLED
-                != 0
+            (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_CQ_EVENTFD_DISABLED != 0
         }
     }
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        unsafe {
-            self.ring_entries.read() as usize
-        }
+        unsafe { self.ring_entries.read() as usize }
     }
 
     #[inline]
@@ -105,7 +102,7 @@ impl CompletionQueue {
                 tail: (*self.tail).load(atomic::Ordering::Acquire),
                 ring_mask: self.ring_mask.read(),
                 ring_entries: self.ring_entries.read(),
-                queue: self
+                queue: self,
             }
         }
     }

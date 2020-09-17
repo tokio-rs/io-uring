@@ -1,16 +1,16 @@
 use std::mem::MaybeUninit;
+
 use loom::cell::UnsafeCell;
-use loom::sync::{ atomic, Mutex };
+use loom::sync::{atomic, Mutex};
 
 const LENGTH: u32 = 8;
 const MASK: u32 = LENGTH - 1;
-
 
 pub struct Ring<T> {
     buf: Box<[UnsafeCell<MaybeUninit<T>>]>,
     head: atomic::AtomicU32,
     tail: atomic::AtomicU32,
-    push_lock: Mutex<()>
+    push_lock: Mutex<()>,
 }
 
 impl<T: Copy> Ring<T> {
@@ -25,7 +25,7 @@ impl<T: Copy> Ring<T> {
             buf: buf.into_boxed_slice(),
             head: atomic::AtomicU32::new(0),
             tail: atomic::AtomicU32::new(0),
-            push_lock: Mutex::new(())
+            push_lock: Mutex::new(()),
         }
     }
 
@@ -39,11 +39,11 @@ impl<T: Copy> Ring<T> {
         }
 
         unsafe {
-            self.buf[(tail & MASK) as usize]
-                .with_mut(|p| (*p).as_mut_ptr().write(t));
+            self.buf[(tail & MASK) as usize].with_mut(|p| (*p).as_mut_ptr().write(t));
         }
 
-        self.tail.store(tail.wrapping_add(1), atomic::Ordering::Release);
+        self.tail
+            .store(tail.wrapping_add(1), atomic::Ordering::Release);
 
         Ok(())
     }
@@ -57,17 +57,16 @@ impl<T: Copy> Ring<T> {
                 return None;
             }
 
-            let t = self.buf[(head & MASK) as usize]
-                .with(|p| unsafe { (*p).as_ptr().read() });
+            let t = self.buf[(head & MASK) as usize].with(|p| unsafe { (*p).as_ptr().read() });
 
             match self.head.compare_exchange_weak(
                 head,
                 head.wrapping_add(1),
                 atomic::Ordering::Release,
-                atomic::Ordering::Relaxed
+                atomic::Ordering::Relaxed,
             ) {
                 Ok(_) => return Some(t),
-                Err(_) => ()
+                Err(_) => (),
             }
         }
     }

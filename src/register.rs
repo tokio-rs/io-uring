@@ -1,11 +1,14 @@
-use std::{ io, ptr, mem };
 use std::os::unix::io::RawFd;
+use std::{io, mem, ptr};
+
 use crate::sys;
 
-
-pub(crate) fn execute(fd: RawFd, opcode: libc::c_uint, arg: *const libc::c_void, len: libc::c_uint)
-    -> io::Result<i32>
-{
+pub(crate) fn execute(
+    fd: RawFd,
+    opcode: libc::c_uint,
+    arg: *const libc::c_void,
+    len: libc::c_uint,
+) -> io::Result<i32> {
     unsafe {
         let ret = sys::io_uring_register(fd, opcode, arg, len);
         if ret >= 0 {
@@ -25,7 +28,7 @@ impl Probe {
 
     #[allow(clippy::cast_ptr_alignment)]
     pub fn new() -> Probe {
-        use std::alloc::{ alloc_zeroed, Layout };
+        use std::alloc::{alloc_zeroed, Layout};
 
         let probe_align = Layout::new::<sys::io_uring_probe>().align();
         let ptr = unsafe {
@@ -67,7 +70,7 @@ impl Default for Probe {
 
 impl Drop for Probe {
     fn drop(&mut self) {
-        use std::alloc::{ dealloc, Layout };
+        use std::alloc::{dealloc, Layout};
 
         let probe_align = Layout::new::<sys::io_uring_probe>().align();
         unsafe {
