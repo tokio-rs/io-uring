@@ -124,7 +124,7 @@ fn main() -> anyhow::Result<()> {
                     let fd = ret;
                     let poll_token = token_alloc.insert(Token::Poll { fd });
 
-                    let poll_e = opcode::PollAdd::new(types::Fd(fd), libc::POLLIN)
+                    let poll_e = opcode::PollAdd::new(types::Fd(fd), libc::POLLIN as _)
                         .build()
                         .user_data(poll_token as _);
 
@@ -202,7 +202,7 @@ fn main() -> anyhow::Result<()> {
 
                         *token = Token::Poll { fd };
 
-                        opcode::PollAdd::new(types::Fd(fd), libc::POLLIN)
+                        opcode::PollAdd::new(types::Fd(fd), libc::POLLIN as _)
                             .build()
                             .user_data(token_index as _)
                     } else {

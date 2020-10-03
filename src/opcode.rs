@@ -421,7 +421,7 @@ opcode!(
         /// The bits that may be set in `flags` are defined in `<poll.h>`,
         /// and documented in `poll (2)`.
         fd: { impl sealed::UseFixed },
-        flags: { libc::c_short }
+        flags: { u32 }
         ;;
     }
 
@@ -433,7 +433,18 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_3.poll_events = flags as _;
+
+        #[cfg(target_endian = "little")] {
+            sqe.__bindgen_anon_3.poll32_events = flags;
+        }
+
+        #[cfg(target_endian = "big")] {
+            let x = a << 16;
+            let y = a >> 16;
+            let flags = x | y;
+            sqe.__bindgen_anon_3.poll32_events = flags;
+        }
+
         Entry(sqe)
     }
 );
@@ -739,7 +750,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `posix_fadvise(2)` system call.
+    /// Issue the equivalent of a `openat(2)` system call.
     pub struct Openat {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -1062,9 +1073,9 @@ opcode!(
 opcode!(
     pub struct Splice {
         fd_in: { impl sealed::UseFixed },
-        off_in: { u64 },
+        off_in: { i64 },
         fd_out: { impl sealed::UseFixed },
-        off_out: { u64 },
+        off_out: { i64 },
         len: { u32 },
         ;;
         flags: u32 = 0
