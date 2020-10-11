@@ -4,6 +4,8 @@ use io_uring::IoUring;
 use std::os::unix::io::AsRawFd;
 
 pub fn test_file_write_read(ring: &mut IoUring) -> anyhow::Result<()> {
+    println!("test_file_write_read");
+
     let fd = tempfile::tempfile()?;
     let fd = types::Fd(fd.as_raw_fd());
 

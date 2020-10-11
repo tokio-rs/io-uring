@@ -1,6 +1,9 @@
 #[path = "tests/fs.rs"]
 mod fs;
 
+#[path = "tests/queue.rs"]
+mod queue;
+
 use io_uring::{opcode, IoUring, Probe};
 
 #[test]
@@ -9,8 +12,10 @@ fn test_all() -> anyhow::Result<()> {
     let mut probe = Probe::new();
 
     if ring.submitter().register_probe(&mut probe).is_err() {
-        panic!("No probe supported");
+        eprintln!("No probe supported");
     }
+
+    queue::test_nop(&mut ring)?;
 
     if probe.is_supported(opcode::Write::CODE) && probe.is_supported(opcode::Read::CODE) {
         fs::test_file_write_read(&mut ring)?;
