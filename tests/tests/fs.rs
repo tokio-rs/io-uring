@@ -1,8 +1,7 @@
-use std::os::unix::io::AsRawFd;
-use io_uring::IoUring;
+use io_uring::opcode::{self, types};
 use io_uring::squeue;
-use io_uring::opcode::{ self, types };
-
+use io_uring::IoUring;
+use std::os::unix::io::AsRawFd;
 
 pub fn test_file_write_read(ring: &mut IoUring) -> anyhow::Result<()> {
     let fd = tempfile::tempfile()?;
@@ -16,20 +15,24 @@ pub fn test_file_write_read(ring: &mut IoUring) -> anyhow::Result<()> {
 
     unsafe {
         let mut queue = ring.submission().available();
-        queue.push(write_e.build().user_data(0x01).flags(squeue::Flags::IO_LINK))
+        queue
+            .push(
+                write_e
+                    .build()
+                    .user_data(0x01)
+                    .flags(squeue::Flags::IO_LINK),
+            )
             .ok()
             .expect("queue is full");
-        queue.push(read_e.build().user_data(0x02))
+        queue
+            .push(read_e.build().user_data(0x02))
             .ok()
             .expect("queue is full");
     }
 
     ring.submit_and_wait(2)?;
 
-    let cqes = ring
-        .completion()
-        .available()
-        .collect::<Vec<_>>();
+    let cqes = ring.completion().available().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);

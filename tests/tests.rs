@@ -1,8 +1,7 @@
 #[path = "tests/fs.rs"]
 mod fs;
 
-use io_uring::{ opcode, IoUring, Probe };
-
+use io_uring::{opcode, IoUring, Probe};
 
 #[test]
 fn test_all() -> anyhow::Result<()> {
