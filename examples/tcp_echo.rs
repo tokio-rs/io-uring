@@ -39,7 +39,7 @@ impl AcceptCount {
         }
     }
 
-    pub fn push(&mut self, sq: &mut squeue::AvailableQueue) {
+    pub fn push_to(&mut self, sq: &mut squeue::AvailableQueue) {
         while self.count > 0 {
             unsafe {
                 match sq.push(self.entry.clone()) {
@@ -66,7 +66,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut accept = AcceptCount::new(listener.as_raw_fd(), token_alloc.insert(Token::Accept), 3);
 
-    accept.push(&mut sq.available());
+    accept.push_to(&mut sq.available());
 
     loop {
         match submitter.submit_and_wait(1) {
@@ -99,7 +99,7 @@ fn main() -> anyhow::Result<()> {
 
         drop(iter);
 
-        accept.push(&mut sq);
+        accept.push_to(&mut sq);
 
         for cqe in cq.available() {
             let ret = cqe.result();
