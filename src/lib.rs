@@ -69,6 +69,9 @@ impl IoUring {
         // NOTE: The `SubmissionQueue` and `CompletionQueue` are references,
         // and their lifetime can never exceed `MemoryMap`.
         //
+        // The memory mapped regions of `MemoryMap` never move,
+        // so `SubmissionQueue` and `CompletionQueue` are `Unpin`.
+        //
         // I really hope that Rust can safely use self-reference types.
         #[inline]
         unsafe fn setup_queue(
