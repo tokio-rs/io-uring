@@ -17,6 +17,10 @@ jobs:
         with:
           command: test
           args: --features unstable,concurrent
+      - uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --package io-uring-test
 
   check:
     runs-on: ubuntu-latest
