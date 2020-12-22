@@ -1,8 +1,9 @@
 use io_uring::opcode;
 use io_uring::IoUring;
 
+
 pub fn test_nop(ring: &mut IoUring) -> anyhow::Result<()> {
-    println!("test_nop");
+    println!("test nop");
 
     let nop_e = opcode::Nop::new().build().user_data(0x42);
 
