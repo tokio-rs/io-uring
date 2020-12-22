@@ -17,6 +17,7 @@ include!(concat!(env!("OUT_DIR"), "/sys.rs"));
 ))]
 include!("sys.rs");
 
+#[cfg(not(feature = "direct-syscall"))]
 pub unsafe fn io_uring_register(
     fd: c_int,
     opcode: c_uint,
@@ -32,6 +33,23 @@ pub unsafe fn io_uring_register(
     ) as _
 }
 
+#[cfg(feature = "direct-syscall")]
+pub unsafe fn io_uring_register(
+    fd: c_int,
+    opcode: c_uint,
+    arg: *const c_void,
+    nr_args: c_uint,
+) -> c_int {
+    sc::syscall4(
+        __NR_io_uring_register as usize,
+        fd as usize,
+        opcode as usize,
+        arg as usize,
+        nr_args as usize,
+    ) as _
+}
+
+#[cfg(not(feature = "direct-syscall"))]
 pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int {
     syscall(
         __NR_io_uring_setup as c_long,
@@ -40,6 +58,16 @@ pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int 
     ) as _
 }
 
+#[cfg(feature = "direct-syscall")]
+pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int {
+    sc::syscall2(
+        __NR_io_uring_setup as usize,
+        entries as usize,
+        p as usize,
+    ) as _
+}
+
+#[cfg(not(feature = "direct-syscall"))]
 pub unsafe fn io_uring_enter(
     fd: c_int,
     to_submit: c_uint,
@@ -55,5 +83,24 @@ pub unsafe fn io_uring_enter(
         flags as c_long,
         sig as c_long,
         core::mem::size_of::<sigset_t>() as c_long,
+    ) as _
+}
+
+#[cfg(feature = "direct-syscall")]
+pub unsafe fn io_uring_enter(
+    fd: c_int,
+    to_submit: c_uint,
+    min_complete: c_uint,
+    flags: c_uint,
+    sig: *const sigset_t,
+) -> c_int {
+    sc::syscall6(
+        __NR_io_uring_enter as usize,
+        fd as usize,
+        to_submit as usize,
+        min_complete as usize,
+        flags as usize,
+        sig as usize,
+        core::mem::size_of::<sigset_t>() as usize,
     ) as _
 }
