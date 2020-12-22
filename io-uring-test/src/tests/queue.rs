@@ -1,7 +1,6 @@
 use io_uring::opcode;
 use io_uring::IoUring;
 
-
 pub fn test_nop(ring: &mut IoUring) -> anyhow::Result<()> {
     println!("test nop");
 

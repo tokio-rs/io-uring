@@ -3,7 +3,6 @@ mod tests;
 
 use io_uring::{opcode, IoUring, Probe};
 
-
 fn main() -> anyhow::Result<()> {
     let mut ring = IoUring::new(8)?;
     let mut probe = Probe::new();
@@ -77,7 +76,6 @@ fn main() -> anyhow::Result<()> {
     if probe.is_supported(opcode::Send::CODE) && probe.is_supported(opcode::Recv::CODE) {
         tests::net::test_tcp_send_recv(&mut ring)?;
     }
-
 
     if probe.is_supported(opcode::SendMsg::CODE) && probe.is_supported(opcode::RecvMsg::CODE) {
         tests::net::test_tcp_sendmsg_recvmsg(&mut ring)?;

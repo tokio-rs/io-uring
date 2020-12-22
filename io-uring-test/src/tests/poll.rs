@@ -1,11 +1,10 @@
 use io_uring::opcode::{self, types};
 use io_uring::IoUring;
-use std::thread;
 use std::fs::File;
+use std::io::{self, Write};
+use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::thread;
 use std::time::Duration;
-use std::io::{ self, Write };
-use std::os::unix::io::{ AsRawFd, FromRawFd };
-
 
 pub fn test_eventfd_poll(ring: &mut IoUring) -> anyhow::Result<()> {
     println!("test eventfd_poll");
@@ -20,10 +19,7 @@ pub fn test_eventfd_poll(ring: &mut IoUring) -> anyhow::Result<()> {
         File::from_raw_fd(fd)
     };
 
-    let poll_e = opcode::PollAdd::new(
-        types::Fd(fd.as_raw_fd()),
-        libc::POLLIN as _
-    );
+    let poll_e = opcode::PollAdd::new(types::Fd(fd.as_raw_fd()), libc::POLLIN as _);
 
     unsafe {
         let mut queue = ring.submission().available();
@@ -64,10 +60,7 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring) -> anyhow::Result<()> {
 
     // add poll
 
-    let poll_e = opcode::PollAdd::new(
-        types::Fd(fd.as_raw_fd()),
-        libc::POLLIN as _
-    );
+    let poll_e = opcode::PollAdd::new(types::Fd(fd.as_raw_fd()), libc::POLLIN as _);
 
     unsafe {
         let mut queue = ring.submission().available();
@@ -125,10 +118,7 @@ pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring) -> anyhow::Result<()>
 
     // add poll
 
-    let poll_e = opcode::PollAdd::new(
-        types::Fd(fd.as_raw_fd()),
-        libc::POLLIN as _
-    );
+    let poll_e = opcode::PollAdd::new(types::Fd(fd.as_raw_fd()), libc::POLLIN as _);
 
     unsafe {
         let mut queue = ring.submission().available();

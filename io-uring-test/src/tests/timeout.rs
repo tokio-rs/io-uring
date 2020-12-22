@@ -2,18 +2,21 @@ use io_uring::opcode::{self, types};
 use io_uring::IoUring;
 use std::time::Instant;
 
-
 pub fn test_timeout(ring: &mut IoUring) -> anyhow::Result<()> {
     println!("test timeout");
 
     // add timeout
 
-    let ts = types::Timespec { tv_sec: 1, tv_nsec: 0 };
+    let ts = types::Timespec {
+        tv_sec: 1,
+        tv_nsec: 0,
+    };
     let timeout_e = opcode::Timeout::new(&ts);
 
     unsafe {
         let mut queue = ring.submission().available();
-        queue.push(timeout_e.build().user_data(0x09))
+        queue
+            .push(timeout_e.build().user_data(0x09))
             .ok()
             .expect("queue is full");
     }
@@ -31,16 +34,21 @@ pub fn test_timeout(ring: &mut IoUring) -> anyhow::Result<()> {
 
     // add timeout but no
 
-    let ts = types::Timespec { tv_sec: 1, tv_nsec: 0 };
+    let ts = types::Timespec {
+        tv_sec: 1,
+        tv_nsec: 0,
+    };
     let timeout_e = opcode::Timeout::new(&ts);
     let nop_e = opcode::Nop::new();
 
     unsafe {
         let mut queue = ring.submission().available();
-        queue.push(timeout_e.build().user_data(0x0a))
+        queue
+            .push(timeout_e.build().user_data(0x0a))
             .ok()
             .expect("queue is full");
-        queue.push(nop_e.build().user_data(0x0b))
+        queue
+            .push(nop_e.build().user_data(0x0b))
             .ok()
             .expect("queue is full");
     }
@@ -76,17 +84,21 @@ pub fn test_timeout(ring: &mut IoUring) -> anyhow::Result<()> {
 pub fn test_timeout_count(ring: &mut IoUring) -> anyhow::Result<()> {
     println!("test timeout_count");
 
-    let ts = types::Timespec { tv_sec: 1, tv_nsec: 0 };
-    let timeout_e = opcode::Timeout::new(&ts)
-        .count(1);
+    let ts = types::Timespec {
+        tv_sec: 1,
+        tv_nsec: 0,
+    };
+    let timeout_e = opcode::Timeout::new(&ts).count(1);
     let nop_e = opcode::Nop::new();
 
     unsafe {
         let mut queue = ring.submission().available();
-        queue.push(timeout_e.build().user_data(0x0c))
+        queue
+            .push(timeout_e.build().user_data(0x0c))
             .ok()
             .expect("queue is full");
-        queue.push(nop_e.build().user_data(0x0d))
+        queue
+            .push(nop_e.build().user_data(0x0d))
             .ok()
             .expect("queue is full");
     }
@@ -113,18 +125,21 @@ pub fn test_timeout_remove(ring: &mut IoUring) -> anyhow::Result<()> {
 
     // add timeout
 
-    let ts = types::Timespec { tv_sec: 1, tv_nsec: 0 };
+    let ts = types::Timespec {
+        tv_sec: 1,
+        tv_nsec: 0,
+    };
     let timeout_e = opcode::Timeout::new(&ts);
 
     unsafe {
         let mut queue = ring.submission().available();
-        queue.push(timeout_e.build().user_data(0x10))
+        queue
+            .push(timeout_e.build().user_data(0x10))
             .ok()
             .expect("queue is full");
     }
 
     ring.submit()?;
-
 
     // remove timeout
 
@@ -132,7 +147,8 @@ pub fn test_timeout_remove(ring: &mut IoUring) -> anyhow::Result<()> {
 
     unsafe {
         let mut queue = ring.submission().available();
-        queue.push(timeout_e.build().user_data(0x11))
+        queue
+            .push(timeout_e.build().user_data(0x11))
             .ok()
             .expect("queue is full");
     }

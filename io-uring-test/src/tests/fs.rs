@@ -1,10 +1,9 @@
+use crate::helper;
 use io_uring::opcode::{self, types};
 use io_uring::IoUring;
 use std::fs;
 use std::io::Write;
-use std::os::unix::io::{ FromRawFd, AsRawFd, IntoRawFd };
-use crate::helper;
-
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 
 pub fn test_file_write_read(ring: &mut IoUring) -> anyhow::Result<()> {
     println!("test file_write_read");
@@ -69,8 +68,7 @@ pub fn test_file_fsync_file_range(ring: &mut IoUring) -> anyhow::Result<()> {
 
     let fd = types::Fd(fd.as_raw_fd());
 
-    let fsync_e = opcode::SyncFileRange::new(fd, 1024)
-        .offset(3 * 1024);
+    let fsync_e = opcode::SyncFileRange::new(fd, 1024).offset(3 * 1024);
 
     unsafe {
         let mut queue = ring.submission().available();

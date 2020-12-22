@@ -1,12 +1,11 @@
+use crate::helper;
 use io_uring::opcode::{self, types};
 use io_uring::squeue;
 use io_uring::IoUring;
-use std::{ io, mem, thread };
-use std::net::{TcpListener, TcpStream, SocketAddr};
-use std::os::unix::io::AsRawFd;
 use once_cell::sync::OnceCell;
-use crate::helper;
-
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::os::unix::io::AsRawFd;
+use std::{io, mem, thread};
 
 static ECHO_TCP_SERVER: OnceCell<SocketAddr> = OnceCell::new();
 
@@ -52,14 +51,8 @@ pub fn test_tcp_send_recv(ring: &mut IoUring) -> anyhow::Result<()> {
 
     unsafe {
         let mut queue = ring.submission().available();
-        let send_e = send_e
-            .build()
-            .user_data(0x01)
-            .flags(squeue::Flags::IO_LINK);
-        queue
-            .push(send_e)
-            .ok()
-            .expect("queue is full");
+        let send_e = send_e.build().user_data(0x01).flags(squeue::Flags::IO_LINK);
+        queue.push(send_e).ok().expect("queue is full");
         queue
             .push(recv_e.build().user_data(0x02))
             .ok()
@@ -126,10 +119,17 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring) -> anyhow::Result<()> {
     // submit
     unsafe {
         let mut queue = ring.submission().available();
-        queue.push(sendmsg_e.build().user_data(0x01).flags(squeue::Flags::IO_LINK))
+        queue
+            .push(
+                sendmsg_e
+                    .build()
+                    .user_data(0x01)
+                    .flags(squeue::Flags::IO_LINK),
+            )
             .ok()
             .expect("queue is full");
-        queue.push(recvmsg_e.build().user_data(0x02))
+        queue
+            .push(recvmsg_e.build().user_data(0x02))
             .ok()
             .expect("queue is full");
     }
@@ -137,10 +137,7 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring) -> anyhow::Result<()> {
     ring.submit_and_wait(2)?;
 
     // complete
-    let cqes = ring
-        .completion()
-        .available()
-        .collect::<Vec<_>>();
+    let cqes = ring.completion().available().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
@@ -204,20 +201,19 @@ pub fn test_tcp_accept(ring: &mut IoUring) -> anyhow::Result<()> {
 }
 
 pub fn test_tcp_connect(ring: &mut IoUring) -> anyhow::Result<()> {
-    use socket2::{ SockAddr, Socket, Domain, Type, Protocol };
+    use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
     println!("test tcp_connect");
 
     let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
 
     let sockaddr = SockAddr::from(*addr);
-    let stream =
-        Socket::new(Domain::ipv4(), Type::stream(), Some(Protocol::tcp()))?;
+    let stream = Socket::new(Domain::ipv4(), Type::stream(), Some(Protocol::tcp()))?;
 
     let connect_e = opcode::Connect::new(
         types::Fd(stream.as_raw_fd()),
         sockaddr.as_ptr() as *const _,
-        sockaddr.len()
+        sockaddr.len(),
     );
 
     unsafe {
