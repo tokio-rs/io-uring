@@ -79,3 +79,45 @@ impl Drop for Probe {
         }
     }
 }
+
+#[cfg(feature = "unstable")]
+#[repr(transparent)]
+pub struct Restriction(sys::io_uring_restriction);
+
+/// inline zeroed to improve codegen
+#[cfg(feature = "unstable")]
+#[inline(always)]
+fn res_zeroed() -> sys::io_uring_restriction {
+    unsafe { std::mem::zeroed() }
+}
+
+#[cfg(feature = "unstable")]
+impl Restriction {
+    pub fn register_op(op: u8) -> Restriction {
+        let mut res = res_zeroed();
+        res.opcode = sys::IORING_RESTRICTION_REGISTER_OP as _;
+        res.__bindgen_anon_1.register_op = op;
+        Restriction(res)
+    }
+
+    pub fn sqe_op(op: u8) -> Restriction {
+        let mut res = res_zeroed();
+        res.opcode = sys::IORING_RESTRICTION_SQE_OP as _;
+        res.__bindgen_anon_1.sqe_op = op;
+        Restriction(res)
+    }
+
+    pub fn sqe_flags_allowed(flags: u8) -> Restriction {
+        let mut res = res_zeroed();
+        res.opcode = sys::IORING_RESTRICTION_SQE_FLAGS_ALLOWED as _;
+        res.__bindgen_anon_1.sqe_flags = flags;
+        Restriction(res)
+    }
+
+    pub fn sqe_flags_required(flags: u8) -> Restriction {
+        let mut res = res_zeroed();
+        res.opcode = sys::IORING_RESTRICTION_SQE_FLAGS_REQUIRED as _;
+        res.__bindgen_anon_1.sqe_flags = flags;
+        Restriction(res)
+    }
+}

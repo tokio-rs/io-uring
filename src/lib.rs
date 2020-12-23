@@ -249,6 +249,12 @@ impl Builder {
         self
     }
 
+    #[cfg(feature = "unstable")]
+    pub fn setup_r_disabled(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_R_DISABLED;
+        self
+    }
+
     /// Build a [IoUring].
     #[inline]
     pub fn build(&self, entries: u32) -> io::Result<IoUring> {
@@ -321,6 +327,11 @@ impl Parameters {
     #[cfg(feature = "unstable")]
     pub fn is_feature_fast_poll(&self) -> bool {
         self.0.features & sys::IORING_FEAT_FAST_POLL != 0
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn is_feature_poll_32bits(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
     }
 
     pub fn sq_entries(&self) -> u32 {
