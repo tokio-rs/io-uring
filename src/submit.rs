@@ -97,6 +97,19 @@ impl<'a> Submitter<'a> {
         unsafe { self.enter(len as _, want as _, flags, None) }
     }
 
+    #[cfg(feature = "unstable")]
+    pub fn squeue_wait(&self) -> io::Result<usize> {
+        let result = unsafe {
+            sys::io_uring_enter(self.fd.as_raw_fd(), 0, 0, sys::IORING_ENTER_SQ_WAIT, ptr::null())
+        };
+
+        if result >= 0 {
+            Ok(result as _)
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+
     /// Register buffers.
     pub fn register_buffers(&self, bufs: &[libc::iovec]) -> io::Result<()> {
         execute(
