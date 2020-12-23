@@ -60,11 +60,7 @@ pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int 
 
 #[cfg(feature = "direct-syscall")]
 pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int {
-    sc::syscall2(
-        __NR_io_uring_setup as usize,
-        entries as usize,
-        p as usize,
-    ) as _
+    sc::syscall2(__NR_io_uring_setup as usize, entries as usize, p as usize) as _
 }
 
 #[cfg(not(feature = "direct-syscall"))]
