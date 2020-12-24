@@ -100,7 +100,13 @@ impl<'a> Submitter<'a> {
     #[cfg(feature = "unstable")]
     pub fn squeue_wait(&self) -> io::Result<usize> {
         let result = unsafe {
-            sys::io_uring_enter(self.fd.as_raw_fd(), 0, 0, sys::IORING_ENTER_SQ_WAIT, ptr::null())
+            sys::io_uring_enter(
+                self.fd.as_raw_fd(),
+                0,
+                0,
+                sys::IORING_ENTER_SQ_WAIT,
+                ptr::null(),
+            )
         };
 
         if result >= 0 {
