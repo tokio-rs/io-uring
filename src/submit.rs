@@ -8,6 +8,9 @@ use crate::squeue::SubmissionQueue;
 use crate::sys;
 use crate::util::{cast_ptr, unsync_load, Fd};
 
+#[cfg(feature = "unstable")]
+use crate::register::Restriction;
+
 /// Submitter
 pub struct Submitter<'a> {
     fd: &'a Fd,
@@ -92,6 +95,25 @@ impl<'a> Submitter<'a> {
         }
 
         unsafe { self.enter(len as _, want as _, flags, None) }
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn squeue_wait(&self) -> io::Result<usize> {
+        let result = unsafe {
+            sys::io_uring_enter(
+                self.fd.as_raw_fd(),
+                0,
+                0,
+                sys::IORING_ENTER_SQ_WAIT,
+                ptr::null(),
+            )
+        };
+
+        if result >= 0 {
+            Ok(result as _)
+        } else {
+            Err(io::Error::last_os_error())
+        }
     }
 
     /// Register buffers.
@@ -221,6 +243,28 @@ impl<'a> Submitter<'a> {
             sys::IORING_UNREGISTER_PERSONALITY,
             ptr::null(),
             id as _,
+        )
+        .map(drop)
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn register_restrictions(&self, res: &mut [Restriction]) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_RESTRICTIONS,
+            res.as_mut_ptr().cast(),
+            res.len() as _,
+        )
+        .map(drop)
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn register_enable_rings(&self) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_ENABLE_RINGS,
+            ptr::null(),
+            0,
         )
         .map(drop)
     }

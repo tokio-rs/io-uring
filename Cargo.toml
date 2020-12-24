@@ -29,7 +29,7 @@ parking_lot = { version = "0.11", optional = true }
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]
-bindgen = { version = "0.55", optional = true }
+bindgen = { version = "0.56", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
