@@ -6,6 +6,14 @@ jobs:
   tests:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+
     steps:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
@@ -16,11 +24,13 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --features unstable,concurrent
+          use-cross: true
+          args: --features unstable,concurrent --target ${{ matrix.target }}
       - uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --package io-uring-test
+          use-cross: true
+          args: --package io-uring-test --target ${{ matrix.target }}
 
   check:
     runs-on: ubuntu-latest
