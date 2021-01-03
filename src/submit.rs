@@ -217,6 +217,7 @@ impl<'a> Submitter<'a> {
     /// # Examples
     ///
     /// ```
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let io_uring = io_uring::IoUring::new(1)?;
     /// let mut probe = io_uring::Probe::new();
     /// io_uring.submitter().register_probe(&mut probe)?;
@@ -224,6 +225,8 @@ impl<'a> Submitter<'a> {
     /// if probe.is_supported(io_uring::opcode::Read::CODE) {
     ///     println!("Reading is supported!");
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn register_probe(&self, probe: &mut Probe) -> io::Result<()> {
         execute(
