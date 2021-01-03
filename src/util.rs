@@ -14,12 +14,14 @@ macro_rules! mmap_offset {
     }
 }
 
+/// A region of memory mapped using `mmap(2)`.
 pub struct Mmap {
     addr: ptr::NonNull<libc::c_void>,
     len: usize,
 }
 
 impl Mmap {
+    /// Map `len` bytes starting from the offset `offset` in the file descriptor `fd` into memory.
     pub fn new(fd: &Fd, offset: libc::off_t, len: usize) -> io::Result<Mmap> {
         unsafe {
             match libc::mmap(
@@ -40,6 +42,7 @@ impl Mmap {
         }
     }
 
+    /// Do not make the stored memory accessible by child processes after a `fork`.
     pub fn dontfork(&self) -> io::Result<()> {
         match unsafe { libc::madvise(self.addr.as_ptr(), self.len, libc::MADV_DONTFORK) } {
             0 => Ok(()),
@@ -47,6 +50,7 @@ impl Mmap {
         }
     }
 
+    /// Get a pointer to the memory.
     #[inline]
     pub fn as_mut_ptr(&self) -> *mut libc::c_void {
         self.addr.as_ptr()
@@ -61,6 +65,7 @@ impl Drop for Mmap {
     }
 }
 
+/// An owned file descriptor.
 pub struct Fd(pub RawFd);
 
 impl TryFrom<RawFd> for Fd {
@@ -114,5 +119,5 @@ pub unsafe fn unsync_load(u: *const atomic::AtomicU32) -> u32 {
 
 #[inline]
 pub fn cast_ptr<T>(n: &T) -> *const T {
-    n as *const T
+    n
 }
