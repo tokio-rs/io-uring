@@ -178,7 +178,7 @@ impl Drop for AvailableQueue<'_> {
 
 impl Entry {
     /// The operation-specific result code. For example, for a [`Read`](crate::opcode::Read)
-    /// operation this is equivalent to the return value of `read(2)` system call.
+    /// operation this is equivalent to the return value of the `read(2)` system call.
     pub fn result(&self) -> i32 {
         self.0.res
     }

@@ -70,14 +70,14 @@ pub mod types {
         _priv: (),
     }
 
-    /// A file descriptor that has not been registered with io_uring. This can be slower than using
-    /// [`Fixed`].
+    /// A file descriptor that has not been registered with io_uring.
     #[derive(Debug, Clone, Copy)]
     #[repr(transparent)]
     pub struct Fd(pub RawFd);
 
     /// A file descriptor that has been registered with io_uring using
-    /// [`Submitter::register_files`](crate::Submitter::register_files).
+    /// [`Submitter::register_files`](crate::Submitter::register_files). This can reduce overhead
+    /// compared to using [`Fd`] in some cases.
     #[derive(Debug, Clone, Copy)]
     #[repr(transparent)]
     pub struct Fixed(pub u32);
