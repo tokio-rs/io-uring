@@ -1,4 +1,4 @@
-//! Operation code
+//! Operation codes that can be used to construct [`squeue::Entry`](crate::squeue::Entry)s.
 
 #![allow(clippy::new_without_default)]
 
@@ -48,46 +48,56 @@ mod sealed {
     }
 }
 
+/// Common Linux types not provided by libc.
 pub mod types {
     use crate::sys;
     use bitflags::bitflags;
     use std::os::unix::io::RawFd;
 
     pub use sys::__kernel_rwf_t as RwFlags;
+
     pub use sys::__kernel_timespec as Timespec;
 
-    /// Opaque types, you should use `libc::statx` instead.
+    /// Opaque types, you should use [`statx`](struct@libc::statx) instead.
     #[repr(C)]
     pub struct statx {
         _priv: (),
     }
 
-    /// Opaque types, you should use `libc::epoll_event` instead.
+    /// Opaque types, you should use [`epoll_event`](libc::epoll_event) instead.
     #[repr(C)]
     pub struct epoll_event {
         _priv: (),
     }
 
+    /// A file descriptor that has not been registered with io_uring. This can be slower than using
+    /// [`Fixed`].
     #[derive(Debug, Clone, Copy)]
     #[repr(transparent)]
     pub struct Fd(pub RawFd);
 
+    /// A file descriptor that has been registered with io_uring using
+    /// [`Submitter::register_files`](crate::Submitter::register_files).
     #[derive(Debug, Clone, Copy)]
     #[repr(transparent)]
     pub struct Fixed(pub u32);
 
     bitflags! {
+        /// Options for [`Timeout`](super::Timeout).
         pub struct TimeoutFlags: u32 {
             const ABS = sys::IORING_TIMEOUT_ABS;
         }
     }
 
     bitflags! {
+        /// Options for [`Fsync`](super::Fsync).
         pub struct FsyncFlags: u32 {
             const DATASYNC = sys::IORING_FSYNC_DATASYNC;
         }
     }
 
+    /// Wrapper around `open_how` as used in [the `openat2(2)` system
+    /// call](https://man7.org/linux/man-pages/man2/openat2.2.html).
     #[derive(Default, Debug, Clone, Copy)]
     #[repr(transparent)]
     pub struct OpenHow(sys::open_how);
@@ -180,6 +190,9 @@ macro_rules! opcode {
                 }
             }
 
+            /// The opcode of the operation. This can be passed to
+            /// [`Probe::is_supported`](crate::Probe::is_supported) to check if this operation is
+            /// supported with the current kernel.
             pub const CODE: u8 = $opcode as _;
 
             $(
@@ -224,9 +237,7 @@ opcode!(
 );
 
 opcode!(
-    /// Vectored read operations, similar to `preadv2 (2)`.
-    ///
-    /// The return values match those documented in the `preadv2 (2)` man pages.
+    /// Vectored read, equivalent to `preadv2(2)`.
     #[derive(Debug)]
     pub struct Readv {
         fd: { impl sealed::UseFixed },
@@ -236,7 +247,7 @@ opcode!(
         ioprio: u16 = 0,
         offset: libc::off_t = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
-        /// as described in the `preadv2 (2)` man page.
+        /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
     }
 
@@ -262,9 +273,7 @@ opcode!(
 );
 
 opcode!(
-    /// Vectored write operations, similar to `pwritev2 (2)`.
-    ///
-    /// The return values match those documented in the `pwritev2 (2)` man pages.
+    /// Vectored write, equivalent to `pwritev2(2)`.
     #[derive(Debug)]
     pub struct Writev {
         fd: { impl sealed::UseFixed },
@@ -274,7 +283,7 @@ opcode!(
         ioprio: u16 = 0,
         offset: libc::off_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
-        /// as described in the `preadv2 (2)` man page.
+        /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
     }
 
@@ -300,17 +309,21 @@ opcode!(
 );
 
 opcode!(
-    /// File sync. See also `fsync (2)`.
+    /// File sync, equivalent to `fsync(2)`.
     ///
-    /// Note that, while I/O is initiated in the order in which it appears in the submission queue, completions are unordered.
-    /// For example, an application which places a write I/O followed by an fsync in the submission queue cannot expect the fsync to apply to the write. The two operations execute in parallel, so the fsync may complete before the write is issued to the storage. The same is also true for previously issued writes that have not completed prior to the fsync.
+    /// Note that, while I/O is initiated in the order in which it appears in the submission queue,
+    /// completions are unordered. For example, an application which places a write I/O followed by
+    /// an fsync in the submission queue cannot expect the fsync to apply to the write. The two
+    /// operations execute in parallel, so the fsync may complete before the write is issued to the
+    /// storage. The same is also true for previously issued writes that have not completed prior to
+    /// the fsync.
     #[derive(Debug)]
     pub struct Fsync {
         fd: { impl sealed::UseFixed },
         ;;
         /// The `flags` bit mask may contain either 0, for a normal file integrity sync,
         /// or [types::FsyncFlags::DATASYNC] to provide data sync only semantics.
-        /// See the descriptions of `O_SYNC` and `O_DSYNC` in the `open (2)` manual page for more information.
+        /// See the descriptions of `O_SYNC` and `O_DSYNC` in the `open(2)` manual page for more information.
         flags: types::FsyncFlags = types::FsyncFlags::empty()
     }
 
@@ -328,9 +341,10 @@ opcode!(
 );
 
 opcode!(
-    /// Read from pre-mapped buffers.
+    /// Read from pre-mapped buffers that have been previously registered with
+    /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
-    /// The return values match those documented in the `preadv2 (2)` man pages.
+    /// The return values match those documented in the `preadv2(2)` man pages.
     #[derive(Debug)]
     pub struct ReadFixed {
         /// The `buf_index` is an index into an array of fixed buffers,
@@ -343,7 +357,7 @@ opcode!(
         offset: libc::off_t = 0,
         ioprio: u16 = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
-        /// as described in the `preadv2 (2)` man page.
+        /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
     }
 
@@ -371,9 +385,10 @@ opcode!(
 );
 
 opcode!(
-    /// Write to pre-mapped buffers.
+    /// Write to pre-mapped buffers that have been previously registered with
+    /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
-    /// The return values match those documented in the `pwritev2 (2)` man pages.
+    /// The return values match those documented in the `pwritev2(2)` man pages.
     #[derive(Debug)]
     pub struct WriteFixed {
         /// The `buf_index` is an index into an array of fixed buffers,
@@ -386,7 +401,7 @@ opcode!(
         ioprio: u16 = 0,
         offset: libc::off_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
-        /// as described in the `preadv2 (2)` man page.
+        /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
     }
 
@@ -421,7 +436,7 @@ opcode!(
     #[derive(Debug)]
     pub struct PollAdd {
         /// The bits that may be set in `flags` are defined in `<poll.h>`,
-        /// and documented in `poll (2)`.
+        /// and documented in `poll(2)`.
         fd: { impl sealed::UseFixed },
         flags: { u32 }
         ;;
@@ -452,7 +467,7 @@ opcode!(
 );
 
 opcode!(
-    /// Remove an existing poll request.
+    /// Remove an existing [poll](PollAdd) request.
     ///
     /// If found, the `result` method of the `cqueue::Entry` will return 0.
     /// If not found, `result` will return `-libc::ENOENT`.
@@ -476,9 +491,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `sync_file_range (2)` on the file descriptor.
-    ///
-    /// See also `sync_file_range (2)`. for the general description of the related system call.
+    /// Sync a file segment with disk, equivalent to `sync_file_range(2)`.
     #[derive(Debug)]
     pub struct SyncFileRange {
         fd: { impl sealed::UseFixed },
@@ -510,11 +523,10 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `sendmsg (2)` system call.
+    /// Send a message on a socket, equivalent to `send(2)`.
     ///
-    /// fd must be set to the socket file descriptor, addr must contains a pointer to the msghdr structure,
-    /// and flags holds the flags associated with the system call.
-    /// See also `sendmsg (2)`. for the general description of the related system call.
+    /// fd must be set to the socket file descriptor, addr must contains a pointer to the msghdr
+    /// structure, and flags holds the flags associated with the system call.
     #[derive(Debug)]
     pub struct SendMsg {
         fd: { impl sealed::UseFixed },
@@ -541,9 +553,9 @@ opcode!(
 );
 
 opcode!(
-    /// Works just like [SendMsg], except for instead.
+    /// Receive a message on a socket, equivalent to `recvmsg(2)`.
     ///
-    /// See the description of [SendMsg].
+    /// See also the description of [`SendMsg`].
     #[derive(Debug)]
     pub struct RecvMsg {
         fd: { impl sealed::UseFixed },
@@ -570,7 +582,7 @@ opcode!(
 );
 
 opcode!(
-    /// This command will register a timeout operation.
+    /// Register a timeout operation.
     ///
     /// A timeout will trigger a wakeup event on the completion ring for anyone waiting for events.
     /// A timeout condition is met when either the specified timeout expires, or the specified number of events have completed.
@@ -585,7 +597,7 @@ opcode!(
         /// `count` may contain a completion event count.
         count: u32 = 0,
 
-        /// `flags` may contain [types::TimeoutFlags::ABS] for an absolutel timeout value, or 0 for a relative timeout.
+        /// `flags` may contain [types::TimeoutFlags::ABS] for an absolute timeout value, or 0 for a relative timeout.
         flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
 
@@ -608,7 +620,7 @@ opcode!(
 // === 5.5 ===
 
 opcode!(
-    /// Attempt to remove an existing timeout operation.
+    /// Attempt to remove an existing [timeout operation](Timeout).
     pub struct TimeoutRemove {
         user_data: { u64 },
         ;;
@@ -630,7 +642,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of an `accept4 (2)` system call.
+    /// Accept a new connection on a socket, equivalent to `accept4(2)`.
     pub struct Accept {
         fd: { impl sealed::UseFixed },
         addr: { *mut libc::sockaddr },
@@ -677,9 +689,9 @@ opcode!(
 );
 
 opcode!(
-    /// This request must be linked with
-    /// another request through [Flags::IO_LINK](crate::squeue::Flags::IO_LINK) which is described below.
-    /// Unlike [Timeout], [LinkTimeout] acts on the linked request, not the completion queue.
+    /// This request must be linked with another request through
+    /// [`Flags::IO_LINK`](crate::squeue::Flags::IO_LINK) which is described below.
+    /// Unlike [`Timeout`], [`LinkTimeout`] acts on the linked request, not the completion queue.
     pub struct LinkTimeout {
         timespec: { *const types::Timespec },
         ;;
@@ -702,7 +714,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `connect (2)` system call.
+    /// Connect a socket, equivalent to `connect(2)`.
     pub struct Connect {
         fd: { impl sealed::UseFixed },
         addr: { *const libc::sockaddr },
@@ -727,7 +739,7 @@ opcode!(
 // === 5.6 ===
 
 opcode!(
-    /// Issue the equivalent of a `fallocate(2)` system call.
+    /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
     pub struct Fallocate {
         fd: { impl sealed::UseFixed },
         len: { libc::off_t },
@@ -752,7 +764,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `openat(2)` system call.
+    /// Open a file, equivalent to `openat(2)`.
     pub struct Openat {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -777,7 +789,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `close(2)` system call.
+    /// Close a file descriptor, equivalent to `close(2)`.
     pub struct Close {
         fd: { impl sealed::UseFd }
         ;;
@@ -796,8 +808,9 @@ opcode!(
 );
 
 opcode!(
-    /// This command is an alternative to using [crate::Submitter::register_files_update]
-    /// which then works in an async fashion, like the rest of the io_uring commands.
+    /// This command is an alternative to using
+    /// [`Submitter::register_files_update`](crate::Submitter::register_files_update) which then
+    /// works in an async fashion, like the rest of the io_uring commands.
     pub struct FilesUpdate {
         fds: { *const RawFd },
         len: { u32 },
@@ -821,7 +834,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `statx(2)` system call.
+    /// Get file status, equivalent to `statx(2)`.
     pub struct Statx {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -851,7 +864,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `read(2)` system call.
+    /// Read from a file descriptor, equivalent to `read(2)`.
     pub struct Read {
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
@@ -887,7 +900,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `write(2)` system call.
+    /// Write to a file descriptor, equivalent to `write(2)`.
     pub struct Write {
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
@@ -920,7 +933,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `posix_fadvise(2)` system call.
+    /// Predeclare an access pattern for file data, equivalent to `posix_fadvise(2)`.
     pub struct Fadvise {
         fd: { impl sealed::UseFixed },
         len: { libc::off_t },
@@ -945,7 +958,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `madvise(2)` system call.
+    /// Give advice about use of memory, equivalent to `madvise(2)`.
     pub struct Madvise {
         addr: { *const libc::c_void },
         len: { libc::off_t },
@@ -969,7 +982,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `send(2)` system call.
+    /// Send a message on a socket, equivalent to `send(2)`.
     pub struct Send {
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
@@ -994,7 +1007,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `recv(2) system call.
+    /// Receive a message from a socket, equivalent to `recv(2)`.
     pub struct Recv {
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
@@ -1021,7 +1034,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `openat2(2) system call.
+    /// Open a file, equivalent to `openat2(2)`.
     pub struct Openat2 {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -1045,7 +1058,7 @@ opcode!(
 );
 
 opcode!(
-    /// Issue the equivalent of a `epoll_ctl(2) system call.
+    /// Modify an epoll file descriptor, equivalent to `epoll_ctl(2)`.
     pub struct EpollCtl {
         epfd: { impl sealed::UseFixed },
         fd: { impl sealed::UseFd },
@@ -1073,6 +1086,9 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    /// Splice data to/from a pipe, equivalent to `splice(2)`.
+    ///
+    /// Requires the `unstable` feature.
     pub struct Splice {
         fd_in: { impl sealed::UseFixed },
         off_in: { i64 },
@@ -1110,6 +1126,11 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    /// Register `nbufs` buffers that each have the length `len` with ids starting from `big` in the
+    /// group `bgid` that can be used for any request. See
+    /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
+    ///
+    /// Requires the `unstable` feature.
     pub struct ProvideBuffers {
         addr: { *mut u8 },
         len: { i32 },
@@ -1137,6 +1158,10 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    /// Remove some number of buffers from a buffer group. See
+    /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
+    ///
+    /// Requires the `unstable` feature.
     pub struct RemoveBuffers {
         nbufs: { u16 },
         bgid: { u16 }
@@ -1160,6 +1185,9 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    /// Duplicate pipe content, equivalent to `tee(2)`.
+    ///
+    /// Requires the `unstable` feature.
     pub struct Tee {
         fd_in: { impl sealed::UseFixed },
         fd_out: { impl sealed::UseFixed },

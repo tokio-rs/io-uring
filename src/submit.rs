@@ -11,7 +11,11 @@ use crate::util::{cast_ptr, unsync_load, Fd};
 #[cfg(feature = "unstable")]
 use crate::register::Restriction;
 
-/// Submitter
+/// Interface for submitting submission queue events in an io_uring instance to the kernel for
+/// executing and registering files or buffers with the instance.
+///
+/// io_uring supports both directly performing I/O on buffers and file descriptors and registering
+/// them beforehand. Registering is slow, but it makes performing the actual I/O much faster.
 pub struct Submitter<'a> {
     fd: &'a Fd,
     flags: u32,
@@ -42,13 +46,21 @@ impl<'a> Submitter<'a> {
         }
     }
 
+    /// Whether the kernel thread has gone to sleep because it waited for too long without
+    /// submission queue entries.
     fn sq_need_wakeup(&self) -> bool {
         unsafe {
             (*self.sq_flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
         }
     }
 
-    /// Initiate and/or complete asynchronous I/O
+    /// Initiate and/or complete asynchronous I/O. This is a low-level wrapper around
+    /// `io_uring_enter` - see `man io_uring_enter` (or [its online
+    /// version](https://manpages.debian.org/unstable/liburing-dev/io_uring_enter.2.en.html) for
+    /// more details.
+    ///
+    /// You will probably want to use a more high-level API such as
+    /// [`submit`](Self::submit) or [`submit_and_wait`](Self::submit_and_wait).
     ///
     /// # Safety
     ///
@@ -69,13 +81,14 @@ impl<'a> Submitter<'a> {
         }
     }
 
-    /// Initiate asynchronous I/O.
+    /// Submit all queued submission queue events to the kernel.
     #[inline]
     pub fn submit(&self) -> io::Result<usize> {
         self.submit_and_wait(0)
     }
 
-    /// Initiate and/or complete asynchronous I/O
+    /// Submit all queued submission queue events to the kernel and wait for at least `want`
+    /// completion events to complete.
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         let len = self.sq_len();
 
@@ -89,7 +102,8 @@ impl<'a> Submitter<'a> {
             if self.sq_need_wakeup() {
                 flags |= sys::IORING_ENTER_SQ_WAKEUP;
             } else if want == 0 {
-                // fast poll
+                // The kernel thread is polling and hasn't fallen asleep, so we don't need to tell
+                // it to process events or wake it up
                 return Ok(len);
             }
         }
@@ -97,6 +111,9 @@ impl<'a> Submitter<'a> {
         unsafe { self.enter(len as _, want as _, flags, None) }
     }
 
+    /// Wait for the submission queue to have free entries.
+    ///
+    /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn squeue_wait(&self) -> io::Result<usize> {
         let result = unsafe {
@@ -116,7 +133,9 @@ impl<'a> Submitter<'a> {
         }
     }
 
-    /// Register buffers.
+    /// Register in-memory user buffers for I/O with the kernel. You can use these buffers with the
+    /// [`ReadFixed`](crate::opcode::ReadFixed) and [`WriteFixed`](crate::opcode::WriteFixed)
+    /// operations.
     pub fn register_buffers(&self, bufs: &[libc::iovec]) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -127,7 +146,14 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// Register files for I/O.
+    /// Register files for I/O. You can use the registered files with
+    /// [`Fixed`](crate::opcode::types::Fixed).
+    ///
+    /// Each fd may be -1, in which case it is considered "sparse", and can be filled in later with
+    /// [`register_files_update`](Self::register_files_update).
+    ///
+    /// Note that this will wait for the ring to idle; it will only return once all active requests
+    /// are complete. Use [`register_files_update`](Self::register_files_update) to avoid this.
     pub fn register_files(&self, fds: &[RawFd]) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -138,20 +164,13 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// It’s possible to use `eventfd(2)` to get notified of completion events on an io_uring instance.
-    pub fn register_eventfd(&self, eventfd: RawFd) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_REGISTER_EVENTFD,
-            cast_ptr::<RawFd>(&eventfd) as *const _,
-            1,
-        )
-        .map(drop)
-    }
-
     /// This operation replaces existing files in the registered file set with new ones,
     /// either turning a sparse entry (one where fd is equal to -1) into a real one, removing an existing entry (new one is set to -1),
-    /// or replacing an existing entry with a new existing entry.
+    /// or replacing an existing entry with a new existing entry. The `offset` parameter specifies
+    /// the offset into the list of registered files at which to start updating files.
+    ///
+    /// You can also perform this asynchronously with the
+    /// [`FilesUpdate`](crate::opcode::FilesUpdate) opcode.
     pub fn register_files_update(&self, offset: u32, fds: &[RawFd]) -> io::Result<usize> {
         let fu = sys::io_uring_files_update {
             offset,
@@ -168,8 +187,20 @@ impl<'a> Submitter<'a> {
         Ok(ret as _)
     }
 
-    /// This works just like [Submitter::register_eventfd],
-    /// except notifications are only posted for events that complete in an async manner.
+    /// Register an eventfd created by [`eventfd`](libc::eventfd) with the io_uring instance.
+    pub fn register_eventfd(&self, eventfd: RawFd) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_EVENTFD,
+            cast_ptr::<RawFd>(&eventfd) as *const _,
+            1,
+        )
+        .map(drop)
+    }
+
+    /// This works just like [`register_eventfd`](Self::register_eventfd), except notifications are
+    /// only posted for events that complete in an async manner, so requests that complete
+    /// immediately will not cause a notification.
     pub fn register_eventfd_async(&self, eventfd: RawFd) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -180,8 +211,20 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// This operation returns a structure `Probe`,
-    /// which contains information about the opcodes supported by io_uring on the running kernel.
+    /// Fill in the given [`Probe`] with information about the opcodes supported by io_uring on the
+    /// running kernel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let io_uring = io_uring::IoUring::new(1)?;
+    /// let mut probe = io_uring::Probe::new();
+    /// io_uring.submitter().register_probe(&mut probe)?;
+    ///
+    /// if probe.is_supported(io_uring::opcode::Read::CODE) {
+    ///     println!("Reading is supported!");
+    /// }
+    /// ```
     pub fn register_probe(&self, probe: &mut Probe) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -192,8 +235,16 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// This operation registers credentials of the running application with io_uring,
-    /// and returns an id associated with these credentials.
+    /// Register credentials of the running application with io_uring, and get an id associated with
+    /// these credentials. This ID can then be passed into submission queue entries to issue the
+    /// request with this process' credentials (although this library does not currently support
+    /// that).
+    ///
+    /// By default, if [`Parameters::is_feature_cur_personality`] is set then requests will use the
+    /// credentials of the task that called [`Submitter::enter`], otherwise they will use the
+    /// credentials of the task that originally registered the io_uring.
+    ///
+    /// [`Parameters::is_feature_cur_personality`]: crate::Parameters::is_feature_cur_personality
     pub fn register_personality(&self) -> io::Result<i32> {
         execute(
             self.fd.as_raw_fd(),
@@ -203,7 +254,10 @@ impl<'a> Submitter<'a> {
         )
     }
 
-    /// Unregister buffers.
+    /// Unregister all previously registered buffers.
+    ///
+    /// You do not need to explicitly call this before dropping the [`IoUring`](crate::IoUring), as
+    /// it will be cleaned up by the kernel automatically.
     pub fn unregister_buffers(&self) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -214,7 +268,10 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// Unregister files.
+    /// Unregister all previously registered files.
+    ///
+    /// You do not need to explicitly call this before dropping the [`IoUring`](crate::IoUring), as
+    /// it will be cleaned up by the kernel automatically.
     pub fn unregister_files(&self) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -236,7 +293,7 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// This operation unregisters a previously registered personality with io_uring.
+    /// Unregister a previously registered personality.
     pub fn unregister_personality(&self, id: i32) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -247,6 +304,12 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
+    /// Permanently install a feature allowlist. Once this has been called, attempting to perform
+    /// an operation not on the allowlist will fail with `-EACCES`.
+    ///
+    /// This can only be called once, to prevent untrusted code from removing restrictions.
+    ///
+    /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn register_restrictions(&self, res: &mut [Restriction]) -> io::Result<()> {
         execute(
@@ -258,6 +321,10 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
+    /// Enable the rings of the io_uring instance if they have been disabled with
+    /// [`setup_r_disabled`](crate::Builder::setup_r_disabled).
+    ///
+    /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn register_enable_rings(&self) -> io::Result<()> {
         execute(

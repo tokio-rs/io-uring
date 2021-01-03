@@ -49,6 +49,7 @@ pub struct Builder {
     params: sys::io_uring_params,
 }
 
+/// The parameters that were used to construct an [`IoUring`].
 #[derive(Clone)]
 pub struct Parameters(sys::io_uring_params);
 
@@ -56,7 +57,8 @@ unsafe impl Send for IoUring {}
 unsafe impl Sync for IoUring {}
 
 impl IoUring {
-    /// Create a IoUring instance
+    /// Create a new `IoUring` instance with default configuration parameters. See [`Builder`] to
+    /// customize it further.
     ///
     /// The `entries` sets the size of queue,
     /// and it value should be the power of two.
@@ -130,17 +132,20 @@ impl IoUring {
         })
     }
 
+    /// Get the submitter of this io_uring instance, which can be used to submit submission queue
+    /// events to the kernel for execution and to register files or buffers with it.
     #[inline]
     pub fn submitter(&self) -> Submitter<'_> {
         Submitter::new(&self.fd, self.params.0.flags, &self.sq)
     }
 
+    /// Get the parameters that were used to construct this instance.
     #[inline]
     pub fn params(&self) -> &Parameters {
         &self.params
     }
 
-    /// Initiate and/or complete asynchronous I/O
+    /// Initiate and/or complete asynchronous I/O. See [`Submitter::enter`] for more details.
     ///
     /// # Safety
     ///
@@ -156,35 +161,38 @@ impl IoUring {
         self.submitter().enter(to_submit, min_complete, flag, sig)
     }
 
-    /// Initiate asynchronous I/O.
+    /// Initiate asynchronous I/O. See [`Submitter::submit`] for more details.
     #[inline]
     pub fn submit(&self) -> io::Result<usize> {
         self.submitter().submit()
     }
 
-    /// Initiate and/or complete asynchronous I/O
+    /// Initiate and/or complete asynchronous I/O. See [`Submitter::submit_and_wait`] for more
+    /// details.
     #[inline]
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         self.submitter().submit_and_wait(want)
     }
 
-    /// Get submitter and submission queue and completion queue
+    /// Get the submitter, submission queue and completion queue of the io_uring instance. This can
+    /// be used to operate on the different parts of the io_uring instance independently.
     pub fn split(&mut self) -> (Submitter<'_>, &mut SubmissionQueue, &mut CompletionQueue) {
         let submit = Submitter::new(&self.fd, self.params.0.flags, &self.sq);
         (submit, &mut self.sq, &mut self.cq)
     }
 
-    /// Get submission queue
+    /// Get the submission queue of the io_uring instace. This is used to send I/O requests to the
+    /// kernel.
     pub fn submission(&mut self) -> &mut SubmissionQueue {
         &mut self.sq
     }
 
-    /// Get completion queue
+    /// Get completion queue. This is used to receive I/O completion events from the kernel.
     pub fn completion(&mut self) -> &mut CompletionQueue {
         &mut self.cq
     }
 
-    /// Make a concurrent IoUring.
+    /// Make this `IoUring` instance concurrent.
     #[cfg(feature = "concurrent")]
     pub fn concurrent(self) -> concurrent::IoUring {
         concurrent::IoUring::new(self)
@@ -200,62 +208,85 @@ impl Drop for IoUring {
 }
 
 impl Builder {
+    /// Do not make this io_uring instance accessible by child processes after a fork.
     pub fn dontfork(&mut self) -> &mut Self {
         self.dontfork = true;
         self
     }
 
-    /// Perform busy-waiting for an I/O completion,
-    /// as opposed to getting notifications via an asynchronous IRQ (Interrupt Request).
+    /// Perform busy-waiting for I/O completion events, as opposed to getting notifications via an
+    /// asynchronous IRQ (Interrupt Request). This will reduce latency, but increases CPU usage.
+    ///
+    /// This is only usable on file systems that support polling and files opened with `O_DIRECT`.
     pub fn setup_iopoll(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_IOPOLL;
         self
     }
 
-    /// When this flag is specified, a kernel thread is created to perform submission queue polling.
-    /// An io_uring instance configured in this way enables an application to issue I/O
-    /// without ever context switching into the kernel.
+    /// Use a kernel thread to perform submission queue polling. This allows your application to
+    /// issue I/O without ever context switching into the kernel, however it does use up a lot more
+    /// CPU. You should use it when you are expecting very large amounts of I/O.
+    ///
+    /// After `idle` seconds, the kernel thread will go to sleep and you will have to wake it up
+    /// again with a system call (this is handled by [`Submitter::submit`] and
+    /// [`Submitter::submit_and_wait`] automatically).
+    ///
+    /// When using this, you _must_ register all file descriptors with the [`Submitter`] via
+    /// [`Submitter::register_files`].
+    ///
+    /// This requires root priviliges.
     pub fn setup_sqpoll(&mut self, idle: impl Into<Option<u32>>) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SQPOLL;
         self.params.sq_thread_idle = idle.into().unwrap_or(0);
         self
     }
 
-    /// If this flag is specified,
-    /// then the poll thread will be bound to the cpu set in the value.
-    /// This flag is only meaningful when [Builder::setup_sqpoll] is enabled.
-    pub fn setup_sqpoll_cpu(&mut self, n: u32) -> &mut Self {
+    /// Bind the kernel's poll thread to the specified cpu. This flag is only meaningful when
+    /// [`Builder::setup_sqpoll`] is enabled.
+    pub fn setup_sqpoll_cpu(&mut self, cpu: u32) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SQ_AFF;
-        self.params.sq_thread_cpu = n;
+        self.params.sq_thread_cpu = cpu;
         self
     }
 
-    /// Create the completion queue with struct `io_uring_params.cq_entries` entries.
-    /// The value must be greater than entries, and may be rounded up to the next power-of-two.
-    pub fn setup_cqsize(&mut self, n: u32) -> &mut Self {
+    /// Create the completion queue with the specified number of entries. The value must be greater
+    /// than `entries`, and may be rounded up to the next power-of-two.
+    pub fn setup_cqsize(&mut self, entries: u32) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_CQSIZE;
-        self.params.cq_entries = n;
+        self.params.cq_entries = entries;
         self
     }
 
+    /// Clamp the sizes of the submission queue and completion queue at their maximum values instead
+    /// of returning an error when you attempt to resize them beyond their maximum values.
     pub fn setup_clamp(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_CLAMP;
         self
     }
 
+    /// Share the asynchronous worker thread backend of this io_uring with the specified io_uring
+    /// file descriptor instead of creating a new thread pool.
     pub fn setup_attach_wq(&mut self, fd: RawFd) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_ATTACH_WQ;
         self.params.wq_fd = fd as _;
         self
     }
 
+    /// Start the io_uring instance with all its rings disabled. This allows you to register
+    /// restrictions, buffers and files before the kernel starts processing submission queue
+    /// events. You are only able to [register restrictions](Submitter::register_restrictions) when
+    /// the rings are disabled due to concurrency issues. You can enable the rings with
+    /// [`Submitter::register_enable_rings`].
+    ///
+    /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn setup_r_disabled(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_R_DISABLED;
         self
     }
 
-    /// Build a [IoUring].
+    /// Build an [IoUring], with the specified number of entries in the submission queue and
+    /// completion queue unless [`setup_cqsize`](Self::setup_cqsize) has been called.
     #[inline]
     pub fn build(&self, entries: u32) -> io::Result<IoUring> {
         let ring = IoUring::with_params(entries, self.params)?;
@@ -273,17 +304,19 @@ impl Builder {
 }
 
 impl Parameters {
+    /// Whether a kernel thread is performing queue polling. Enabled with [`Builder::setup_sqpoll`].
     pub fn is_setup_sqpoll(&self) -> bool {
         self.0.flags & sys::IORING_SETUP_SQPOLL != 0
     }
 
+    /// Whether waiting for completion events is done with a busy loop instead of using IRQs.
+    /// Enabled with [`Builder::setup_iopoll`].
     pub fn is_setup_iopoll(&self) -> bool {
         self.0.flags & sys::IORING_SETUP_IOPOLL != 0
     }
 
-    /// If this flag is set, the two SQ and CQ rings can be mapped with a single `mmap(2)` call.
-    /// The SQEs must still be allocated separately.
-    /// This brings the necessary `mmap(2)` calls down from three to two.
+    /// If this flag is set, the SQ and CQ rings were mapped with a single `mmap(2)` call. This
+    /// means that only two syscalls were used instead of three.
     pub fn is_feature_single_mmap(&self) -> bool {
         self.0.features & sys::IORING_FEAT_SINGLE_MMAP != 0
     }
@@ -295,16 +328,17 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_NODROP != 0
     }
 
-    /// If this flag is set, applications can be certain that any data for async offload has been consumed
-    /// when the kernel has consumed the SQE
+    /// If this flag is set, applications can be certain that any data for async offload has been
+    /// consumed when the kernel has consumed the SQE.
     pub fn is_feature_submit_stable(&self) -> bool {
         self.0.features & sys::IORING_FEAT_SUBMIT_STABLE != 0
     }
 
-    /// If this flag is set, applications can specify offset == -1 with
-    /// `IORING_OP_{READV,WRITEV}`, `IORING_OP_{READ,WRITE}_FIXED`, and `IORING_OP_{READ,WRITE}`
-    /// to mean current file position, which behaves like `preadv2(2)` and `pwritev2(2)` with offset == -1.
-    /// It’ll use (and update) the current file position.
+    /// If this flag is set, applications can specify offset == -1 with [`Readv`](opcode::Readv),
+    /// [`Writev`](opcode::Writev), [`ReadFixed`](opcode::ReadFixed),
+    /// [`WriteFixed`](opcode::WriteFixed), [`Read`](opcode::Read) and [`Write`](opcode::Write),
+    /// which behaves exactly like setting offset == -1 in `preadv2(2)` and `pwritev2(2)`: it’ll use
+    /// (and update) the current file position.
     ///
     /// This obviously comes with the caveat that if the application has multiple reads or writes in flight,
     /// then the end result will not be as expected.
@@ -314,30 +348,41 @@ impl Parameters {
     }
 
     /// If this flag is set, then io_uring guarantees that both sync and async execution of
-    /// a request assumes the credentials of the task that called `io_uring_enter(2)` to queue the requests.
+    /// a request assumes the credentials of the task that called [`Submitter::enter`] to queue the requests.
     /// If this flag isn’t set, then requests are issued with the credentials of the task that originally registered the io_uring.
     /// If only one task is using a ring, then this flag doesn’t matter as the credentials will always be the same.
-    /// Note that this is the default behavior,
-    /// tasks can still register different personalities through
-    /// `io_uring_register(2)` with `IORING_REGISTER_PERSONALITY` and specify the personality to use in the sqe.
+    ///
+    /// Note that this is the default behavior, tasks can still register different personalities
+    /// through [`Submitter::register_personality`].
     pub fn is_feature_cur_personality(&self) -> bool {
         self.0.features & sys::IORING_FEAT_CUR_PERSONALITY != 0
     }
 
+    /// Whether async pollable I/O is fast.
+    ///
+    /// See [the commit message that introduced
+    /// it](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=d7718a9d25a61442da8ee8aeeff6a0097f0ccfd6)
+    /// for more details.
+    ///
+    /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn is_feature_fast_poll(&self) -> bool {
         self.0.features & sys::IORING_FEAT_FAST_POLL != 0
     }
 
+    /// Whether poll events are stored using 32 bits instead of 16. This allows the user to use
+    /// `EPOLLEXCLUSIVE`.
     #[cfg(feature = "unstable")]
     pub fn is_feature_poll_32bits(&self) -> bool {
         self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
     }
 
+    /// The number of submission queue entries allocated.
     pub fn sq_entries(&self) -> u32 {
         self.0.sq_entries
     }
 
+    /// The number of completion queue entries allocated.
     pub fn cq_entries(&self) -> u32 {
         self.0.cq_entries
     }

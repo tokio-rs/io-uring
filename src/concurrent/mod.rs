@@ -1,4 +1,6 @@
 //! Concurrent IoUring.
+//!
+//! This allows io_uring to be used from several threads at once.
 
 mod cqueue;
 mod squeue;
@@ -10,6 +12,8 @@ use parking_lot::Mutex;
 pub use squeue::SubmissionQueue;
 
 /// Concurrent IoUring instance
+///
+/// You can create it with [`IoUring::concurrent`](crate::IoUring::concurrent).
 pub struct IoUring {
     ring: crate::IoUring,
     push_lock: Mutex<()>,
@@ -26,7 +30,8 @@ impl IoUring {
         }
     }
 
-    /// Initiate and/or complete asynchronous I/O
+    /// Initiate and/or complete asynchronous I/O. See
+    /// [`Submitter::enter`](crate::Submitter::enter) for more details.
     ///
     /// # Safety
     ///
@@ -42,19 +47,21 @@ impl IoUring {
         self.ring.enter(to_submit, min_complete, flag, sig)
     }
 
-    /// Initiate asynchronous I/O.
+    /// Submit all queued submission queue events to the kernel.
     #[inline]
     pub fn submit(&self) -> io::Result<usize> {
         self.ring.submit()
     }
 
-    /// Initiate and/or complete asynchronous I/O
+    /// Submit all queued submission queue events to the kernel and wait for at least `want`
+    /// completion events to complete.
     #[inline]
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         self.ring.submit_and_wait(want)
     }
 
-    /// Get submission queue
+    /// Get the submission queue of the io_uring instace. This is used to send I/O requests to the
+    /// kernel.
     pub fn submission(&self) -> SubmissionQueue<'_> {
         unsafe {
             SubmissionQueue {
@@ -66,7 +73,7 @@ impl IoUring {
         }
     }
 
-    /// Get completion queue
+    /// Get completion queue. This is used to receive I/O completion events from the kernel.
     pub fn completion(&self) -> CompletionQueue<'_> {
         unsafe {
             CompletionQueue {
@@ -77,7 +84,7 @@ impl IoUring {
         }
     }
 
-    /// Get original IoUring instance
+    /// Get the original [`IoUring`](crate::IoUring) instance.
     pub fn into_inner(self) -> crate::IoUring {
         self.ring
     }

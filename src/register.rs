@@ -19,6 +19,9 @@ pub(crate) fn execute(
     }
 }
 
+/// Information about what `io_uring` features the kernel supports.
+///
+/// You can fill this in with [`register_probe`](crate::Submitter::register_probe).
 pub struct Probe(ptr::NonNull<sys::io_uring_probe>);
 
 impl Probe {
@@ -26,6 +29,7 @@ impl Probe {
     pub(crate) const SIZE: usize = mem::size_of::<sys::io_uring_probe>()
         + Self::COUNT * mem::size_of::<sys::io_uring_probe_op>();
 
+    /// Create a new probe with no features enabled.
     #[allow(clippy::cast_ptr_alignment)]
     pub fn new() -> Probe {
         use std::alloc::{alloc_zeroed, Layout};
@@ -47,6 +51,7 @@ impl Probe {
         self.0.as_ptr()
     }
 
+    /// Get whether a specific opcode is supported.
     pub fn is_supported(&self, opcode: u8) -> bool {
         unsafe {
             let probe = &*self.0.as_ptr();
@@ -80,6 +85,10 @@ impl Drop for Probe {
     }
 }
 
+/// An allowed feature of io_uring. You can set the allowed features with
+/// [`register_restrictions`](crate::Submitter::register_restrictions).
+///
+/// Requires the `unstable` feature.
 #[cfg(feature = "unstable")]
 #[repr(transparent)]
 pub struct Restriction(sys::io_uring_restriction);
@@ -93,6 +102,7 @@ fn res_zeroed() -> sys::io_uring_restriction {
 
 #[cfg(feature = "unstable")]
 impl Restriction {
+    /// Allow an `io_uring_register` opcode.
     pub fn register_op(op: u8) -> Restriction {
         let mut res = res_zeroed();
         res.opcode = sys::IORING_RESTRICTION_REGISTER_OP as _;
@@ -100,6 +110,7 @@ impl Restriction {
         Restriction(res)
     }
 
+    /// Allow a submission queue event opcode.
     pub fn sqe_op(op: u8) -> Restriction {
         let mut res = res_zeroed();
         res.opcode = sys::IORING_RESTRICTION_SQE_OP as _;
@@ -107,6 +118,7 @@ impl Restriction {
         Restriction(res)
     }
 
+    /// Allow the given [submission queue event flags](crate::squeue::Flags).
     pub fn sqe_flags_allowed(flags: u8) -> Restriction {
         let mut res = res_zeroed();
         res.opcode = sys::IORING_RESTRICTION_SQE_FLAGS_ALLOWED as _;
@@ -114,6 +126,8 @@ impl Restriction {
         Restriction(res)
     }
 
+    /// Require the given [submission queue event flags](crate::squeue::Flags). These flags must be
+    /// set on every submission.
     pub fn sqe_flags_required(flags: u8) -> Restriction {
         let mut res = res_zeroed();
         res.opcode = sys::IORING_RESTRICTION_SQE_FLAGS_REQUIRED as _;
