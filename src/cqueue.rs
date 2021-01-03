@@ -177,8 +177,8 @@ impl Drop for AvailableQueue<'_> {
 }
 
 impl Entry {
-    /// If successful, the number of bytes transferred. If an error occurred, this is a negative
-    /// errno code.
+    /// The operation-specific result code. For example, for a [`Read`](crate::opcode::Read)
+    /// operation this is equivalent to the return value of `read(2)` system call.
     pub fn result(&self) -> i32 {
         self.0.res
     }
