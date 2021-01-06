@@ -1,5 +1,5 @@
 [package]
-name = "io-uring-test"
+name = "io-uring-bench"
 version = "0.1.0"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
@@ -8,13 +8,15 @@ edition = "2018"
 
 [dependencies]
 io-uring = { path = ".." }
-libc = "0.2"
-anyhow = "1"
+criterion = "0.3"
 tempfile = "3"
-once_cell = "1"
-socket2 = "0.3"
 
-[features]
-default = [ "unstable", "direct-syscall" ]
-unstable = [ "io-uring/unstable" ]
-direct-syscall = [ "io-uring/direct-syscall" ]
+[[bench]]
+name = "nop"
+path = "src/nop.rs"
+harness = false
+
+[[bench]]
+name = "iovec"
+path = "src/iovec.rs"
+harness = false

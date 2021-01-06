@@ -14,7 +14,7 @@ categories = [ "asynchronous", "network-programming", "filesystem" ]
 
 [workspace]
 exclude = [ "loom-ringbuf" ]
-members = [ "io-uring-test" ]
+members = [ "io-uring-test", "io-uring-bench" ]
 
 [features]
 concurrent = [ "parking_lot" ]
@@ -36,16 +36,7 @@ anyhow = "1"
 nix = "0.19"
 lazy_static = "1"
 socket2 = "0.3"
-criterion = "0.3"
 slab = "0.4"
 
 [package.metadata.docs.rs]
 features = [ "concurrent", "unstable" ]
-
-[[bench]]
-name = "nop"
-harness = false
-
-[[bench]]
-name = "iovec"
-harness = false
