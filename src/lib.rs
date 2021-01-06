@@ -61,7 +61,7 @@ impl IoUring {
     /// customize it further.
     ///
     /// The `entries` sets the size of queue,
-    /// and it value should be the power of two.
+    /// and its value should be the power of two.
     #[inline]
     pub fn new(entries: u32) -> io::Result<IoUring> {
         IoUring::with_params(entries, Default::default())
