@@ -2,8 +2,7 @@ use std::net::TcpListener;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, ptr};
 
-use io_uring::opcode::{self, types};
-use io_uring::{squeue, IoUring};
+use io_uring::{types, opcode, squeue, IoUring};
 use slab::Slab;
 
 #[derive(Clone, Debug)]
