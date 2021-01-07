@@ -2,12 +2,12 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, ptr};
 
-use crate::Parameters;
 use crate::register::execute;
 use crate::register::Probe;
 use crate::squeue::SubmissionQueue;
 use crate::sys;
 use crate::util::{cast_ptr, unsync_load, Fd};
+use crate::Parameters;
 
 #[cfg(feature = "unstable")]
 use crate::register::Restriction;
@@ -31,7 +31,11 @@ pub struct Submitter<'a> {
 
 impl<'a> Submitter<'a> {
     #[inline]
-    pub(crate) const fn new(fd: &'a Fd, params: &'a Parameters, sq: &SubmissionQueue) -> Submitter<'a> {
+    pub(crate) const fn new(
+        fd: &'a Fd,
+        params: &'a Parameters,
+        sq: &SubmissionQueue,
+    ) -> Submitter<'a> {
         Submitter {
             fd,
             params,
@@ -76,9 +80,18 @@ impl<'a> Submitter<'a> {
         flag: u32,
         arg: Option<&T>,
     ) -> io::Result<usize> {
-        let arg = arg.map(|arg| cast_ptr(arg) as *const _).unwrap_or_else(ptr::null);
+        let arg = arg
+            .map(|arg| cast_ptr(arg) as *const _)
+            .unwrap_or_else(ptr::null);
         let size = std::mem::size_of::<T>();
-        let result = sys::io_uring_enter(self.fd.as_raw_fd(), to_submit, min_complete, flag, arg, size);
+        let result = sys::io_uring_enter(
+            self.fd.as_raw_fd(),
+            to_submit,
+            min_complete,
+            flag,
+            arg,
+            size,
+        );
         if result >= 0 {
             Ok(result as _)
         } else {
@@ -117,9 +130,7 @@ impl<'a> Submitter<'a> {
     }
 
     #[cfg(feature = "unstable")]
-    pub fn submit_and_timeout(&self, want: usize, ts: &types::Timespec)
-        -> io::Result<usize>
-    {
+    pub fn submit_and_timeout(&self, want: usize, ts: &types::Timespec) -> io::Result<usize> {
         if !self.params.is_feature_ext_arg() {
             todo!()
         }
@@ -128,7 +139,7 @@ impl<'a> Submitter<'a> {
             sigmask: 0,
             sigmask_sz: 0,
             pad: 0,
-            ts: cast_ptr(ts) as _
+            ts: cast_ptr(ts) as _,
         };
 
         let len = self.sq_len();
@@ -156,9 +167,7 @@ impl<'a> Submitter<'a> {
     /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn squeue_wait(&self) -> io::Result<usize> {
-        unsafe {
-            self.enter::<libc::sigset_t>(0, 0, sys::IORING_ENTER_SQ_WAIT, None)
-        }
+        unsafe { self.enter::<libc::sigset_t>(0, 0, sys::IORING_ENTER_SQ_WAIT, None) }
     }
 
     /// Register in-memory user buffers for I/O with the kernel. You can use these buffers with the

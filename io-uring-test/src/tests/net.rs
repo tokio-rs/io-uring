@@ -1,7 +1,5 @@
 use crate::helper;
-use io_uring::opcode::{self, types};
-use io_uring::squeue;
-use io_uring::IoUring;
+use io_uring::{opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::os::unix::io::AsRawFd;

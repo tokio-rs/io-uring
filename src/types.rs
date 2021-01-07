@@ -126,7 +126,7 @@ impl Timespec {
     pub const fn new() -> Self {
         Timespec(sys::__kernel_timespec {
             tv_sec: 0,
-            tv_nsec: 0
+            tv_nsec: 0,
         })
     }
 

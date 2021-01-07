@@ -65,7 +65,7 @@ fn main() -> anyhow::Result<()> {
         tests::fs::test_file_fallocate(&mut ring)?;
     }
 
-    if probe.is_supported(opcode::Openat2::CODE) {
+    if probe.is_supported(opcode::OpenAt2::CODE) {
         tests::fs::test_file_openat2(&mut ring)?;
     }
 

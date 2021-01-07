@@ -1,6 +1,5 @@
 use crate::helper;
-use io_uring::opcode::{self, types};
-use io_uring::IoUring;
+use io_uring::{opcode, types, IoUring};
 use std::fs;
 use std::io::Write;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
@@ -130,7 +129,7 @@ pub fn test_file_openat2(ring: &mut IoUring) -> anyhow::Result<()> {
     let path = CString::new(path.as_os_str().as_bytes())?;
 
     let openhow = types::OpenHow::new().flags(libc::O_CREAT as _);
-    let open_e = opcode::Openat2::new(dirfd, path.as_ptr(), &openhow);
+    let open_e = opcode::OpenAt2::new(dirfd, path.as_ptr(), &openhow);
 
     unsafe {
         ring.submission()

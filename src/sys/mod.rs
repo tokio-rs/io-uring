@@ -70,7 +70,7 @@ pub unsafe fn io_uring_enter(
     min_complete: c_uint,
     flags: c_uint,
     arg: *const libc::c_void,
-    size: usize
+    size: usize,
 ) -> c_int {
     syscall(
         __NR_io_uring_enter as c_long,
@@ -79,7 +79,7 @@ pub unsafe fn io_uring_enter(
         min_complete as c_long,
         flags as c_long,
         arg as c_long,
-        size as c_long
+        size as c_long,
     ) as _
 }
 
@@ -90,7 +90,7 @@ pub unsafe fn io_uring_enter(
     min_complete: c_uint,
     flags: c_uint,
     arg: *const libc::c_void,
-    size: usize
+    size: usize,
 ) -> c_int {
     sc::syscall6(
         __NR_io_uring_enter as usize,
@@ -99,6 +99,6 @@ pub unsafe fn io_uring_enter(
         min_complete as usize,
         flags as usize,
         arg as usize,
-        size
+        size,
     ) as _
 }
