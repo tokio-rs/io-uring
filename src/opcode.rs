@@ -7,126 +7,7 @@ use std::os::unix::io::RawFd;
 
 use crate::squeue::Entry;
 use crate::sys;
-
-mod sealed {
-    use super::types::{Fd, Fixed};
-    use std::os::unix::io::RawFd;
-
-    #[derive(Debug)]
-    pub enum Target {
-        Fd(RawFd),
-        Fixed(u32),
-    }
-
-    pub trait UseFd: Sized {
-        fn into(self) -> RawFd;
-    }
-
-    pub trait UseFixed: Sized {
-        fn into(self) -> Target;
-    }
-
-    impl UseFd for Fd {
-        #[inline]
-        fn into(self) -> RawFd {
-            self.0
-        }
-    }
-
-    impl UseFixed for Fd {
-        #[inline]
-        fn into(self) -> Target {
-            Target::Fd(self.0)
-        }
-    }
-
-    impl UseFixed for Fixed {
-        #[inline]
-        fn into(self) -> Target {
-            Target::Fixed(self.0)
-        }
-    }
-}
-
-/// Common Linux types not provided by libc.
-pub mod types {
-    use crate::sys;
-    use bitflags::bitflags;
-    use std::os::unix::io::RawFd;
-
-    pub use sys::__kernel_rwf_t as RwFlags;
-
-    pub use sys::__kernel_timespec as Timespec;
-
-    /// Opaque types, you should use [`statx`](struct@libc::statx) instead.
-    #[repr(C)]
-    pub struct statx {
-        _priv: (),
-    }
-
-    /// Opaque types, you should use [`epoll_event`](libc::epoll_event) instead.
-    #[repr(C)]
-    pub struct epoll_event {
-        _priv: (),
-    }
-
-    /// A file descriptor that has not been registered with io_uring.
-    #[derive(Debug, Clone, Copy)]
-    #[repr(transparent)]
-    pub struct Fd(pub RawFd);
-
-    /// A file descriptor that has been registered with io_uring using
-    /// [`Submitter::register_files`](crate::Submitter::register_files). This can reduce overhead
-    /// compared to using [`Fd`] in some cases.
-    #[derive(Debug, Clone, Copy)]
-    #[repr(transparent)]
-    pub struct Fixed(pub u32);
-
-    bitflags! {
-        /// Options for [`Timeout`](super::Timeout).
-        pub struct TimeoutFlags: u32 {
-            const ABS = sys::IORING_TIMEOUT_ABS;
-        }
-    }
-
-    bitflags! {
-        /// Options for [`Fsync`](super::Fsync).
-        pub struct FsyncFlags: u32 {
-            const DATASYNC = sys::IORING_FSYNC_DATASYNC;
-        }
-    }
-
-    /// Wrapper around `open_how` as used in [the `openat2(2)` system
-    /// call](https://man7.org/linux/man-pages/man2/openat2.2.html).
-    #[derive(Default, Debug, Clone, Copy)]
-    #[repr(transparent)]
-    pub struct OpenHow(sys::open_how);
-
-    impl OpenHow {
-        pub const fn new() -> Self {
-            OpenHow(sys::open_how {
-                flags: 0,
-                mode: 0,
-                resolve: 0,
-            })
-        }
-
-        pub const fn flags(mut self, flags: u64) -> Self {
-            self.0.flags = flags;
-            self
-        }
-
-        pub const fn mode(mut self, mode: u64) -> Self {
-            self.0.mode = mode;
-            self
-        }
-
-        pub const fn resolve(mut self, resolve: u64) -> Self {
-            self.0.resolve = resolve;
-            self
-        }
-    }
-}
+use crate::types::{self, sealed};
 
 macro_rules! assign_fd {
     ( $sqe:ident . fd = $opfd:expr ) => {
@@ -648,7 +529,7 @@ opcode!(
         addr: { *mut libc::sockaddr },
         addrlen: { *mut libc::socklen_t },
         ;;
-        flags: u32 = 0
+        flags: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_ACCEPT;
@@ -661,7 +542,7 @@ opcode!(
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_2.addr = addr as _;
         sqe.__bindgen_anon_1.addr2 = addrlen as _;
-        sqe.__bindgen_anon_3.accept_flags = flags;
+        sqe.__bindgen_anon_3.accept_flags = flags as _;
         Entry(sqe)
     }
 );
@@ -765,7 +646,7 @@ opcode!(
 
 opcode!(
     /// Open a file, equivalent to `openat(2)`.
-    pub struct Openat {
+    pub struct OpenAt {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
         ;;
@@ -776,7 +657,7 @@ opcode!(
     pub const CODE = sys::IORING_OP_OPENAT;
 
     pub fn build(self) -> Entry {
-        let Openat { dirfd, pathname, flags, mode } = self;
+        let OpenAt { dirfd, pathname, flags, mode } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -1035,7 +916,7 @@ opcode!(
 
 opcode!(
     /// Open a file, equivalent to `openat2(2)`.
-    pub struct Openat2 {
+    pub struct OpenAt2 {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
         how: { *const types::OpenHow }
@@ -1045,7 +926,7 @@ opcode!(
     pub const CODE = sys::IORING_OP_OPENAT2;
 
     pub fn build(self) -> Entry {
-        let Openat2 { dirfd, pathname, how } = self;
+        let OpenAt2 { dirfd, pathname, how } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -1217,6 +1098,83 @@ opcode!(
 
         sqe.__bindgen_anon_3.splice_flags = flags;
 
+        Entry(sqe)
+    }
+);
+
+// === 5.11 ===
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct Shutdown {
+        fd: { impl sealed::UseFixed },
+        how: { i32 },
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_SHUTDOWN;
+
+    pub fn build(self) -> Entry {
+        let Shutdown { fd, how } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.len = how as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct RenameAt {
+        olddirfd: { impl sealed::UseFd },
+        oldpath: { *const libc::c_char },
+        newdirfd: { impl sealed::UseFd },
+        newpath: { *const libc::c_char },
+        ;;
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_RENAMEAT;
+
+    pub fn build(self) -> Entry {
+        let RenameAt {
+            olddirfd, oldpath,
+            newdirfd, newpath,
+            flags
+        } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = olddirfd;
+        sqe.__bindgen_anon_2.addr = oldpath as _;
+        sqe.len = newdirfd as _;
+        sqe.__bindgen_anon_1.off = newpath as _;
+        sqe.__bindgen_anon_3.rename_flags = flags;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    pub struct UnlinkAt {
+        dirfd: { impl sealed::UseFd },
+        pathname: { *const libc::c_char },
+        ;;
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_UNLINKAT;
+
+    pub fn build(self) -> Entry {
+        let UnlinkAt { dirfd, pathname, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = dirfd;
+        sqe.__bindgen_anon_2.addr = pathname as _;
+        sqe.__bindgen_anon_3.unlink_flags = flags as _;
         Entry(sqe)
     }
 );

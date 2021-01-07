@@ -11,6 +11,7 @@ mod register;
 pub mod squeue;
 mod submit;
 mod sys;
+pub mod types;
 
 #[cfg(feature = "concurrent")]
 pub mod concurrent;
@@ -136,7 +137,7 @@ impl IoUring {
     /// events to the kernel for execution and to register files or buffers with it.
     #[inline]
     pub fn submitter(&self) -> Submitter<'_> {
-        Submitter::new(&self.fd, self.params.0.flags, &self.sq)
+        Submitter::new(&self.fd, &self.params, &self.sq)
     }
 
     /// Get the parameters that were used to construct this instance.
@@ -177,7 +178,7 @@ impl IoUring {
     /// Get the submitter, submission queue and completion queue of the io_uring instance. This can
     /// be used to operate on the different parts of the io_uring instance independently.
     pub fn split(&mut self) -> (Submitter<'_>, &mut SubmissionQueue, &mut CompletionQueue) {
-        let submit = Submitter::new(&self.fd, self.params.0.flags, &self.sq);
+        let submit = Submitter::new(&self.fd, &self.params, &self.sq);
         (submit, &mut self.sq, &mut self.cq)
     }
 
@@ -375,6 +376,16 @@ impl Parameters {
     #[cfg(feature = "unstable")]
     pub fn is_feature_poll_32bits(&self) -> bool {
         self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn is_feature_sqpoll_nonfixed(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_SQPOLL_NONFIXED != 0
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn is_feature_ext_arg(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_EXT_ARG != 0
     }
 
     /// The number of submission queue entries allocated.
