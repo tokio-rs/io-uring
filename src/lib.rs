@@ -236,9 +236,9 @@ impl Builder {
     /// [`Submitter::register_files`].
     ///
     /// This requires root priviliges.
-    pub fn setup_sqpoll(&mut self, idle: impl Into<Option<u32>>) -> &mut Self {
+    pub fn setup_sqpoll(&mut self, idle: u32) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SQPOLL;
-        self.params.sq_thread_idle = idle.into().unwrap_or(0);
+        self.params.sq_thread_idle = idle;
         self
     }
 

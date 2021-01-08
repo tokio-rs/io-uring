@@ -198,3 +198,17 @@ impl Entry {
         self.0.flags
     }
 }
+
+#[cfg(feature = "unstable")]
+pub fn buffer_select(flags: u32) -> Option<u16> {
+    if flags & sys::IORING_CQE_F_BUFFER != 0 {
+        let id = flags >> sys::IORING_CQE_BUFFER_SHIFT;
+
+        // FIXME
+        //
+        // Should we return u16? maybe kernel will change value of `IORING_CQE_BUFFER_SHIFT` in future.
+        Some(id as u16)
+    } else {
+        None
+    }
+}

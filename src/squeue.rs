@@ -79,6 +79,8 @@ bitflags! {
         /// (buffer_id << IORING_CQE_BUFFER_SHIFT) | IORING_CQE_F_BUFFER
         /// ```
         ///
+        /// You can use [`buffer_select`](crate::cqueue::buffer_select) to take the buffer ID.
+        ///
         /// The buffer will then be removed from the group and won't be usable by other requests
         /// anymore.
         ///
