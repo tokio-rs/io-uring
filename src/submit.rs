@@ -173,7 +173,7 @@ impl<'a> Submitter<'a> {
     }
 
     /// Register files for I/O. You can use the registered files with
-    /// [`Fixed`](crate::opcode::types::Fixed).
+    /// [`Fixed`](crate::types::Fixed).
     ///
     /// Each fd may be -1, in which case it is considered "sparse", and can be filled in later with
     /// [`register_files_update`](Self::register_files_update).

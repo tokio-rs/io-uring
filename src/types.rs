@@ -41,10 +41,14 @@ pub(crate) mod sealed {
 }
 
 use crate::sys;
-use crate::util::cast_ptr;
 use bitflags::bitflags;
-use std::marker::PhantomData;
 use std::os::unix::io::RawFd;
+
+#[cfg(feature = "unstable")]
+use std::marker::PhantomData;
+
+#[cfg(feature = "unstable")]
+use crate::util::cast_ptr;
 
 pub use sys::__kernel_rwf_t as RwFlags;
 
