@@ -41,7 +41,9 @@ pub(crate) mod sealed {
 }
 
 use crate::sys;
+use crate::util::cast_ptr;
 use bitflags::bitflags;
+use std::marker::PhantomData;
 use std::os::unix::io::RawFd;
 
 pub use sys::__kernel_rwf_t as RwFlags;
@@ -123,6 +125,7 @@ impl OpenHow {
 pub struct Timespec(sys::__kernel_timespec);
 
 impl Timespec {
+    #[inline]
     pub const fn new() -> Self {
         Timespec(sys::__kernel_timespec {
             tv_sec: 0,
@@ -130,13 +133,65 @@ impl Timespec {
         })
     }
 
+    #[inline]
     pub const fn sec(mut self, sec: u64) -> Self {
         self.0.tv_sec = sec as _;
         self
     }
 
+    #[inline]
     pub const fn nsec(mut self, nsec: u32) -> Self {
         self.0.tv_nsec = nsec as _;
         self
+    }
+}
+
+#[cfg(feature = "unstable")]
+#[derive(Default, Debug, Clone, Copy)]
+pub struct Args<'s, 't> {
+    pub(crate) args: sys::io_uring_getevents_arg,
+    sigmask: PhantomData<&'s libc::sigset_t>,
+    timespec: PhantomData<&'t Timespec>,
+}
+
+#[cfg(feature = "unstable")]
+impl<'s, 't> Args<'s, 't> {
+    #[inline]
+    pub const fn new() -> Args<'static, 'static> {
+        let args = sys::io_uring_getevents_arg {
+            sigmask: 0,
+            sigmask_sz: 0,
+            pad: 0,
+            ts: 0,
+        };
+
+        Args {
+            args,
+            sigmask: PhantomData,
+            timespec: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn sigmask<'s2>(mut self, sigmask: &'s2 libc::sigset_t) -> Args<'s2, 't> {
+        self.args.sigmask = cast_ptr(sigmask) as _;
+        self.args.sigmask_sz = std::mem::size_of::<libc::sigset_t>() as _;
+
+        Args {
+            args: self.args,
+            sigmask: PhantomData,
+            timespec: self.timespec,
+        }
+    }
+
+    #[inline]
+    pub fn timespec<'t2>(mut self, timespec: &'t2 Timespec) -> Args<'s, 't2> {
+        self.args.ts = cast_ptr(timespec) as _;
+
+        Args {
+            args: self.args,
+            sigmask: self.sigmask,
+            timespec: PhantomData,
+        }
     }
 }

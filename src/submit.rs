@@ -130,18 +130,7 @@ impl<'a> Submitter<'a> {
     }
 
     #[cfg(feature = "unstable")]
-    pub fn submit_and_timeout(&self, want: usize, ts: &types::Timespec) -> io::Result<usize> {
-        if !self.params.is_feature_ext_arg() {
-            todo!()
-        }
-
-        let arg = sys::io_uring_getevents_arg {
-            sigmask: 0,
-            sigmask_sz: 0,
-            pad: 0,
-            ts: cast_ptr(ts) as _,
-        };
-
+    pub fn submit_with_args(&self, want: usize, args: &types::Args) -> io::Result<usize> {
         let len = self.sq_len();
         let mut flags = sys::IORING_ENTER_EXT_ARG;
 
@@ -159,7 +148,7 @@ impl<'a> Submitter<'a> {
             }
         }
 
-        unsafe { self.enter(len as _, want as _, flags, Some(&arg)) }
+        unsafe { self.enter(len as _, want as _, flags, Some(&args.args)) }
     }
 
     /// Wait for the submission queue to have free entries.
