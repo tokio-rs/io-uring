@@ -7,9 +7,13 @@ use crate::register::Probe;
 use crate::squeue::SubmissionQueue;
 use crate::sys;
 use crate::util::{cast_ptr, unsync_load, Fd};
+use crate::Parameters;
 
 #[cfg(feature = "unstable")]
 use crate::register::Restriction;
+
+#[cfg(feature = "unstable")]
+use crate::types;
 
 /// Interface for submitting submission queue events in an io_uring instance to the kernel for
 /// executing and registering files or buffers with the instance.
@@ -18,7 +22,7 @@ use crate::register::Restriction;
 /// them beforehand. Registering is slow, but it makes performing the actual I/O much faster.
 pub struct Submitter<'a> {
     fd: &'a Fd,
-    flags: u32,
+    params: &'a Parameters,
 
     sq_head: *const atomic::AtomicU32,
     sq_tail: *const atomic::AtomicU32,
@@ -27,10 +31,14 @@ pub struct Submitter<'a> {
 
 impl<'a> Submitter<'a> {
     #[inline]
-    pub(crate) const fn new(fd: &'a Fd, flags: u32, sq: &SubmissionQueue) -> Submitter<'a> {
+    pub(crate) const fn new(
+        fd: &'a Fd,
+        params: &'a Parameters,
+        sq: &SubmissionQueue,
+    ) -> Submitter<'a> {
         Submitter {
             fd,
-            flags,
+            params,
             sq_head: sq.head,
             sq_tail: sq.tail,
             sq_flags: sq.flags,
@@ -65,15 +73,25 @@ impl<'a> Submitter<'a> {
     /// # Safety
     ///
     /// This provides a raw interface so developer must ensure that parameters are correct.
-    pub unsafe fn enter(
+    pub unsafe fn enter<T: Sized>(
         &self,
         to_submit: u32,
         min_complete: u32,
         flag: u32,
-        sig: Option<&libc::sigset_t>,
+        arg: Option<&T>,
     ) -> io::Result<usize> {
-        let sig = sig.map(|sig| sig as *const _).unwrap_or_else(ptr::null);
-        let result = sys::io_uring_enter(self.fd.as_raw_fd(), to_submit, min_complete, flag, sig);
+        let arg = arg
+            .map(|arg| cast_ptr(arg) as *const _)
+            .unwrap_or_else(ptr::null);
+        let size = std::mem::size_of::<T>();
+        let result = sys::io_uring_enter(
+            self.fd.as_raw_fd(),
+            to_submit,
+            min_complete,
+            flag,
+            arg,
+            size,
+        );
         if result >= 0 {
             Ok(result as _)
         } else {
@@ -98,7 +116,7 @@ impl<'a> Submitter<'a> {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
-        if self.flags & sys::IORING_SETUP_SQPOLL != 0 {
+        if self.params.is_setup_sqpoll() {
             if self.sq_need_wakeup() {
                 flags |= sys::IORING_ENTER_SQ_WAKEUP;
             } else if want == 0 {
@@ -108,7 +126,29 @@ impl<'a> Submitter<'a> {
             }
         }
 
-        unsafe { self.enter(len as _, want as _, flags, None) }
+        unsafe { self.enter::<libc::sigset_t>(len as _, want as _, flags, None) }
+    }
+
+    #[cfg(feature = "unstable")]
+    pub fn submit_with_args(&self, want: usize, args: &types::Args) -> io::Result<usize> {
+        let len = self.sq_len();
+        let mut flags = sys::IORING_ENTER_EXT_ARG;
+
+        if want > 0 {
+            flags |= sys::IORING_ENTER_GETEVENTS;
+        }
+
+        if self.params.is_setup_sqpoll() {
+            if self.sq_need_wakeup() {
+                flags |= sys::IORING_ENTER_SQ_WAKEUP;
+            } else if want == 0 {
+                // The kernel thread is polling and hasn't fallen asleep, so we don't need to tell
+                // it to process events or wake it up
+                return Ok(len);
+            }
+        }
+
+        unsafe { self.enter(len as _, want as _, flags, Some(&args.args)) }
     }
 
     /// Wait for the submission queue to have free entries.
@@ -116,21 +156,7 @@ impl<'a> Submitter<'a> {
     /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn squeue_wait(&self) -> io::Result<usize> {
-        let result = unsafe {
-            sys::io_uring_enter(
-                self.fd.as_raw_fd(),
-                0,
-                0,
-                sys::IORING_ENTER_SQ_WAIT,
-                ptr::null(),
-            )
-        };
-
-        if result >= 0 {
-            Ok(result as _)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        unsafe { self.enter::<libc::sigset_t>(0, 0, sys::IORING_ENTER_SQ_WAIT, None) }
     }
 
     /// Register in-memory user buffers for I/O with the kernel. You can use these buffers with the

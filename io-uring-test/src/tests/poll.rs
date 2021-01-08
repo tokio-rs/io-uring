@@ -1,5 +1,4 @@
-use io_uring::opcode::{self, types};
-use io_uring::IoUring;
+use io_uring::{opcode, types, IoUring};
 use std::fs::File;
 use std::io::{self, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd};

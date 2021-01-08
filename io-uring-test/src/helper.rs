@@ -1,6 +1,4 @@
-use io_uring::opcode::{self, types};
-use io_uring::squeue;
-use io_uring::IoUring;
+use io_uring::{opcode, squeue, types, IoUring};
 use std::io::{IoSlice, IoSliceMut};
 
 pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> anyhow::Result<()> {

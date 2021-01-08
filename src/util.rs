@@ -118,6 +118,6 @@ pub unsafe fn unsync_load(u: *const atomic::AtomicU32) -> u32 {
 }
 
 #[inline]
-pub fn cast_ptr<T>(n: &T) -> *const T {
+pub const fn cast_ptr<T>(n: &T) -> *const T {
     n
 }

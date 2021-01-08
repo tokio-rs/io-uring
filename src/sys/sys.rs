@@ -42,6 +42,7 @@ pub const IORING_SETUP_ATTACH_WQ: u32 = 32;
 pub const IORING_SETUP_R_DISABLED: u32 = 64;
 pub const IORING_FSYNC_DATASYNC: u32 = 1;
 pub const IORING_TIMEOUT_ABS: u32 = 1;
+pub const IORING_TIMEOUT_UPDATE: u32 = 2;
 pub const SPLICE_F_FD_IN_FIXED: u32 = 2147483648;
 pub const IORING_CQE_F_BUFFER: u32 = 1;
 pub const IORING_OFF_SQ_RING: u32 = 0;
@@ -53,6 +54,7 @@ pub const IORING_CQ_EVENTFD_DISABLED: u32 = 1;
 pub const IORING_ENTER_GETEVENTS: u32 = 1;
 pub const IORING_ENTER_SQ_WAKEUP: u32 = 2;
 pub const IORING_ENTER_SQ_WAIT: u32 = 4;
+pub const IORING_ENTER_EXT_ARG: u32 = 8;
 pub const IORING_FEAT_SINGLE_MMAP: u32 = 1;
 pub const IORING_FEAT_NODROP: u32 = 2;
 pub const IORING_FEAT_SUBMIT_STABLE: u32 = 4;
@@ -60,6 +62,8 @@ pub const IORING_FEAT_RW_CUR_POS: u32 = 8;
 pub const IORING_FEAT_CUR_PERSONALITY: u32 = 16;
 pub const IORING_FEAT_FAST_POLL: u32 = 32;
 pub const IORING_FEAT_POLL_32BITS: u32 = 64;
+pub const IORING_FEAT_SQPOLL_NONFIXED: u32 = 128;
+pub const IORING_FEAT_EXT_ARG: u32 = 256;
 pub const IO_URING_OP_SUPPORTED: u32 = 1;
 pub type __u8 = libc::c_uchar;
 pub type __u16 = libc::c_ushort;
@@ -284,6 +288,8 @@ pub union io_uring_sqe__bindgen_ty_3 {
     pub statx_flags: __u32,
     pub fadvise_advice: __u32,
     pub splice_flags: __u32,
+    pub rename_flags: __u32,
+    pub unlink_flags: __u32,
     _bindgen_union_align: u32,
 }
 #[test]
@@ -459,6 +465,32 @@ fn bindgen_test_layout_io_uring_sqe__bindgen_ty_3() {
             stringify!(io_uring_sqe__bindgen_ty_3),
             "::",
             stringify!(splice_flags)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_3>())).rename_flags as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_3),
+            "::",
+            stringify!(rename_flags)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_3>())).unlink_flags as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_3),
+            "::",
+            stringify!(unlink_flags)
         )
     );
 }
@@ -737,7 +769,10 @@ pub const IORING_OP_SPLICE: libc::c_uint = 30;
 pub const IORING_OP_PROVIDE_BUFFERS: libc::c_uint = 31;
 pub const IORING_OP_REMOVE_BUFFERS: libc::c_uint = 32;
 pub const IORING_OP_TEE: libc::c_uint = 33;
-pub const IORING_OP_LAST: libc::c_uint = 34;
+pub const IORING_OP_SHUTDOWN: libc::c_uint = 34;
+pub const IORING_OP_RENAMEAT: libc::c_uint = 35;
+pub const IORING_OP_UNLINKAT: libc::c_uint = 36;
+pub const IORING_OP_LAST: libc::c_uint = 37;
 pub type _bindgen_ty_5 = libc::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -1478,3 +1513,66 @@ pub const IORING_RESTRICTION_SQE_FLAGS_ALLOWED: libc::c_uint = 2;
 pub const IORING_RESTRICTION_SQE_FLAGS_REQUIRED: libc::c_uint = 3;
 pub const IORING_RESTRICTION_LAST: libc::c_uint = 4;
 pub type _bindgen_ty_8 = libc::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct io_uring_getevents_arg {
+    pub sigmask: __u64,
+    pub sigmask_sz: __u32,
+    pub pad: __u32,
+    pub ts: __u64,
+}
+#[test]
+fn bindgen_test_layout_io_uring_getevents_arg() {
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_getevents_arg>(),
+        24usize,
+        concat!("Size of: ", stringify!(io_uring_getevents_arg))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_getevents_arg>(),
+        8usize,
+        concat!("Alignment of ", stringify!(io_uring_getevents_arg))
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_getevents_arg>())).sigmask as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_getevents_arg),
+            "::",
+            stringify!(sigmask)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_getevents_arg>())).sigmask_sz as *const _ as usize
+        },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_getevents_arg),
+            "::",
+            stringify!(sigmask_sz)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_getevents_arg>())).pad as *const _ as usize },
+        12usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_getevents_arg),
+            "::",
+            stringify!(pad)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_getevents_arg>())).ts as *const _ as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_getevents_arg),
+            "::",
+            stringify!(ts)
+        )
+    );
+}
