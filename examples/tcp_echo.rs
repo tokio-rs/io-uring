@@ -144,11 +144,11 @@ fn main() -> anyhow::Result<()> {
                         }
                     };
 
-                    let read_token = token_alloc.insert(Token::Read { fd, buf_index });
+                    *token = Token::Read { fd, buf_index };
 
                     let read_e = opcode::Recv::new(types::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
                         .build()
-                        .user_data(read_token as _);
+                        .user_data(token_index as _);
 
                     unsafe {
                         if let Err(entry) = sq.push(read_e) {
