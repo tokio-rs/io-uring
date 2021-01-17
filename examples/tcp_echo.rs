@@ -40,12 +40,10 @@ impl AcceptCount {
 
     pub fn push_to(&mut self, sq: &mut squeue::AvailableQueue) {
         while self.count > 0 {
-            unsafe {
-                match sq.push(self.entry.clone()) {
-                    Ok(_) => self.count -= 1,
-                    Err(_) => break,
-                }
+            if !unsafe { sq.push(self.entry) } {
+                break;
             }
+            self.count -= 1;
         }
     }
 }
@@ -127,10 +125,8 @@ fn main() -> anyhow::Result<()> {
                         .build()
                         .user_data(poll_token as _);
 
-                    unsafe {
-                        if let Err(entry) = sq.push(poll_e) {
-                            backlog.push(entry);
-                        }
+                    if !unsafe { sq.push(poll_e) } {
+                        backlog.push(poll_e);
                     }
                 }
                 Token::Poll { fd } => {
@@ -150,10 +146,8 @@ fn main() -> anyhow::Result<()> {
                         .build()
                         .user_data(token_index as _);
 
-                    unsafe {
-                        if let Err(entry) = sq.push(read_e) {
-                            backlog.push(entry);
-                        }
+                    if !unsafe { sq.push(read_e) } {
+                        backlog.push(read_e);
                     }
                 }
                 Token::Read { fd, buf_index } => {
@@ -181,10 +175,8 @@ fn main() -> anyhow::Result<()> {
                             .build()
                             .user_data(token_index as _);
 
-                        unsafe {
-                            if let Err(entry) = sq.push(write_e) {
-                                backlog.push(entry);
-                            }
+                        if !unsafe { sq.push(write_e) } {
+                            backlog.push(write_e);
                         }
                     }
                 }
@@ -222,10 +214,8 @@ fn main() -> anyhow::Result<()> {
                             .user_data(token_index as _)
                     };
 
-                    unsafe {
-                        if let Err(entry) = sq.push(entry) {
-                            backlog.push(entry);
-                        }
+                    if !unsafe { sq.push(entry) } {
+                        backlog.push(entry);
                     }
                 }
             }

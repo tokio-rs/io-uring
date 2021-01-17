@@ -33,7 +33,7 @@ pub struct AvailableQueue<'a> {
 ///
 /// These can be created via the opcodes in [`opcode`](crate::opcode).
 #[repr(transparent)]
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Entry(pub(crate) sys::io_uring_sqe);
 
 bitflags! {
@@ -229,19 +229,20 @@ impl AvailableQueue<'_> {
     }
 
     /// Attempts to push an [`Entry`] into the queue.
-    /// If the queue is full, the element is returned back as an error.
+    /// If pushing the entry was successful, this function returns `true`. If the queue was full,
+    /// this function returns `false`.
     ///
     /// # Safety
     ///
     /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
+    pub unsafe fn push(&mut self, Entry(entry): Entry) -> bool {
         if !self.is_full() {
             *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = entry;
             self.tail = self.tail.wrapping_add(1);
-            Ok(())
+            true
         } else {
-            Err(Entry(entry))
+            false
         }
     }
 }

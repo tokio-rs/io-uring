@@ -60,26 +60,47 @@ impl SubmissionQueue<'_> {
     }
 
     /// Attempts to push an [`Entry`] into the queue.
-    /// If the queue is full, the element is returned back as an error.
+    /// If pushing the entry was successful, this function returns `true`. If the queue was full,
+    /// this function returns `false`.
     ///
     /// # Safety
     ///
     /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub unsafe fn push(&self, Entry(entry): Entry) -> Result<(), Entry> {
+    pub unsafe fn push(&self, entry: Entry) -> bool {
+        self.push_multiple(&[entry])
+    }
+
+    /// Attempts to push multiple [`Entry`] submissions into the queue.
+    /// If pushing the entries was successful, this function returns `true`. If the queue was full,
+    /// this function returns `false`.
+    ///
+    /// This operation will complete atomically, so no submissions can be submitted in between the
+    /// two. This is useful for example when sending two [linked SQEs](squeue::Flags::IO_LINK).
+    ///
+    /// # Safety
+    ///
+    /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
+    /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
+    pub unsafe fn push_multiple(&self, entries: &[Entry]) -> bool {
         let _lock = self.push_lock.lock();
 
         let head = (*self.queue.head).load(atomic::Ordering::Acquire);
-        let tail = unsync_load(self.queue.tail);
+        // We can load without synchronization because the only time the tail is modified is inside
+        // this function, which we have the lock on.
+        let mut tail = unsync_load(self.queue.tail);
 
-        if tail.wrapping_sub(head) == self.ring_entries {
-            return Err(Entry(entry));
+        if self.capacity() - (tail.wrapping_sub(head) as usize) < entries.len() {
+            return false;
         }
 
-        *self.queue.sqes.add((tail & self.ring_mask) as usize) = entry;
+        for &Entry(entry) in entries {
+            *self.queue.sqes.add((tail & self.ring_mask) as usize) = entry;
+            tail = tail.wrapping_add(1);
+        }
 
-        (*self.queue.tail).store(tail.wrapping_add(1), atomic::Ordering::Release);
+        (*self.queue.tail).store(tail, atomic::Ordering::Release);
 
-        Ok(())
+        true
     }
 }
