@@ -60,20 +60,18 @@ impl SubmissionQueue<'_> {
     }
 
     /// Attempts to push an [`Entry`] into the queue.
-    /// If pushing the entry was successful, this function returns `true`. If the queue was full,
-    /// this function returns `false`.
+    /// If the queue is full, this function returns an error.
     ///
     /// # Safety
     ///
     /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub unsafe fn push(&self, entry: Entry) -> bool {
+    pub unsafe fn push(&self, entry: Entry) -> Result<(), ()> {
         self.push_multiple(&[entry])
     }
 
     /// Attempts to push multiple [`Entry`] submissions into the queue.
-    /// If pushing the entries was successful, this function returns `true`. If the queue was full,
-    /// this function returns `false`.
+    /// If the queue is full, this function returns an error.
     ///
     /// This operation will complete atomically, so no submissions can be submitted in between the
     /// two. This is useful for example when sending two [linked SQEs](squeue::Flags::IO_LINK).
@@ -82,7 +80,7 @@ impl SubmissionQueue<'_> {
     ///
     /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub unsafe fn push_multiple(&self, entries: &[Entry]) -> bool {
+    pub unsafe fn push_multiple(&self, entries: &[Entry]) -> Result<(), ()> {
         let _lock = self.push_lock.lock();
 
         let head = (*self.queue.head).load(atomic::Ordering::Acquire);
@@ -91,7 +89,7 @@ impl SubmissionQueue<'_> {
         let mut tail = unsync_load(self.queue.tail);
 
         if self.capacity() - (tail.wrapping_sub(head) as usize) < entries.len() {
-            return false;
+            return Err(());
         }
 
         for &Entry(entry) in entries {
@@ -101,6 +99,6 @@ impl SubmissionQueue<'_> {
 
         (*self.queue.tail).store(tail, atomic::Ordering::Release);
 
-        true
+        Ok(())
     }
 }

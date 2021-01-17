@@ -229,20 +229,19 @@ impl AvailableQueue<'_> {
     }
 
     /// Attempts to push an [`Entry`] into the queue.
-    /// If pushing the entry was successful, this function returns `true`. If the queue was full,
-    /// this function returns `false`.
+    /// If the queue is full, this function returns an error.
     ///
     /// # Safety
     ///
     /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub unsafe fn push(&mut self, Entry(entry): Entry) -> bool {
+    pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), ()> {
         if !self.is_full() {
             *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = entry;
             self.tail = self.tail.wrapping_add(1);
-            true
+            Ok(())
         } else {
-            false
+            Err(())
         }
     }
 }

@@ -40,7 +40,7 @@ impl AcceptCount {
 
     pub fn push_to(&mut self, sq: &mut squeue::AvailableQueue) {
         while self.count > 0 {
-            if !unsafe { sq.push(self.entry) } {
+            if unsafe { sq.push(self.entry) }.is_err() {
                 break;
             }
             self.count -= 1;
@@ -125,7 +125,7 @@ fn main() -> anyhow::Result<()> {
                         .build()
                         .user_data(poll_token as _);
 
-                    if !unsafe { sq.push(poll_e) } {
+                    if unsafe { sq.push(poll_e) }.is_err() {
                         backlog.push(poll_e);
                     }
                 }
@@ -146,7 +146,7 @@ fn main() -> anyhow::Result<()> {
                         .build()
                         .user_data(token_index as _);
 
-                    if !unsafe { sq.push(read_e) } {
+                    if unsafe { sq.push(read_e) }.is_err() {
                         backlog.push(read_e);
                     }
                 }
@@ -175,7 +175,7 @@ fn main() -> anyhow::Result<()> {
                             .build()
                             .user_data(token_index as _);
 
-                        if !unsafe { sq.push(write_e) } {
+                        if unsafe { sq.push(write_e) }.is_err() {
                             backlog.push(write_e);
                         }
                     }
@@ -214,7 +214,7 @@ fn main() -> anyhow::Result<()> {
                             .user_data(token_index as _)
                     };
 
-                    if !unsafe { sq.push(entry) } {
+                    if unsafe { sq.push(entry) }.is_err() {
                         backlog.push(entry);
                     }
                 }
