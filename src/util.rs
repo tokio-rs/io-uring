@@ -3,17 +3,6 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, mem, ptr};
 
-macro_rules! mmap_offset {
-    ( $mmap:ident + $offset:expr => $ty:ty ) => {
-        $mmap.as_mut_ptr().add($offset as _) as $ty
-    };
-    ( $( let $val:ident = $mmap:ident + $offset:expr => $ty:ty );+ ; ) => {
-        $(
-            let $val = mmap_offset!($mmap + $offset => $ty);
-        )*
-    }
-}
-
 /// A region of memory mapped using `mmap(2)`.
 pub struct Mmap {
     addr: ptr::NonNull<libc::c_void>,
@@ -54,6 +43,12 @@ impl Mmap {
     #[inline]
     pub fn as_mut_ptr(&self) -> *mut libc::c_void {
         self.addr.as_ptr()
+    }
+
+    /// Get a pointer to the data at the given offset.
+    #[inline]
+    pub unsafe fn get_offset(&self, offset: u32) -> *mut libc::c_void {
+        self.as_mut_ptr().add(offset as usize)
     }
 }
 

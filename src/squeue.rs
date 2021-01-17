@@ -97,22 +97,21 @@ bitflags! {
 }
 
 impl SubmissionQueue {
+    #[rustfmt::skip]
     pub(crate) unsafe fn new(
         sq_mmap: &Mmap,
         sqe_mmap: &Mmap,
         p: &sys::io_uring_params,
     ) -> SubmissionQueue {
-        mmap_offset! {
-            let head            = sq_mmap + p.sq_off.head           => *const atomic::AtomicU32;
-            let tail            = sq_mmap + p.sq_off.tail           => *const atomic::AtomicU32;
-            let ring_mask       = sq_mmap + p.sq_off.ring_mask      => *const u32;
-            let ring_entries    = sq_mmap + p.sq_off.ring_entries   => *const u32;
-            let flags           = sq_mmap + p.sq_off.flags          => *const atomic::AtomicU32;
-            let dropped         = sq_mmap + p.sq_off.dropped        => *const atomic::AtomicU32;
-            let array           = sq_mmap + p.sq_off.array          => *mut u32;
+        let head         = sq_mmap.get_offset(p.sq_off.head        ) as *const atomic::AtomicU32;
+        let tail         = sq_mmap.get_offset(p.sq_off.tail        ) as *const atomic::AtomicU32;
+        let ring_mask    = sq_mmap.get_offset(p.sq_off.ring_mask   ) as *const u32;
+        let ring_entries = sq_mmap.get_offset(p.sq_off.ring_entries) as *const u32;
+        let flags        = sq_mmap.get_offset(p.sq_off.flags       ) as *const atomic::AtomicU32;
+        let dropped      = sq_mmap.get_offset(p.sq_off.dropped     ) as *const atomic::AtomicU32;
+        let array        = sq_mmap.get_offset(p.sq_off.array       ) as *mut u32;
 
-            let sqes            = sqe_mmap + 0                      => *mut sys::io_uring_sqe;
-        }
+        let sqes         = sqe_mmap.as_mut_ptr() as *mut sys::io_uring_sqe;
 
         // To keep it simple, map it directly to `sqes`.
         for i in 0..*ring_entries {
