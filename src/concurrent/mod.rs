@@ -6,27 +6,32 @@ mod cqueue;
 mod squeue;
 
 use std::io;
+use std::sync::atomic;
 
 pub use cqueue::CompletionQueue;
-use parking_lot::Mutex;
 pub use squeue::SubmissionQueue;
+
+use crate::util::unsync_load;
 
 /// Concurrent IoUring instance
 ///
 /// You can create it with [`IoUring::concurrent`](crate::IoUring::concurrent).
 pub struct IoUring {
     ring: crate::IoUring,
-    push_lock: Mutex<()>,
+    /// The index in the submission queue up to which entries are reserved. They are either filled
+    /// in, or a thread is currently filling them in.
+    sq_reserved_tail: atomic::AtomicU32,
 }
 
 unsafe impl Send for IoUring {}
 unsafe impl Sync for IoUring {}
 
 impl IoUring {
-    pub(crate) fn new(ring: crate::IoUring) -> IoUring {
+    pub(crate) fn new(mut ring: crate::IoUring) -> IoUring {
+        let tail = unsafe { unsync_load(ring.submission().tail) };
         IoUring {
             ring,
-            push_lock: Mutex::new(()),
+            sq_reserved_tail: atomic::AtomicU32::new(tail),
         }
     }
 
@@ -66,7 +71,7 @@ impl IoUring {
         unsafe {
             SubmissionQueue {
                 queue: &self.ring.sq,
-                push_lock: &self.push_lock,
+                reserved_tail: &self.sq_reserved_tail,
                 ring_mask: self.ring.sq.ring_mask.read(),
                 ring_entries: self.ring.sq.ring_entries.read(),
             }

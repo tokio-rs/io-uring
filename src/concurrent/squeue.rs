@@ -1,15 +1,12 @@
 use std::sync::atomic;
 
 use crate::squeue::{self, Entry};
-use crate::util::unsync_load;
-
-use parking_lot::Mutex;
 
 /// An io_uring instance's submission queue. This contains all the I/O operations the application
 /// sends to the kernel.
 pub struct SubmissionQueue<'a> {
     pub(crate) queue: &'a squeue::SubmissionQueue,
-    pub(crate) push_lock: &'a Mutex<()>,
+    pub(crate) reserved_tail: &'a atomic::AtomicU32,
     pub(crate) ring_mask: u32,
     pub(crate) ring_entries: u32,
 }
@@ -40,7 +37,7 @@ impl SubmissionQueue<'_> {
     pub fn len(&self) -> usize {
         unsafe {
             let head = (*self.queue.head).load(atomic::Ordering::Acquire);
-            let tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
+            let tail = self.reserved_tail.load(atomic::Ordering::Acquire);
 
             tail.wrapping_sub(head) as usize
         }
@@ -67,18 +64,63 @@ impl SubmissionQueue<'_> {
     /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     pub unsafe fn push(&self, Entry(entry): Entry) -> Result<(), Entry> {
-        let _lock = self.push_lock.lock();
-
         let head = (*self.queue.head).load(atomic::Ordering::Acquire);
-        let tail = unsync_load(self.queue.tail);
 
-        if tail.wrapping_sub(head) == self.ring_entries {
-            return Err(Entry(entry));
+        let previous_reserved_tail = self
+            .reserved_tail
+            .fetch_update(
+                atomic::Ordering::Acquire,
+                atomic::Ordering::Relaxed,
+                |tail| {
+                    if tail.wrapping_sub(head) == self.ring_entries {
+                        None
+                    } else {
+                        Some(tail.wrapping_add(1))
+                    }
+                },
+            )
+            .map_err(|_| Entry(entry))?;
+
+        *self
+            .queue
+            .sqes
+            .add((previous_reserved_tail & self.ring_mask) as usize) = entry;
+
+        while (*self.queue.tail)
+            .compare_exchange(
+                previous_reserved_tail,
+                previous_reserved_tail.wrapping_add(1),
+                atomic::Ordering::Release,
+                atomic::Ordering::Relaxed,
+            )
+            .is_err()
+        {
+            libc::syscall(
+                libc::SYS_futex,
+                self.queue.tail,
+                libc::FUTEX_WAIT,
+                previous_reserved_tail,
+                // No timeout.
+                std::ptr::null::<libc::timespec>(),
+                // Ignored by FUTEX_WAIT.
+                std::ptr::null::<u32>(),
+                // Ignored by FUTEX_WAIt.
+                0_u32,
+            );
         }
 
-        *self.queue.sqes.add((tail & self.ring_mask) as usize) = entry;
-
-        (*self.queue.tail).store(tail.wrapping_add(1), atomic::Ordering::Release);
+        libc::syscall(
+            libc::SYS_futex,
+            self.queue.tail,
+            libc::FUTEX_WAKE,
+            i32::MAX,
+            // Ignored by FUTEX_WAKE.
+            std::ptr::null::<libc::timespec>(),
+            // Ignored by FUTEX_WAKE.
+            std::ptr::null::<u32>(),
+            // Ignored by FUTEX_WAKE.
+            0_u32,
+        );
 
         Ok(())
     }

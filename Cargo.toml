@@ -17,7 +17,7 @@ exclude = [ "loom-ringbuf" ]
 members = [ "io-uring-test", "io-uring-bench" ]
 
 [features]
-concurrent = [ "parking_lot" ]
+concurrent = []
 unstable = []
 overwrite = [ "bindgen" ]
 direct-syscall = [ "sc" ]
@@ -25,7 +25,6 @@ direct-syscall = [ "sc" ]
 [dependencies]
 libc = "0.2"
 bitflags = "1"
-parking_lot = { version = "0.11", optional = true }
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]
