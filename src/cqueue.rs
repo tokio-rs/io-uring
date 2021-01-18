@@ -36,16 +36,15 @@ pub struct AvailableQueue<'a> {
 }
 
 impl CompletionQueue {
+    #[rustfmt::skip]
     pub(crate) unsafe fn new(cq_mmap: &Mmap, p: &sys::io_uring_params) -> CompletionQueue {
-        mmap_offset! {
-            let head            = cq_mmap + p.cq_off.head           => *const atomic::AtomicU32;
-            let tail            = cq_mmap + p.cq_off.tail           => *const atomic::AtomicU32;
-            let ring_mask       = cq_mmap + p.cq_off.ring_mask      => *const u32;
-            let ring_entries    = cq_mmap + p.cq_off.ring_entries   => *const u32;
-            let overflow        = cq_mmap + p.cq_off.overflow       => *const atomic::AtomicU32;
-            let cqes            = cq_mmap + p.cq_off.cqes           => *const sys::io_uring_cqe;
-            let flags           = cq_mmap + p.cq_off.flags          => *const atomic::AtomicU32;
-        }
+        let head         = cq_mmap.get_offset(p.cq_off.head         ) as *const atomic::AtomicU32;
+        let tail         = cq_mmap.get_offset(p.cq_off.tail         ) as *const atomic::AtomicU32;
+        let ring_mask    = cq_mmap.get_offset(p.cq_off.ring_mask    ) as *const u32;
+        let ring_entries = cq_mmap.get_offset(p.cq_off.ring_entries ) as *const u32;
+        let overflow     = cq_mmap.get_offset(p.cq_off.overflow     ) as *const atomic::AtomicU32;
+        let cqes         = cq_mmap.get_offset(p.cq_off.cqes         ) as *const sys::io_uring_cqe;
+        let flags        = cq_mmap.get_offset(p.cq_off.flags        ) as *const atomic::AtomicU32;
 
         CompletionQueue {
             head,
