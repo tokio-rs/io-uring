@@ -6,6 +6,8 @@
 )]
 #![allow(clippy::unreadable_literal, clippy::missing_safety_doc)]
 
+use std::sync::atomic;
+
 use libc::*;
 
 #[cfg(all(feature = "bindgen", not(feature = "overwrite")))]
@@ -100,5 +102,37 @@ pub unsafe fn io_uring_enter(
         flags as usize,
         arg as usize,
         size,
+    ) as _
+}
+
+#[cfg(not(feature = "direct-syscall"))]
+pub unsafe fn futex(
+    futex: *const atomic::AtomicU32,
+    op: c_int,
+    val: u32,
+    timeout: *const timespec,
+    futex_2: *const atomic::AtomicU32,
+    val_3: u32,
+) -> c_long {
+    syscall(SYS_futex, futex, op, val, timeout, futex_2, val_3)
+}
+
+#[cfg(feature = "direct-syscall")]
+pub unsafe fn futex(
+    futex: *const atomic::AtomicU32,
+    op: c_int,
+    val: u32,
+    timeout: *const timespec,
+    futex_2: *const atomic::AtomicU32,
+    val_3: u32,
+) -> c_long {
+    sc::syscall6(
+        SYS_futex as usize,
+        futex as usize,
+        op as usize,
+        val as usize,
+        timeout as usize,
+        futex_2 as usize,
+        val_3 as usize,
     ) as _
 }

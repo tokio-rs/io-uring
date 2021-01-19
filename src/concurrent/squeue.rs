@@ -1,6 +1,7 @@
 use std::sync::atomic;
 
 use crate::squeue::{self, Entry};
+use crate::util::{futex_wait, futex_wake_all};
 
 /// An io_uring instance's submission queue. This contains all the I/O operations the application
 /// sends to the kernel.
@@ -86,41 +87,16 @@ impl SubmissionQueue<'_> {
             .sqes
             .add((previous_reserved_tail & self.ring_mask) as usize) = entry;
 
-        while (*self.queue.tail)
-            .compare_exchange(
-                previous_reserved_tail,
-                previous_reserved_tail.wrapping_add(1),
-                atomic::Ordering::Release,
-                atomic::Ordering::Relaxed,
-            )
-            .is_err()
-        {
-            libc::syscall(
-                libc::SYS_futex,
-                self.queue.tail,
-                libc::FUTEX_WAIT,
-                previous_reserved_tail,
-                // No timeout.
-                std::ptr::null::<libc::timespec>(),
-                // Ignored by FUTEX_WAIT.
-                std::ptr::null::<u32>(),
-                // Ignored by FUTEX_WAIt.
-                0_u32,
-            );
+        while let Err(previous_value) = (*self.queue.tail).compare_exchange(
+            previous_reserved_tail,
+            previous_reserved_tail.wrapping_add(1),
+            atomic::Ordering::Release,
+            atomic::Ordering::Relaxed,
+        ) {
+            futex_wait(self.queue.tail, previous_value);
         }
 
-        libc::syscall(
-            libc::SYS_futex,
-            self.queue.tail,
-            libc::FUTEX_WAKE,
-            i32::MAX,
-            // Ignored by FUTEX_WAKE.
-            std::ptr::null::<libc::timespec>(),
-            // Ignored by FUTEX_WAKE.
-            std::ptr::null::<u32>(),
-            // Ignored by FUTEX_WAKE.
-            0_u32,
-        );
+        futex_wake_all(self.queue.tail);
 
         Ok(())
     }
