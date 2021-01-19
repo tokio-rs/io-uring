@@ -87,16 +87,20 @@ impl SubmissionQueue<'_> {
             .sqes
             .add((previous_reserved_tail & self.ring_mask) as usize) = entry;
 
+        let new_reserved_tail = previous_reserved_tail.wrapping_add(1);
+
         while let Err(previous_value) = (*self.queue.tail).compare_exchange(
             previous_reserved_tail,
-            previous_reserved_tail.wrapping_add(1),
+            new_reserved_tail,
             atomic::Ordering::Release,
             atomic::Ordering::Relaxed,
         ) {
             futex_wait(self.queue.tail, previous_value);
         }
 
-        futex_wake_all(self.queue.tail);
+        if self.reserved_tail.load(atomic::Ordering::Acquire) != new_reserved_tail {
+            futex_wake_all(self.queue.tail);
+        }
 
         Ok(())
     }

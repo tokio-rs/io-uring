@@ -10,6 +10,7 @@ edition = "2018"
 io-uring = { path = ".." }
 criterion = "0.3"
 tempfile = "3"
+crossbeam-utils = "0.8.1"
 
 [features]
 concurrent = ["io-uring/concurrent"]
