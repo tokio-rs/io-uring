@@ -11,6 +11,9 @@ io-uring = { path = ".." }
 criterion = "0.3"
 tempfile = "3"
 
+[features]
+concurrent = ["io-uring/concurrent"]
+
 [[bench]]
 name = "nop"
 path = "src/nop.rs"

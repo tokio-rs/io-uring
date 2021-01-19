@@ -3,8 +3,6 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, mem, ptr};
 
-use crate::sys;
-
 /// A region of memory mapped using `mmap(2)`.
 pub struct Mmap {
     addr: ptr::NonNull<libc::c_void>,
@@ -120,8 +118,9 @@ pub const fn cast_ptr<T>(n: &T) -> *const T {
 }
 
 #[inline]
+#[cfg(feature = "concurrent")]
 pub unsafe fn futex_wait(futex: *const atomic::AtomicU32, current_value: u32) {
-    sys::futex(
+    crate::sys::futex(
         futex,
         libc::FUTEX_WAIT,
         current_value,
@@ -131,8 +130,9 @@ pub unsafe fn futex_wait(futex: *const atomic::AtomicU32, current_value: u32) {
     );
 }
 #[inline]
+#[cfg(feature = "concurrent")]
 pub unsafe fn futex_wake_all(futex: *const atomic::AtomicU32) {
-    sys::futex(
+    crate::sys::futex(
         futex,
         libc::FUTEX_WAKE,
         i32::MAX as u32,
