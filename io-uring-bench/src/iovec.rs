@@ -2,7 +2,7 @@ use std::io;
 use std::os::unix::io::AsRawFd;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use io_uring::{opcode, squeue, IoUring};
+use io_uring::{types, opcode, squeue, IoUring};
 use tempfile::tempfile;
 
 fn bench_iovec(c: &mut Criterion) {
@@ -29,7 +29,7 @@ fn bench_iovec(c: &mut Criterion) {
             let bufs = black_box(&bufs);
 
             let entry = opcode::Writev::new(
-                opcode::types::Fd(fd.as_raw_fd()),
+                types::Fd(fd.as_raw_fd()),
                 bufs.as_ptr() as *const _,
                 bufs.len() as _,
             );
@@ -63,7 +63,7 @@ fn bench_iovec(c: &mut Criterion) {
             let bufs = black_box(&bufs);
 
             let entry = opcode::Writev::new(
-                opcode::types::Fd(fd.as_raw_fd()),
+                types::Fd(fd.as_raw_fd()),
                 bufs.as_ptr() as *const _,
                 bufs.len() as _,
             );
@@ -97,7 +97,7 @@ fn bench_iovec(c: &mut Criterion) {
             let mut queue = ring.submission().available();
             for buf in black_box(&bufs) {
                 let entry = opcode::Write::new(
-                    opcode::types::Fd(fd.as_raw_fd()),
+                    types::Fd(fd.as_raw_fd()),
                     buf.as_ptr(),
                     buf.len() as _,
                 );
@@ -125,7 +125,7 @@ fn bench_iovec(c: &mut Criterion) {
         b.iter(|| {
             for buf in black_box(&bufs) {
                 let entry = opcode::Write::new(
-                    opcode::types::Fd(fd.as_raw_fd()),
+                    types::Fd(fd.as_raw_fd()),
                     buf.as_ptr(),
                     buf.len() as _,
                 );
