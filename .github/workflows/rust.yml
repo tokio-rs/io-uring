@@ -57,6 +57,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --target ${{ matrix.target }} --features unstable,concurrent
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --package io-uring-bench --target ${{ matrix.target }} --features concurrent
 
   fmt:
     name: fmt
