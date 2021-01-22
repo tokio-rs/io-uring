@@ -2,7 +2,6 @@
 
 use std::sync::atomic;
 
-use crate::register::Personality;
 use crate::sys;
 use crate::util::{unsync_load, Mmap};
 
@@ -268,9 +267,10 @@ impl Entry {
         self
     }
 
-    /// Set the [`Personality`] of this event.
-    pub fn personality(mut self, personality: Personality) -> Entry {
-        self.0.__bindgen_anon_4.__bindgen_anon_1.personality = personality.id;
+    /// Set the personality of this event. You can obtain a personality using
+    /// [`Submitter::register_personality`](crate::Submitter::register_personality).
+    pub fn personality(mut self, personality: u16) -> Entry {
+        self.0.__bindgen_anon_4.__bindgen_anon_1.personality = personality;
         self
     }
 }
