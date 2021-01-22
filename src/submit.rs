@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, ptr};
@@ -282,7 +281,7 @@ impl<'a> Submitter<'a> {
             ptr::null(),
             0,
         )?;
-        Ok(id.try_into().unwrap())
+        Ok(id as u16)
     }
 
     /// Unregister all previously registered buffers.
