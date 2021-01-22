@@ -1,9 +1,9 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, ptr};
+use std::convert::TryInto;
 
-use crate::register::execute;
-use crate::register::Probe;
+use crate::register::{execute, Personality, Probe};
 use crate::squeue::SubmissionQueue;
 use crate::sys;
 use crate::util::{cast_ptr, unsync_load, Fd};
@@ -267,22 +267,22 @@ impl<'a> Submitter<'a> {
     }
 
     /// Register credentials of the running application with io_uring, and get an id associated with
-    /// these credentials. This ID can then be passed into submission queue entries to issue the
-    /// request with this process' credentials (although this library does not currently support
-    /// that).
+    /// these credentials. This ID can then be [passed](crate::squeue::Entry::personality) into
+    /// submission queue entries to issue the request with this process' credentials.
     ///
     /// By default, if [`Parameters::is_feature_cur_personality`] is set then requests will use the
     /// credentials of the task that called [`Submitter::enter`], otherwise they will use the
     /// credentials of the task that originally registered the io_uring.
     ///
     /// [`Parameters::is_feature_cur_personality`]: crate::Parameters::is_feature_cur_personality
-    pub fn register_personality(&self) -> io::Result<i32> {
-        execute(
+    pub fn register_personality(&self) -> io::Result<Personality> {
+        let id = execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_PERSONALITY,
             ptr::null(),
             0,
-        )
+        )?;
+        Ok(Personality { id: id.try_into().unwrap() })
     }
 
     /// Unregister all previously registered buffers.
@@ -325,12 +325,12 @@ impl<'a> Submitter<'a> {
     }
 
     /// Unregister a previously registered personality.
-    pub fn unregister_personality(&self, id: i32) -> io::Result<()> {
+    pub fn unregister_personality(&self, personality: Personality) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_UNREGISTER_PERSONALITY,
             ptr::null(),
-            id as _,
+            personality.id as _,
         )
         .map(drop)
     }

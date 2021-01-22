@@ -3,6 +3,7 @@
 use std::sync::atomic;
 
 use crate::sys;
+use crate::register::Personality;
 use crate::util::{unsync_load, Mmap};
 
 use bitflags::bitflags;
@@ -264,6 +265,12 @@ impl Entry {
     /// through into the [completion queue entry](crate::cqueue::Entry::user_data).
     pub fn user_data(mut self, user_data: u64) -> Entry {
         self.0.user_data = user_data;
+        self
+    }
+
+    /// Set the [`Personality`] of this event.
+    pub fn personality(mut self, personality: Personality) -> Entry {
+        self.0.__bindgen_anon_4.__bindgen_anon_1.personality = personality.id;
         self
     }
 }

@@ -85,6 +85,14 @@ impl Drop for Probe {
     }
 }
 
+/// An id associated with the credentials of the current process. After [registering](crate::Submitter::register_personality)
+/// the id, it can be [passed](crate::squeue::Entry::personality) into submission queue entries
+/// to issue the request with the process' credentials.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Personality {
+    pub(crate) id: u16,
+}
+
 /// An allowed feature of io_uring. You can set the allowed features with
 /// [`register_restrictions`](crate::Submitter::register_restrictions).
 ///

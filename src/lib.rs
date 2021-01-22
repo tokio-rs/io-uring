@@ -22,7 +22,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::{cmp, io, mem};
 
 pub use cqueue::CompletionQueue;
-pub use register::Probe;
+pub use register::{Personality, Probe};
 pub use squeue::SubmissionQueue;
 pub use submit::Submitter;
 use util::{Fd, Mmap};
