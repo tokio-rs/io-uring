@@ -266,4 +266,14 @@ impl Entry {
         self.0.user_data = user_data;
         self
     }
+
+    /// Set the personality of this event. You can obtain a personality using
+    /// [`Submitter::register_personality`](crate::Submitter::register_personality).
+    ///
+    /// Requires the `unstable` feature.
+    #[cfg(feature = "unstable")]
+    pub fn personality(mut self, personality: u16) -> Entry {
+        self.0.__bindgen_anon_4.__bindgen_anon_1.personality = personality;
+        self
+    }
 }
