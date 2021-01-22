@@ -1,7 +1,7 @@
+use std::convert::TryInto;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, ptr};
-use std::convert::TryInto;
 
 use crate::register::{execute, Personality, Probe};
 use crate::squeue::SubmissionQueue;
@@ -282,7 +282,9 @@ impl<'a> Submitter<'a> {
             ptr::null(),
             0,
         )?;
-        Ok(Personality { id: id.try_into().unwrap() })
+        Ok(Personality {
+            id: id.try_into().unwrap(),
+        })
     }
 
     /// Unregister all previously registered buffers.

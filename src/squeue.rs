@@ -2,8 +2,8 @@
 
 use std::sync::atomic;
 
-use crate::sys;
 use crate::register::Personality;
+use crate::sys;
 use crate::util::{unsync_load, Mmap};
 
 use bitflags::bitflags;
