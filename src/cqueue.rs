@@ -107,6 +107,7 @@ impl CompletionQueue {
     }
 
     /// Take a snapshot of the completion queue.
+    #[inline]
     pub fn available(&mut self) -> AvailableQueue<'_> {
         unsafe {
             AvailableQueue {
@@ -122,6 +123,7 @@ impl CompletionQueue {
 
 impl AvailableQueue<'_> {
     /// Synchronize this snapshot with the real queue.
+    #[inline]
     pub fn sync(&mut self) {
         unsafe {
             (*self.queue.head).store(self.head, atomic::Ordering::Release);
@@ -154,12 +156,13 @@ impl ExactSizeIterator for AvailableQueue<'_> {
 impl Iterator for AvailableQueue<'_> {
     type Item = Entry;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.head != self.tail {
             unsafe {
-                let entry = self.queue.cqes.add((self.head & self.ring_mask) as usize);
+                let entry = *self.queue.cqes.add((self.head & self.ring_mask) as usize);
                 self.head = self.head.wrapping_add(1);
-                Some(Entry(*entry))
+                Some(Entry(entry))
             }
         } else {
             None
@@ -168,6 +171,7 @@ impl Iterator for AvailableQueue<'_> {
 }
 
 impl Drop for AvailableQueue<'_> {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             (*self.queue.head).store(self.head, atomic::Ordering::Release);
@@ -178,12 +182,14 @@ impl Drop for AvailableQueue<'_> {
 impl Entry {
     /// The operation-specific result code. For example, for a [`Read`](crate::opcode::Read)
     /// operation this is equivalent to the return value of the `read(2)` system call.
+    #[inline]
     pub fn result(&self) -> i32 {
         self.0.res
     }
 
     /// The user data of the request, as set by
     /// [`Entry::user_data`](crate::squeue::Entry::user_data) on the submission queue event.
+    #[inline]
     pub fn user_data(&self) -> u64 {
         self.0.user_data
     }
@@ -193,6 +199,7 @@ impl Entry {
     /// This is currently used for:
     /// - Storing the selected buffer ID, if one was selected. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
+    #[inline]
     pub fn flags(&self) -> u32 {
         self.0.flags
     }

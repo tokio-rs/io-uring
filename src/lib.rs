@@ -288,7 +288,6 @@ impl Builder {
 
     /// Build an [IoUring], with the specified number of entries in the submission queue and
     /// completion queue unless [`setup_cqsize`](Self::setup_cqsize) has been called.
-    #[inline]
     pub fn build(&self, entries: u32) -> io::Result<IoUring> {
         let ring = IoUring::with_params(entries, self.params)?;
 

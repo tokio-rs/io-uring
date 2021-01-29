@@ -180,6 +180,7 @@ impl SubmissionQueue {
     }
 
     /// Take a snapshot of the submission queue.
+    #[inline]
     pub fn available(&mut self) -> AvailableQueue<'_> {
         unsafe {
             AvailableQueue {
@@ -195,6 +196,7 @@ impl SubmissionQueue {
 
 impl AvailableQueue<'_> {
     /// Synchronize this snapshot with the real queue.
+    #[inline]
     pub fn sync(&mut self) {
         unsafe {
             (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
@@ -234,6 +236,7 @@ impl AvailableQueue<'_> {
     ///
     /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
+    #[inline]
     pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
         if !self.is_full() {
             *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = entry;
@@ -246,6 +249,7 @@ impl AvailableQueue<'_> {
 }
 
 impl Drop for AvailableQueue<'_> {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
@@ -255,6 +259,7 @@ impl Drop for AvailableQueue<'_> {
 
 impl Entry {
     /// Set the submission event's [flags](Flags).
+    #[inline]
     pub fn flags(mut self, flags: Flags) -> Entry {
         self.0.flags |= flags.bits();
         self
@@ -262,6 +267,7 @@ impl Entry {
 
     /// Set the user data. This is an application-supplied value that will be passed straight
     /// through into the [completion queue entry](crate::cqueue::Entry::user_data).
+    #[inline]
     pub fn user_data(mut self, user_data: u64) -> Entry {
         self.0.user_data = user_data;
         self

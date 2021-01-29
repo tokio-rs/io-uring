@@ -152,16 +152,16 @@ impl Timespec {
 
 #[cfg(feature = "unstable")]
 #[derive(Default, Debug, Clone, Copy)]
-pub struct Args<'s, 't> {
+pub struct SubmitArgs<'s, 't> {
     pub(crate) args: sys::io_uring_getevents_arg,
     sigmask: PhantomData<&'s libc::sigset_t>,
     timespec: PhantomData<&'t Timespec>,
 }
 
 #[cfg(feature = "unstable")]
-impl<'s, 't> Args<'s, 't> {
+impl<'s, 't> SubmitArgs<'s, 't> {
     #[inline]
-    pub const fn new() -> Args<'static, 'static> {
+    pub const fn new() -> SubmitArgs<'static, 'static> {
         let args = sys::io_uring_getevents_arg {
             sigmask: 0,
             sigmask_sz: 0,
@@ -169,7 +169,7 @@ impl<'s, 't> Args<'s, 't> {
             ts: 0,
         };
 
-        Args {
+        SubmitArgs {
             args,
             sigmask: PhantomData,
             timespec: PhantomData,
@@ -177,11 +177,11 @@ impl<'s, 't> Args<'s, 't> {
     }
 
     #[inline]
-    pub fn sigmask<'s2>(mut self, sigmask: &'s2 libc::sigset_t) -> Args<'s2, 't> {
+    pub fn sigmask<'s2>(mut self, sigmask: &'s2 libc::sigset_t) -> SubmitArgs<'s2, 't> {
         self.args.sigmask = cast_ptr(sigmask) as _;
         self.args.sigmask_sz = std::mem::size_of::<libc::sigset_t>() as _;
 
-        Args {
+        SubmitArgs {
             args: self.args,
             sigmask: PhantomData,
             timespec: self.timespec,
@@ -189,10 +189,10 @@ impl<'s, 't> Args<'s, 't> {
     }
 
     #[inline]
-    pub fn timespec<'t2>(mut self, timespec: &'t2 Timespec) -> Args<'s, 't2> {
+    pub fn timespec<'t2>(mut self, timespec: &'t2 Timespec) -> SubmitArgs<'s, 't2> {
         self.args.ts = cast_ptr(timespec) as _;
 
-        Args {
+        SubmitArgs {
             args: self.args,
             sigmask: self.sigmask,
             timespec: PhantomData,
