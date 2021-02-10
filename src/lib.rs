@@ -222,7 +222,13 @@ impl IoUring {
 
     #[inline]
     #[cfg(feature = "unstable")]
-    pub fn owned_split(self) -> (ownedsplit::SubmissionUring, ownedsplit::CompletionUring) {
+    pub fn owned_split(
+        self,
+    ) -> (
+        ownedsplit::SubmitterUring,
+        ownedsplit::SubmissionUring,
+        ownedsplit::CompletionUring,
+    ) {
         ownedsplit::split(self)
     }
 }
