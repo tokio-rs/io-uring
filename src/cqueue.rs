@@ -38,13 +38,13 @@ pub struct AvailableQueue<'a> {
 impl CompletionQueue {
     #[rustfmt::skip]
     pub(crate) unsafe fn new(cq_mmap: &Mmap, p: &sys::io_uring_params) -> CompletionQueue {
-        let head         = cq_mmap.get_offset(p.cq_off.head         ) as *const atomic::AtomicU32;
-        let tail         = cq_mmap.get_offset(p.cq_off.tail         ) as *const atomic::AtomicU32;
-        let ring_mask    = cq_mmap.get_offset(p.cq_off.ring_mask    ) as *const u32;
-        let ring_entries = cq_mmap.get_offset(p.cq_off.ring_entries ) as *const u32;
-        let overflow     = cq_mmap.get_offset(p.cq_off.overflow     ) as *const atomic::AtomicU32;
-        let cqes         = cq_mmap.get_offset(p.cq_off.cqes         ) as *const sys::io_uring_cqe;
-        let flags        = cq_mmap.get_offset(p.cq_off.flags        ) as *const atomic::AtomicU32;
+        let head         = cq_mmap.offset(p.cq_off.head         ) as *const atomic::AtomicU32;
+        let tail         = cq_mmap.offset(p.cq_off.tail         ) as *const atomic::AtomicU32;
+        let ring_mask    = cq_mmap.offset(p.cq_off.ring_mask    ) as *const u32;
+        let ring_entries = cq_mmap.offset(p.cq_off.ring_entries ) as *const u32;
+        let overflow     = cq_mmap.offset(p.cq_off.overflow     ) as *const atomic::AtomicU32;
+        let cqes         = cq_mmap.offset(p.cq_off.cqes         ) as *const sys::io_uring_cqe;
+        let flags        = cq_mmap.offset(p.cq_off.flags        ) as *const atomic::AtomicU32;
 
         CompletionQueue {
             head,

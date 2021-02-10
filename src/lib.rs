@@ -13,6 +13,9 @@ mod submit;
 mod sys;
 pub mod types;
 
+#[cfg(feature = "unstable")]
+pub mod ownedsplit;
+
 #[cfg(feature = "concurrent")]
 pub mod concurrent;
 
@@ -29,11 +32,15 @@ use util::{Fd, Mmap};
 
 /// IoUring instance
 pub struct IoUring {
+    inner: Inner,
+    sq: SubmissionQueue,
+    cq: CompletionQueue,
+}
+
+struct Inner {
     fd: Fd,
     params: Parameters,
     memory: ManuallyDrop<MemoryMap>,
-    sq: SubmissionQueue,
-    cq: CompletionQueue,
 }
 
 #[allow(dead_code)]
@@ -125,11 +132,13 @@ impl IoUring {
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
         Ok(IoUring {
-            fd,
+            inner: Inner {
+                fd,
+                params: Parameters(p),
+                memory: ManuallyDrop::new(mm),
+            },
             sq,
-            cq,
-            params: Parameters(p),
-            memory: ManuallyDrop::new(mm),
+            cq
         })
     }
 
@@ -137,13 +146,19 @@ impl IoUring {
     /// events to the kernel for execution and to register files or buffers with it.
     #[inline]
     pub fn submitter(&self) -> Submitter<'_> {
-        Submitter::new(&self.fd, &self.params, &self.sq)
+        Submitter::new(
+            &self.inner.fd,
+            &self.inner.params,
+            self.sq.head,
+            self.sq.tail,
+            self.sq.flags
+        )
     }
 
     /// Get the parameters that were used to construct this instance.
     #[inline]
     pub fn params(&self) -> &Parameters {
-        &self.params
+        &self.inner.params
     }
 
     /// Initiate and/or complete asynchronous I/O. See [`Submitter::enter`] for more details.
@@ -178,7 +193,13 @@ impl IoUring {
     /// Get the submitter, submission queue and completion queue of the io_uring instance. This can
     /// be used to operate on the different parts of the io_uring instance independently.
     pub fn split(&mut self) -> (Submitter<'_>, &mut SubmissionQueue, &mut CompletionQueue) {
-        let submit = Submitter::new(&self.fd, &self.params, &self.sq);
+        let submit = Submitter::new(
+            &self.inner.fd,
+            &self.inner.params,
+            self.sq.head,
+            self.sq.tail,
+            self.sq.flags
+        );
         (submit, &mut self.sq, &mut self.cq)
     }
 
@@ -198,10 +219,17 @@ impl IoUring {
     pub fn concurrent(self) -> concurrent::IoUring {
         concurrent::IoUring::new(self)
     }
+
+    #[inline]
+    #[cfg(feature = "unstable")]
+    pub fn owned_split(self) -> (ownedsplit::SubmissionUring, ownedsplit::CompletionUring) {
+        ownedsplit::split(self)
+    }
 }
 
-impl Drop for IoUring {
+impl Drop for Inner {
     fn drop(&mut self) {
+        // Ensure that `MemoryMap` is released before `fd`.
         unsafe {
             ManuallyDrop::drop(&mut self.memory);
         }
@@ -292,9 +320,9 @@ impl Builder {
         let ring = IoUring::with_params(entries, self.params)?;
 
         if self.dontfork {
-            ring.memory.sq_mmap.dontfork()?;
-            ring.memory.sqe_mmap.dontfork()?;
-            if let Some(cq_mmap) = ring.memory.cq_mmap.as_ref() {
+            ring.inner.memory.sq_mmap.dontfork()?;
+            ring.inner.memory.sqe_mmap.dontfork()?;
+            if let Some(cq_mmap) = ring.inner.memory.cq_mmap.as_ref() {
                 cq_mmap.dontfork()?;
             }
         }
@@ -400,6 +428,6 @@ impl Parameters {
 
 impl AsRawFd for IoUring {
     fn as_raw_fd(&self) -> RawFd {
-        self.fd.as_raw_fd()
+        self.inner.fd.as_raw_fd()
     }
 }
