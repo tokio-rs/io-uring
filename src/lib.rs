@@ -138,7 +138,7 @@ impl IoUring {
                 memory: ManuallyDrop::new(mm),
             },
             sq,
-            cq
+            cq,
         })
     }
 
@@ -151,7 +151,7 @@ impl IoUring {
             &self.inner.params,
             self.sq.head,
             self.sq.tail,
-            self.sq.flags
+            self.sq.flags,
         )
     }
 
@@ -198,7 +198,7 @@ impl IoUring {
             &self.inner.params,
             self.sq.head,
             self.sq.tail,
-            self.sq.flags
+            self.sq.flags,
         );
         (submit, &mut self.sq, &mut self.cq)
     }

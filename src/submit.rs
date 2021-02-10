@@ -36,7 +36,13 @@ impl<'a> Submitter<'a> {
         sq_tail: *const atomic::AtomicU32,
         sq_flags: *const atomic::AtomicU32,
     ) -> Submitter<'a> {
-        Submitter { fd, params, sq_head, sq_tail, sq_flags }
+        Submitter {
+            fd,
+            params,
+            sq_head,
+            sq_tail,
+            sq_flags,
+        }
     }
 
     fn sq_len(&self) -> usize {

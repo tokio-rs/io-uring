@@ -1,14 +1,9 @@
-use std::sync::{ atomic, Arc };
-use crate::{
-    IoUring, Inner,
-    Submitter, SubmissionQueue, CompletionQueue
-};
-
-
+use crate::{CompletionQueue, Inner, IoUring, SubmissionQueue, Submitter};
+use std::sync::{atomic, Arc};
 
 pub struct SubmissionUring {
     _inner: Arc<Inner>,
-    sq: SubmissionQueue
+    sq: SubmissionQueue,
 }
 
 pub struct CompletionUring {
@@ -34,7 +29,7 @@ pub(crate) fn split(ring: IoUring) -> (SubmissionUring, CompletionUring) {
     };
     let su = SubmissionUring {
         _inner: inner2,
-        sq: ring.sq
+        sq: ring.sq,
     };
 
     (su, cu)
@@ -63,7 +58,7 @@ impl CompletionUring {
             &self.inner.params,
             self.sq_head,
             self.sq_tail,
-            self.sq_flags
+            self.sq_flags,
         )
     }
 
@@ -75,7 +70,7 @@ impl CompletionUring {
             &self.inner.params,
             self.sq_head,
             self.sq_tail,
-            self.sq_flags
+            self.sq_flags,
         );
         (submit, &mut self.cq)
     }
