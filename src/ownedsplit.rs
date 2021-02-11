@@ -1,6 +1,7 @@
 use crate::{CompletionQueue, Inner, IoUring, SubmissionQueue, Submitter};
 use std::sync::{atomic, Arc};
 
+#[derive(Clone)]
 pub struct SubmitterUring {
     inner: Arc<Inner>,
 
@@ -18,6 +19,10 @@ pub struct CompletionUring {
     _inner: Arc<Inner>,
     cq: CompletionQueue,
 }
+
+/// Safety: This only allows execution of syscall and atomic reads, so it is thread-safe.
+unsafe impl Send for SubmitterUring {}
+unsafe impl Sync for SubmitterUring {}
 
 pub(crate) fn split(ring: IoUring) -> (SubmitterUring, SubmissionUring, CompletionUring) {
     let inner = Arc::new(ring.inner);
