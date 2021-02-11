@@ -24,6 +24,9 @@ pub struct CompletionUring {
 unsafe impl Send for SubmitterUring {}
 unsafe impl Sync for SubmitterUring {}
 
+unsafe impl Send for SubmissionUring {}
+unsafe impl Send for CompletionUring {}
+
 pub(crate) fn split(ring: IoUring) -> (SubmitterUring, SubmissionUring, CompletionUring) {
     let inner = Arc::new(ring.inner);
     let inner2 = Arc::clone(&inner);
