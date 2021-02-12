@@ -13,7 +13,7 @@ categories = [ "asynchronous", "network-programming", "filesystem" ]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-exclude = [ "loom-ringbuf" ]
+exclude = []
 members = [ "io-uring-test", "io-uring-bench" ]
 
 [features]
