@@ -57,8 +57,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: bench
-          use-cross: true
-          args: --package io-uring-test --bench iai_new_nop
+          args: --package io-uring-bench --bench iai_new_nop
 
   check:
     runs-on: ubuntu-latest

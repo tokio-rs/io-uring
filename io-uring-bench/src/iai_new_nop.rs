@@ -1,6 +1,5 @@
 use criterion::black_box;
 
-
 const N: usize = 8;
 
 fn bench_io_uring() {
@@ -12,13 +11,9 @@ fn bench_io_uring() {
         let mut sq = io_uring.submission().available();
 
         for i in 0..N {
-            let nop_e = opcode::Nop::new()
-                .build()
-                .user_data(black_box(i as _));
+            let nop_e = opcode::Nop::new().build().user_data(black_box(i as _));
             unsafe {
-                sq.push(nop_e)
-                    .ok()
-                    .unwrap();
+                sq.push(nop_e).ok().unwrap();
             }
         }
 
@@ -52,14 +47,12 @@ fn bench_iou() {
 
         sq.submit_and_wait(N as _).unwrap();
 
-        io_uring.cqes()
-            .map(black_box)
-            .for_each(drop);
+        io_uring.cqes().map(black_box).for_each(drop);
     }
 }
 
 fn bench_uring_sys() {
-    use std::{ mem, ptr };
+    use std::{mem, ptr};
     use uring_sys::*;
 
     let mut io_uring = mem::MaybeUninit::<io_uring>::uninit();
@@ -98,7 +91,7 @@ fn bench_uring_sys() {
                 io_uring_peek_cqe(&mut io_uring, &mut cqe);
 
                 if cqe.is_null() {
-                    break
+                    break;
                 }
 
                 black_box(cqe);
@@ -110,7 +103,7 @@ fn bench_uring_sys() {
 }
 
 fn bench_uring_sys_batch() {
-    use std::{ mem, ptr };
+    use std::{mem, ptr};
     use uring_sys::*;
 
     let mut io_uring = mem::MaybeUninit::<io_uring>::uninit();
@@ -153,11 +146,13 @@ fn bench_uring_sys_batch() {
             io_uring_cq_advance(&mut io_uring, 8);
         }
 
-        cqes.iter()
-            .copied()
-            .map(black_box)
-            .for_each(drop);
+        cqes.iter().copied().map(black_box).for_each(drop);
     }
 }
 
-iai::main!(bench_io_uring, bench_iou, bench_uring_sys, bench_uring_sys_batch);
+iai::main!(
+    bench_io_uring,
+    bench_iou,
+    bench_uring_sys,
+    bench_uring_sys_batch
+);
