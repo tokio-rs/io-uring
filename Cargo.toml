@@ -17,7 +17,6 @@ exclude = [ "loom-ringbuf" ]
 members = [ "io-uring-test", "io-uring-bench" ]
 
 [features]
-concurrent = [ "parking_lot" ]
 unstable = []
 overwrite = [ "bindgen" ]
 direct-syscall = [ "sc" ]

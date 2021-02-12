@@ -16,9 +16,6 @@ pub mod types;
 #[cfg(feature = "unstable")]
 pub mod ownedsplit;
 
-#[cfg(feature = "concurrent")]
-pub mod concurrent;
-
 use std::convert::TryInto;
 use std::mem::ManuallyDrop;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -212,12 +209,6 @@ impl IoUring {
     /// Get completion queue. This is used to receive I/O completion events from the kernel.
     pub fn completion(&mut self) -> &mut CompletionQueue {
         &mut self.cq
-    }
-
-    /// Make this `IoUring` instance concurrent.
-    #[cfg(feature = "concurrent")]
-    pub fn concurrent(self) -> concurrent::IoUring {
-        concurrent::IoUring::new(self)
     }
 
     #[inline]
