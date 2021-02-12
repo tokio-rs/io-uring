@@ -10,7 +10,10 @@ edition = "2018"
 
 [dependencies]
 io-uring = { path = ".." }
+iou = "0.3"
+uring-sys = "0.7"
 criterion = "0.3"
+iai = "0.1"
 tempfile = "3"
 
 [[bench]]
@@ -21,4 +24,9 @@ harness = false
 [[bench]]
 name = "iovec"
 path = "src/iovec.rs"
+harness = false
+
+[[bench]]
+name = "iai_new_nop"
+path = "src/iai_new_nop.rs"
 harness = false
