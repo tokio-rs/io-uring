@@ -1,6 +1,5 @@
-use std::thread;
 use io_uring::{opcode, IoUring};
-
+use std::thread;
 
 pub fn main(ring: IoUring) -> anyhow::Result<()> {
     test_nop(ring)?;

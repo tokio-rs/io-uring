@@ -1,6 +1,6 @@
 mod helper;
-mod tests;
 mod ownedsplit;
+mod tests;
 
 use io_uring::{opcode, IoUring, Probe};
 
