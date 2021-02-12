@@ -17,6 +17,10 @@ fn main() -> anyhow::Result<()> {
     if probe.is_supported(opcode::Write::CODE) && probe.is_supported(opcode::Read::CODE) {
         tests::fs::test_file_write_read(&mut ring)?;
         tests::net::test_tcp_write_read(&mut ring)?;
+
+        if ring.params().is_feature_rw_cur_pos() {
+            tests::fs::test_file_cur_pos(&mut ring)?;
+        }
     }
 
     if probe.is_supported(opcode::Writev::CODE) && probe.is_supported(opcode::Readv::CODE) {

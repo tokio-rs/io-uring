@@ -21,7 +21,7 @@ pub fn test_tcp_write_read(ring: &mut IoUring) -> anyhow::Result<()> {
 }
 
 pub fn test_tcp_writev_readv(ring: &mut IoUring) -> anyhow::Result<()> {
-    println!("test tcp_write_read");
+    println!("test tcp_writev_readv");
 
     let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
 

@@ -21,7 +21,7 @@ pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> an
             .expect("queue is full");
     }
 
-    ring.submit_and_wait(2)?;
+    assert_eq!(ring.submit_and_wait(2)?, 2);
 
     let cqes = ring.completion().available().collect::<Vec<_>>();
 
