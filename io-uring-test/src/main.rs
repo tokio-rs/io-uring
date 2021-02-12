@@ -1,4 +1,5 @@
 mod helper;
+mod ownedsplit;
 mod tests;
 
 use io_uring::{opcode, IoUring, Probe};
@@ -81,5 +82,5 @@ fn main() -> anyhow::Result<()> {
         tests::net::test_tcp_sendmsg_recvmsg(&mut ring)?;
     }
 
-    Ok(())
+    ownedsplit::main(ring)
 }

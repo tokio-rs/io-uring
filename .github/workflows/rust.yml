@@ -25,7 +25,7 @@ jobs:
         with:
           command: test
           use-cross: true
-          args: --features unstable,concurrent --target ${{ matrix.target }}
+          args: --features unstable --target ${{ matrix.target }}
       - uses: actions-rs/cargo@v1
         with:
           command: run
@@ -56,11 +56,11 @@ jobs:
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --target ${{ matrix.target }} --features unstable,concurrent
+          args: --target ${{ matrix.target }} --features unstable
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --package io-uring-bench --target ${{ matrix.target }} --features concurrent
+          args: --package io-uring-bench --target ${{ matrix.target }}
 
   fmt:
     name: fmt

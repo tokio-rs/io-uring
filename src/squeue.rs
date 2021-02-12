@@ -103,13 +103,13 @@ impl SubmissionQueue {
         sqe_mmap: &Mmap,
         p: &sys::io_uring_params,
     ) -> SubmissionQueue {
-        let head         = sq_mmap.get_offset(p.sq_off.head        ) as *const atomic::AtomicU32;
-        let tail         = sq_mmap.get_offset(p.sq_off.tail        ) as *const atomic::AtomicU32;
-        let ring_mask    = sq_mmap.get_offset(p.sq_off.ring_mask   ) as *const u32;
-        let ring_entries = sq_mmap.get_offset(p.sq_off.ring_entries) as *const u32;
-        let flags        = sq_mmap.get_offset(p.sq_off.flags       ) as *const atomic::AtomicU32;
-        let dropped      = sq_mmap.get_offset(p.sq_off.dropped     ) as *const atomic::AtomicU32;
-        let array        = sq_mmap.get_offset(p.sq_off.array       ) as *mut u32;
+        let head         = sq_mmap.offset(p.sq_off.head        ) as *const atomic::AtomicU32;
+        let tail         = sq_mmap.offset(p.sq_off.tail        ) as *const atomic::AtomicU32;
+        let ring_mask    = sq_mmap.offset(p.sq_off.ring_mask   ) as *const u32;
+        let ring_entries = sq_mmap.offset(p.sq_off.ring_entries) as *const u32;
+        let flags        = sq_mmap.offset(p.sq_off.flags       ) as *const atomic::AtomicU32;
+        let dropped      = sq_mmap.offset(p.sq_off.dropped     ) as *const atomic::AtomicU32;
+        let array        = sq_mmap.offset(p.sq_off.array       ) as *mut u32;
 
         let sqes         = sqe_mmap.as_mut_ptr() as *mut sys::io_uring_sqe;
 

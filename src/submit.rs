@@ -3,7 +3,6 @@ use std::sync::atomic;
 use std::{io, ptr};
 
 use crate::register::{execute, Probe};
-use crate::squeue::SubmissionQueue;
 use crate::sys;
 use crate::util::{cast_ptr, unsync_load, Fd};
 use crate::Parameters;
@@ -33,14 +32,16 @@ impl<'a> Submitter<'a> {
     pub(crate) const fn new(
         fd: &'a Fd,
         params: &'a Parameters,
-        sq: &SubmissionQueue,
+        sq_head: *const atomic::AtomicU32,
+        sq_tail: *const atomic::AtomicU32,
+        sq_flags: *const atomic::AtomicU32,
     ) -> Submitter<'a> {
         Submitter {
             fd,
             params,
-            sq_head: sq.head,
-            sq_tail: sq.tail,
-            sq_flags: sq.flags,
+            sq_head,
+            sq_tail,
+            sq_flags,
         }
     }
 

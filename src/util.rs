@@ -47,7 +47,7 @@ impl Mmap {
 
     /// Get a pointer to the data at the given offset.
     #[inline]
-    pub unsafe fn get_offset(&self, offset: u32) -> *mut libc::c_void {
+    pub unsafe fn offset(&self, offset: u32) -> *mut libc::c_void {
         self.as_mut_ptr().add(offset as usize)
     }
 }
@@ -109,7 +109,7 @@ impl Drop for Fd {
 
 #[inline(always)]
 pub unsafe fn unsync_load(u: *const atomic::AtomicU32) -> u32 {
-    u.cast::<u32>().read()
+    *u.cast::<u32>()
 }
 
 #[inline]
