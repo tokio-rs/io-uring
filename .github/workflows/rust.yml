@@ -32,7 +32,7 @@ jobs:
           use-cross: true
           args: --package io-uring-test --target ${{ matrix.target }}
 
-  bench:
+  check-bench:
     runs-on: ubuntu-latest
 
     strategy:
@@ -43,9 +43,6 @@ jobs:
           - x86_64-unknown-linux-gnu
 
     steps:
-      - run: sudo apt-get update
-      - run: sudo apt install -y valgrind
-
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
         with:
@@ -57,10 +54,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --package io-uring-bench
-      - uses: actions-rs/cargo@v1
-        with:
-          command: bench
-          args: --package io-uring-bench --bench iai_new_nop
 
   check:
     runs-on: ubuntu-latest
