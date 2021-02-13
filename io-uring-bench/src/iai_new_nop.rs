@@ -31,8 +31,8 @@ fn bench_io_uring() {
 }
 
 fn bench_io_uring_batch() {
-    use std::mem;
     use io_uring::{opcode, IoUring};
+    use std::mem;
 
     let mut io_uring = IoUring::new(N as _).unwrap();
     let sqes = [
@@ -58,7 +58,8 @@ fn bench_io_uring_batch() {
 
     for _ in 0..ITER {
         unsafe {
-            io_uring.submission()
+            io_uring
+                .submission()
                 .available()
                 .push_multiple(&sqes)
                 .ok()
@@ -67,16 +68,11 @@ fn bench_io_uring_batch() {
 
         io_uring.submit_and_wait(N).unwrap();
 
-        let n = io_uring
-            .completion()
-            .available()
-            .fill(&mut cqes);
+        let n = io_uring.completion().available().fill(&mut cqes);
 
         assert_eq!(n, N);
 
-        cqes.iter()
-            .map(black_box)
-            .for_each(drop);
+        cqes.iter().map(black_box).for_each(drop);
     }
 }
 

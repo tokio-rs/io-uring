@@ -34,9 +34,7 @@ pub fn test_batch(ring: &mut IoUring) -> anyhow::Result<()> {
 
         assert_eq!(sq.capacity(), 8);
 
-        sq.push_multiple(&sqes)
-            .ok()
-            .unwrap();
+        sq.push_multiple(&sqes).ok().unwrap();
 
         assert_eq!(sq.len(), 5);
 
@@ -45,9 +43,7 @@ pub fn test_batch(ring: &mut IoUring) -> anyhow::Result<()> {
 
         assert_eq!(sq.len(), 5);
 
-        sq.push_multiple(&sqes[..3])
-            .ok()
-            .unwrap();
+        sq.push_multiple(&sqes[..3]).ok().unwrap();
     }
 
     ring.submit_and_wait(8)?;
@@ -59,9 +55,7 @@ pub fn test_batch(ring: &mut IoUring) -> anyhow::Result<()> {
     assert_eq!(n, 8);
 
     for entry in cqes.into_iter().take(8) {
-        let entry = unsafe {
-            entry.assume_init()
-        };
+        let entry = unsafe { entry.assume_init() };
 
         assert_eq!(entry.user_data(), 0x09);
     }

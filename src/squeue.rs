@@ -258,7 +258,9 @@ impl AvailableQueue<'_> {
         for i in 0..len {
             let tail = self.tail + i;
             let Entry(entry) = &entries[i as usize];
-            self.queue.sqes.add((tail & self.ring_mask) as usize)
+            self.queue
+                .sqes
+                .add((tail & self.ring_mask) as usize)
                 .copy_from_nonoverlapping(entry, 1);
         }
 
