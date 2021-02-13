@@ -174,7 +174,7 @@ impl Timespec {
 pub struct SubmitArgs<'prev: 'now, 'now> {
     pub(crate) args: sys::io_uring_getevents_arg,
     prev: PhantomData<&'prev ()>,
-    now: PhantomData<&'now ()>
+    now: PhantomData<&'now ()>,
 }
 
 #[cfg(feature = "unstable")]
@@ -191,7 +191,7 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
         SubmitArgs {
             args,
             prev: PhantomData,
-            now: PhantomData
+            now: PhantomData,
         }
     }
 
@@ -203,7 +203,7 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
         SubmitArgs {
             args: self.args,
             prev: self.now,
-            now: PhantomData
+            now: PhantomData,
         }
     }
 
@@ -214,7 +214,7 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
         SubmitArgs {
             args: self.args,
             prev: self.now,
-            now: PhantomData
+            now: PhantomData,
         }
     }
 }
