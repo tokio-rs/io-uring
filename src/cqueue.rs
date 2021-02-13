@@ -144,6 +144,23 @@ impl AvailableQueue<'_> {
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }
+
+    #[inline]
+    pub fn fill(&mut self, entries: &mut [std::mem::MaybeUninit<Entry>]) -> usize {
+        let len = std::cmp::min(self.len(), entries.len()) as u32;
+
+        for i in 0..len {
+            unsafe {
+                let head = self.head + i;
+                let entry = self.queue.cqes.add((head & self.ring_mask) as usize);
+                entries[i as usize].as_mut_ptr().copy_from_nonoverlapping(entry.cast(), 1);
+            }
+        }
+
+        self.head = self.head.wrapping_add(len);
+
+        len as usize
+    }
 }
 
 impl ExactSizeIterator for AvailableQueue<'_> {

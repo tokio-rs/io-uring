@@ -246,6 +246,26 @@ impl AvailableQueue<'_> {
             Err(Entry(entry))
         }
     }
+
+    #[inline]
+    pub unsafe fn push_multiple(&mut self, entries: &[Entry]) -> Result<(), Insufficient> {
+        if (self.capacity() - self.len()) < entries.len() {
+            return Err(Insufficient(()));
+        }
+
+        let len = entries.len() as u32;
+
+        for i in 0..len {
+            let tail = self.tail + i;
+            let Entry(entry) = &entries[i as usize];
+            self.queue.sqes.add((tail & self.ring_mask) as usize)
+                .copy_from_nonoverlapping(entry, 1);
+        }
+
+        self.tail = self.tail.wrapping_add(len);
+
+        Ok(())
+    }
 }
 
 impl Drop for AvailableQueue<'_> {
@@ -283,3 +303,5 @@ impl Entry {
         self
     }
 }
+
+pub struct Insufficient(());
