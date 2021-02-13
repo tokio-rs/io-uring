@@ -158,22 +158,6 @@ impl IoUring {
         &self.inner.params
     }
 
-    /// Initiate and/or complete asynchronous I/O. See [`Submitter::enter`] for more details.
-    ///
-    /// # Safety
-    ///
-    /// This provides a raw interface so developer must ensure that parameters are correct.
-    #[inline]
-    pub unsafe fn enter(
-        &self,
-        to_submit: u32,
-        min_complete: u32,
-        flag: u32,
-        sig: Option<&libc::sigset_t>,
-    ) -> io::Result<usize> {
-        self.submitter().enter(to_submit, min_complete, flag, sig)
-    }
-
     /// Initiate asynchronous I/O. See [`Submitter::submit`] for more details.
     #[inline]
     pub fn submit(&self) -> io::Result<usize> {
