@@ -64,8 +64,6 @@ pub fn test_batch(ring: &mut IoUring) -> anyhow::Result<()> {
         };
 
         assert_eq!(entry.user_data(), 0x09);
-
-        a += 1;
     }
 
     Ok(())
