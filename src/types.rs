@@ -155,6 +155,8 @@ impl Timespec {
 /// Note that arguments that exceed their lifetime will fail to compile.
 ///
 /// ```compile_fail
+/// use io_uring::types::{ SubmitArgs, Timespec };
+///
 /// let sigmask: libc::sigset_t = unsafe { std::mem::zeroed() };
 ///
 /// let mut args = SubmitArgs::new();
