@@ -1,13 +1,14 @@
 use criterion::black_box;
 
 const N: usize = 8;
+const ITER: usize = 8;
 
 fn bench_io_uring() {
     use io_uring::{opcode, IoUring};
 
     let mut io_uring = IoUring::new(N as _).unwrap();
 
-    for _ in 0..4 {
+    for _ in 0..ITER {
         let mut sq = io_uring.submission().available();
 
         for i in 0..N {
@@ -55,8 +56,7 @@ fn bench_io_uring_batch() {
         mem::MaybeUninit::uninit(),
     ];
 
-    for _ in 0..4 {
-
+    for _ in 0..ITER {
         unsafe {
             io_uring.submission()
                 .available()
@@ -85,7 +85,7 @@ fn bench_iou() {
 
     let mut io_uring = IoUring::new(N as _).unwrap();
 
-    for _ in 0..4 {
+    for _ in 0..ITER {
         let mut sq = io_uring.sq();
 
         for i in 0..N {
@@ -116,7 +116,7 @@ fn bench_uring_sys() {
 
     let mut io_uring = unsafe { io_uring.assume_init() };
 
-    for _ in 0..4 {
+    for _ in 0..ITER {
         for i in 0..N {
             unsafe {
                 let sqe = io_uring_get_sqe(&mut io_uring);
@@ -168,7 +168,7 @@ fn bench_uring_sys_batch() {
     let mut io_uring = unsafe { io_uring.assume_init() };
     let mut cqes = [ptr::null_mut(); 8];
 
-    for _ in 0..4 {
+    for _ in 0..ITER {
         for i in 0..N {
             unsafe {
                 let sqe = io_uring_get_sqe(&mut io_uring);

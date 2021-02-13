@@ -153,7 +153,9 @@ impl AvailableQueue<'_> {
             unsafe {
                 let head = self.head + i;
                 let entry = self.queue.cqes.add((head & self.ring_mask) as usize);
-                entries[i as usize].as_mut_ptr().copy_from_nonoverlapping(entry.cast(), 1);
+                entries[i as usize]
+                    .as_mut_ptr()
+                    .copy_from_nonoverlapping(entry.cast(), 1);
             }
         }
 
