@@ -247,6 +247,7 @@ impl AvailableQueue<'_> {
         }
     }
 
+    #[cfg(feature = "unstable")]
     #[inline]
     pub unsafe fn push_multiple(&mut self, entries: &[Entry]) -> Result<(), Insufficient> {
         if (self.capacity() - self.len()) < entries.len() {

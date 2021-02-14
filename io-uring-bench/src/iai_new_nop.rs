@@ -30,6 +30,7 @@ fn bench_io_uring() {
     }
 }
 
+#[cfg(feature = "unstable")]
 fn bench_io_uring_batch() {
     use io_uring::{opcode, IoUring};
     use std::mem;
@@ -196,9 +197,18 @@ fn bench_uring_sys_batch() {
     }
 }
 
+#[cfg(feature = "unstable")]
 iai::main!(
     bench_io_uring,
     bench_io_uring_batch,
+    bench_iou,
+    bench_uring_sys,
+    bench_uring_sys_batch
+);
+
+#[cfg(not(feature = "unstable"))]
+iai::main!(
+    bench_io_uring,
     bench_iou,
     bench_uring_sys,
     bench_uring_sys_batch

@@ -145,6 +145,7 @@ impl AvailableQueue<'_> {
         self.len() == self.capacity()
     }
 
+    #[cfg(feature = "unstable")]
     #[inline]
     pub fn fill(&mut self, entries: &mut [std::mem::MaybeUninit<Entry>]) -> usize {
         let len = std::cmp::min(self.len(), entries.len()) as u32;

@@ -21,6 +21,7 @@ pub fn test_nop(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "unstable")]
 pub fn test_batch(ring: &mut IoUring) -> anyhow::Result<()> {
     use std::mem::MaybeUninit;
 
