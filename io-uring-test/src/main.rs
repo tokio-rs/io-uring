@@ -1,6 +1,8 @@
 mod helper;
-mod ownedsplit;
 mod tests;
+
+#[cfg(feature = "unstable")]
+mod ownedsplit;
 
 use io_uring::{opcode, IoUring, Probe};
 
@@ -89,5 +91,8 @@ fn main() -> anyhow::Result<()> {
         tests::net::test_tcp_sendmsg_recvmsg(&mut ring)?;
     }
 
-    ownedsplit::main(ring)
+    #[cfg(feature = "unstable")]
+    ownedsplit::main(ring)?;
+
+    Ok(())
 }
