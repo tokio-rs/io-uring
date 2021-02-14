@@ -150,16 +150,35 @@ impl Timespec {
     }
 }
 
+/// Submit arguments
+///
+/// Note that arguments that exceed their lifetime will fail to compile.
+///
+/// ```compile_fail
+/// use io_uring::types::{ SubmitArgs, Timespec };
+///
+/// let sigmask: libc::sigset_t = unsafe { std::mem::zeroed() };
+///
+/// let mut args = SubmitArgs::new();
+///
+/// {
+///     let ts = Timespec::new();
+///     args = args.timespec(&ts);
+///     args = args.sigmask(&sigmask);
+/// }
+///
+/// drop(args);
+/// ```
 #[cfg(feature = "unstable")]
 #[derive(Default, Debug, Clone, Copy)]
-pub struct SubmitArgs<'s, 't> {
+pub struct SubmitArgs<'prev: 'now, 'now> {
     pub(crate) args: sys::io_uring_getevents_arg,
-    sigmask: PhantomData<&'s libc::sigset_t>,
-    timespec: PhantomData<&'t Timespec>,
+    prev: PhantomData<&'prev ()>,
+    now: PhantomData<&'now ()>,
 }
 
 #[cfg(feature = "unstable")]
-impl<'s, 't> SubmitArgs<'s, 't> {
+impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     #[inline]
     pub const fn new() -> SubmitArgs<'static, 'static> {
         let args = sys::io_uring_getevents_arg {
@@ -171,31 +190,31 @@ impl<'s, 't> SubmitArgs<'s, 't> {
 
         SubmitArgs {
             args,
-            sigmask: PhantomData,
-            timespec: PhantomData,
+            prev: PhantomData,
+            now: PhantomData,
         }
     }
 
     #[inline]
-    pub fn sigmask<'s2>(mut self, sigmask: &'s2 libc::sigset_t) -> SubmitArgs<'s2, 't> {
+    pub fn sigmask<'new>(mut self, sigmask: &'new libc::sigset_t) -> SubmitArgs<'now, 'new> {
         self.args.sigmask = cast_ptr(sigmask) as _;
         self.args.sigmask_sz = std::mem::size_of::<libc::sigset_t>() as _;
 
         SubmitArgs {
             args: self.args,
-            sigmask: PhantomData,
-            timespec: self.timespec,
+            prev: self.now,
+            now: PhantomData,
         }
     }
 
     #[inline]
-    pub fn timespec<'t2>(mut self, timespec: &'t2 Timespec) -> SubmitArgs<'s, 't2> {
+    pub fn timespec<'new>(mut self, timespec: &'new Timespec) -> SubmitArgs<'now, 'new> {
         self.args.ts = cast_ptr(timespec) as _;
 
         SubmitArgs {
             args: self.args,
-            sigmask: self.sigmask,
-            timespec: PhantomData,
+            prev: self.now,
+            now: PhantomData,
         }
     }
 }
