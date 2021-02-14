@@ -14,6 +14,9 @@ fn main() -> anyhow::Result<()> {
 
     tests::queue::test_nop(&mut ring)?;
 
+    #[cfg(feature = "unstable")]
+    tests::queue::test_batch(&mut ring)?;
+
     if probe.is_supported(opcode::Write::CODE) && probe.is_supported(opcode::Read::CODE) {
         tests::fs::test_file_write_read(&mut ring)?;
         tests::net::test_tcp_write_read(&mut ring)?;

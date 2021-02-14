@@ -1,13 +1,14 @@
 use criterion::black_box;
 
 const N: usize = 8;
+const ITER: usize = 8;
 
 fn bench_io_uring() {
     use io_uring::{opcode, IoUring};
 
     let mut io_uring = IoUring::new(N as _).unwrap();
 
-    for _ in 0..4 {
+    for _ in 0..ITER {
         let mut sq = io_uring.submission().available();
 
         for i in 0..N {
@@ -29,12 +30,59 @@ fn bench_io_uring() {
     }
 }
 
+#[cfg(feature = "unstable")]
+fn bench_io_uring_batch() {
+    use io_uring::{opcode, IoUring};
+    use std::mem;
+
+    let mut io_uring = IoUring::new(N as _).unwrap();
+    let sqes = [
+        opcode::Nop::new().build().user_data(black_box(0)),
+        opcode::Nop::new().build().user_data(black_box(1)),
+        opcode::Nop::new().build().user_data(black_box(2)),
+        opcode::Nop::new().build().user_data(black_box(3)),
+        opcode::Nop::new().build().user_data(black_box(4)),
+        opcode::Nop::new().build().user_data(black_box(5)),
+        opcode::Nop::new().build().user_data(black_box(6)),
+        opcode::Nop::new().build().user_data(black_box(7)),
+    ];
+    let mut cqes = [
+        mem::MaybeUninit::uninit(),
+        mem::MaybeUninit::uninit(),
+        mem::MaybeUninit::uninit(),
+        mem::MaybeUninit::uninit(),
+        mem::MaybeUninit::uninit(),
+        mem::MaybeUninit::uninit(),
+        mem::MaybeUninit::uninit(),
+        mem::MaybeUninit::uninit(),
+    ];
+
+    for _ in 0..ITER {
+        unsafe {
+            io_uring
+                .submission()
+                .available()
+                .push_multiple(&sqes)
+                .ok()
+                .unwrap();
+        }
+
+        io_uring.submit_and_wait(N).unwrap();
+
+        let n = io_uring.completion().available().fill(&mut cqes);
+
+        assert_eq!(n, N);
+
+        cqes.iter().map(black_box).for_each(drop);
+    }
+}
+
 fn bench_iou() {
     use iou::IoUring;
 
     let mut io_uring = IoUring::new(N as _).unwrap();
 
-    for _ in 0..4 {
+    for _ in 0..ITER {
         let mut sq = io_uring.sq();
 
         for i in 0..N {
@@ -65,7 +113,7 @@ fn bench_uring_sys() {
 
     let mut io_uring = unsafe { io_uring.assume_init() };
 
-    for _ in 0..4 {
+    for _ in 0..ITER {
         for i in 0..N {
             unsafe {
                 let sqe = io_uring_get_sqe(&mut io_uring);
@@ -115,8 +163,9 @@ fn bench_uring_sys_batch() {
     }
 
     let mut io_uring = unsafe { io_uring.assume_init() };
+    let mut cqes = [ptr::null_mut(); 8];
 
-    for _ in 0..4 {
+    for _ in 0..ITER {
         for i in 0..N {
             unsafe {
                 let sqe = io_uring_get_sqe(&mut io_uring);
@@ -136,8 +185,6 @@ fn bench_uring_sys_batch() {
             }
         }
 
-        let mut cqes = [ptr::null_mut(); 8];
-
         unsafe {
             if io_uring_peek_batch_cqe(&mut io_uring, cqes.as_mut_ptr(), cqes.len() as _) != 8 {
                 panic!()
@@ -150,6 +197,16 @@ fn bench_uring_sys_batch() {
     }
 }
 
+#[cfg(feature = "unstable")]
+iai::main!(
+    bench_io_uring,
+    bench_io_uring_batch,
+    bench_iou,
+    bench_uring_sys,
+    bench_uring_sys_batch
+);
+
+#[cfg(not(feature = "unstable"))]
 iai::main!(
     bench_io_uring,
     bench_iou,
