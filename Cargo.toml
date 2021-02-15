@@ -38,4 +38,4 @@ socket2 = "0.3"
 slab = "0.4"
 
 [package.metadata.docs.rs]
-features = [ "concurrent", "unstable" ]
+features = [ "unstable" ]
