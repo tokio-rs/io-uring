@@ -24,7 +24,8 @@ fn main() -> anyhow::Result<()> {
     tests::fs::test_file_write_read(&mut ring, &probe)?;
     tests::fs::test_file_writev_readv(&mut ring, &probe)?;
     tests::fs::test_file_cur_pos(&mut ring, &probe)?;
-    tests::fs::test_file_fsync(&mut ring, &probe)?;tests::fs::test_file_fsync_file_range(&mut ring, &probe)?;
+    tests::fs::test_file_fsync(&mut ring, &probe)?;
+    tests::fs::test_file_fsync_file_range(&mut ring, &probe)?;
     tests::fs::test_file_fallocate(&mut ring, &probe)?;
     tests::fs::test_file_openat2(&mut ring, &probe)?;
     tests::fs::test_file_close(&mut ring, &probe)?;

@@ -1,6 +1,5 @@
 use io_uring::{opcode, IoUring, Probe};
 
-
 pub fn test_nop(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
     require!();
 
