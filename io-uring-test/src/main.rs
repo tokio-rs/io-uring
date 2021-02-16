@@ -52,10 +52,14 @@ fn main() -> anyhow::Result<()> {
 
     if probe.is_supported(opcode::Timeout::CODE) {
         tests::timeout::test_timeout(&mut ring)?;
+        tests::timeout::test_timeout_count(&mut ring)?;
 
         if probe.is_supported(opcode::TimeoutRemove::CODE) {
             tests::timeout::test_timeout_remove(&mut ring)?;
-            tests::timeout::test_timeout_count(&mut ring)?;
+        }
+
+        if probe.is_supported(opcode::AsyncCancel::CODE) {
+            tests::timeout::test_timeout_cancel(&mut ring)?;
         }
     }
 
