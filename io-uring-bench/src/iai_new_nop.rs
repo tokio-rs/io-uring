@@ -14,7 +14,7 @@ fn bench_io_uring() {
         for i in 0..N {
             let nop_e = opcode::Nop::new().build().user_data(black_box(i as _));
             unsafe {
-                sq.push(nop_e).ok().unwrap();
+                sq.push(&nop_e).ok().unwrap();
             }
         }
 

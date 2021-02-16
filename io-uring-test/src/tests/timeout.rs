@@ -16,8 +16,7 @@ pub fn test_timeout(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(timeout_e.build().user_data(0x09))
-            .ok()
+            .push(&timeout_e.build().user_data(0x09))
             .expect("queue is full");
     }
 
@@ -41,12 +40,10 @@ pub fn test_timeout(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(timeout_e.build().user_data(0x0a))
-            .ok()
+            .push(&timeout_e.build().user_data(0x0a))
             .expect("queue is full");
         queue
-            .push(nop_e.build().user_data(0x0b))
-            .ok()
+            .push(&nop_e.build().user_data(0x0b))
             .expect("queue is full");
     }
 
@@ -92,12 +89,10 @@ pub fn test_timeout_count(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<(
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(timeout_e.build().user_data(0x0c))
-            .ok()
+            .push(&timeout_e.build().user_data(0x0c))
             .expect("queue is full");
         queue
-            .push(nop_e.build().user_data(0x0d))
-            .ok()
+            .push(&nop_e.build().user_data(0x0d))
             .expect("queue is full");
     }
 
@@ -134,8 +129,7 @@ pub fn test_timeout_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(timeout_e.build().user_data(0x10))
-            .ok()
+            .push(&timeout_e.build().user_data(0x10))
             .expect("queue is full");
     }
 
@@ -148,8 +142,7 @@ pub fn test_timeout_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(timeout_e.build().user_data(0x11))
-            .ok()
+            .push(&timeout_e.build().user_data(0x11))
             .expect("queue is full");
     }
 
@@ -186,8 +179,7 @@ pub fn test_timeout_cancel(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(timeout_e.build().user_data(0x10))
-            .ok()
+            .push(&timeout_e.build().user_data(0x10))
             .expect("queue is full");
     }
 
@@ -200,8 +192,7 @@ pub fn test_timeout_cancel(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(timeout_e.build().user_data(0x11))
-            .ok()
+            .push(&timeout_e.build().user_data(0x11))
             .expect("queue is full");
     }
 

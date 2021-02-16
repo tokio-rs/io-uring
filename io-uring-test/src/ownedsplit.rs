@@ -19,8 +19,7 @@ fn test_nop(ring: IoUring) -> anyhow::Result<()> {
         unsafe {
             su.submission()
                 .available()
-                .push(nop_e)
-                .ok()
+                .push(&nop_e)
                 .expect("queue is full");
         }
         stu2.submitter().submit()?;

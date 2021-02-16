@@ -28,10 +28,9 @@ pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> an
             .build()
             .user_data(0x01)
             .flags(squeue::Flags::IO_LINK);
-        queue.push(write_e).ok().expect("queue is full");
+        queue.push(&write_e).expect("queue is full");
         queue
-            .push(read_e.build().user_data(0x02))
-            .ok()
+            .push(&read_e.build().user_data(0x02))
             .expect("queue is full");
     }
 
@@ -68,10 +67,9 @@ pub fn writev_readv(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> 
             .build()
             .user_data(0x01)
             .flags(squeue::Flags::IO_LINK);
-        queue.push(write_e).ok().expect("queue is full");
+        queue.push(&write_e).expect("queue is full");
         queue
-            .push(read_e.build().user_data(0x02))
-            .ok()
+            .push(&read_e.build().user_data(0x02))
             .expect("queue is full");
     }
 

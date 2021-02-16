@@ -65,10 +65,9 @@ pub fn test_tcp_send_recv(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<(
     unsafe {
         let mut queue = ring.submission().available();
         let send_e = send_e.build().user_data(0x01).flags(squeue::Flags::IO_LINK);
-        queue.push(send_e).ok().expect("queue is full");
+        queue.push(&send_e).expect("queue is full");
         queue
-            .push(recv_e.build().user_data(0x02))
-            .ok()
+            .push(&recv_e.build().user_data(0x02))
             .expect("queue is full");
     }
 
@@ -139,16 +138,14 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, probe: &Probe) -> anyhow::Re
         let mut queue = ring.submission().available();
         queue
             .push(
-                sendmsg_e
+                &sendmsg_e
                     .build()
                     .user_data(0x01)
                     .flags(squeue::Flags::IO_LINK),
             )
-            .ok()
             .expect("queue is full");
         queue
-            .push(recvmsg_e.build().user_data(0x02))
-            .ok()
+            .push(&recvmsg_e.build().user_data(0x02))
             .expect("queue is full");
     }
 
@@ -198,8 +195,7 @@ pub fn test_tcp_accept(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> 
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(accept_e.build().user_data(0x0e))
-            .ok()
+            .push(&accept_e.build().user_data(0x0e))
             .expect("queue is full");
     }
 
@@ -249,8 +245,7 @@ pub fn test_tcp_connect(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()>
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(connect_e.build().user_data(0x0f))
-            .ok()
+            .push(&connect_e.build().user_data(0x0f))
             .expect("queue is full");
     }
 
