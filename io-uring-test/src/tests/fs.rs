@@ -52,15 +52,14 @@ pub fn test_file_fsync(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> 
     let fsync_e = opcode::Fsync::new(fd);
 
     unsafe {
-        let mut queue = ring.submission().available();
-        queue
+        ring.submission_mut()
             .push(&fsync_e.build().user_data(0x03))
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().available().collect::<Vec<_>>();
+    let cqes = ring.completion_mut().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x03);
@@ -87,15 +86,14 @@ pub fn test_file_fsync_file_range(ring: &mut IoUring, probe: &Probe) -> anyhow::
     let fsync_e = opcode::SyncFileRange::new(fd, 1024).offset(3 * 1024);
 
     unsafe {
-        let mut queue = ring.submission().available();
-        queue
+        ring.submission_mut()
             .push(&fsync_e.build().user_data(0x04))
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().available().collect::<Vec<_>>();
+    let cqes = ring.completion_mut().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x04);
@@ -117,15 +115,14 @@ pub fn test_file_fallocate(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<
     let falloc_e = opcode::Fallocate::new(fd, 1024);
 
     unsafe {
-        ring.submission()
-            .available()
+        ring.submission_mut()
             .push(&falloc_e.build().user_data(0x10))
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().available().collect::<Vec<_>>();
+    let cqes = ring.completion_mut().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x10);
@@ -155,15 +152,14 @@ pub fn test_file_openat2(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     let open_e = opcode::OpenAt2::new(dirfd, path.as_ptr(), &openhow);
 
     unsafe {
-        ring.submission()
-            .available()
+        ring.submission_mut()
             .push(&open_e.build().user_data(0x11))
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().available().collect::<Vec<_>>();
+    let cqes = ring.completion_mut().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x11);
@@ -189,15 +185,14 @@ pub fn test_file_close(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> 
     let close_e = opcode::Close::new(fd);
 
     unsafe {
-        ring.submission()
-            .available()
+        ring.submission_mut()
             .push(&close_e.build().user_data(0x12))
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().available().collect::<Vec<_>>();
+    let cqes = ring.completion_mut().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x12);
@@ -227,10 +222,7 @@ pub fn test_file_cur_pos(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
         .user_data(0x01);
 
     unsafe {
-        ring.submission()
-            .available()
-            .push(&write_e)
-            .expect("queue is full");
+        ring.submission_mut().push(&write_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
@@ -241,10 +233,7 @@ pub fn test_file_cur_pos(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
         .user_data(0x02);
 
     unsafe {
-        ring.submission()
-            .available()
-            .push(&write_e)
-            .expect("queue is full");
+        ring.submission_mut().push(&write_e).expect("queue is full");
     }
 
     ring.submit_and_wait(2)?;
@@ -252,15 +241,14 @@ pub fn test_file_cur_pos(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     let read_e = opcode::Read::new(fd, output.as_mut_ptr(), output.len() as _);
 
     unsafe {
-        ring.submission()
-            .available()
+        ring.submission_mut()
             .push(&read_e.build().user_data(0x03))
             .expect("queue is full");
     }
 
     ring.submit_and_wait(3)?;
 
-    let cqes = ring.completion().available().collect::<Vec<_>>();
+    let cqes = ring.completion_mut().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 3);
     assert_eq!(cqes[0].user_data(), 0x01);

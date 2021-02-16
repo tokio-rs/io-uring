@@ -35,14 +35,13 @@ fn bench_iovec(c: &mut Criterion) {
             );
 
             unsafe {
-                ring.submission()
-                    .available()
+                ring.submission_mut()
                     .push(&entry.build())
                     .expect("queue is full");
             }
 
             ring.submit_and_wait(1).unwrap();
-            ring.completion().available().map(black_box).for_each(drop);
+            ring.completion_mut().map(black_box).for_each(drop);
         });
     });
 
@@ -68,7 +67,7 @@ fn bench_iovec(c: &mut Criterion) {
             );
 
             unsafe {
-                let mut queue = ring.submission().available();
+                let mut queue = ring.submission_mut();
                 queue
                     .push(&entry.build().flags(squeue::Flags::IO_LINK))
                     .expect("queue is full");
@@ -81,7 +80,7 @@ fn bench_iovec(c: &mut Criterion) {
             }
 
             ring.submit_and_wait(5).unwrap();
-            ring.completion().available().map(black_box).for_each(drop);
+            ring.completion_mut().map(black_box).for_each(drop);
         });
     });
 
@@ -91,7 +90,7 @@ fn bench_iovec(c: &mut Criterion) {
         let bufs = [&buf[..], &buf2[..], &buf3[..], &buf4[..], &buf5[..]];
 
         b.iter(|| {
-            let mut queue = ring.submission().available();
+            let mut queue = ring.submission_mut();
             for buf in black_box(&bufs) {
                 let entry =
                     opcode::Write::new(types::Fd(fd.as_raw_fd()), buf.as_ptr(), buf.len() as _);
@@ -106,7 +105,7 @@ fn bench_iovec(c: &mut Criterion) {
             drop(queue);
 
             ring.submit_and_wait(bufs.len()).unwrap();
-            ring.completion().available().map(black_box).for_each(drop);
+            ring.completion_mut().map(black_box).for_each(drop);
         });
     });
 
@@ -121,14 +120,13 @@ fn bench_iovec(c: &mut Criterion) {
                     opcode::Write::new(types::Fd(fd.as_raw_fd()), buf.as_ptr(), buf.len() as _);
 
                 unsafe {
-                    ring.submission()
-                        .available()
+                    ring.submission_mut()
                         .push(&entry.build())
                         .expect("queue is full");
                 }
 
                 ring.submit_and_wait(1).unwrap();
-                ring.completion().available().map(black_box).for_each(drop);
+                ring.completion_mut().map(black_box).for_each(drop);
             }
         });
     });

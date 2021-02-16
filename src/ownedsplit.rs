@@ -1,4 +1,4 @@
-use crate::{CompletionQueue, Inner, IoUring, SubmissionQueue, Submitter};
+use crate::{cqueue, squeue, CompletionQueue, Inner, IoUring, SubmissionQueue, Submitter};
 use std::sync::{atomic, Arc};
 
 #[derive(Clone)]
@@ -69,14 +69,14 @@ impl SubmitterUring {
 impl SubmissionUring {
     /// Get the submission queue of the io_uring instace. This is used to send I/O requests to the
     /// kernel.
-    pub fn submission(&mut self) -> &mut SubmissionQueue {
-        &mut self.sq
+    pub fn submission_mut(&mut self) -> squeue::Mut<'_> {
+        squeue::Mut(&mut self.sq)
     }
 }
 
 impl CompletionUring {
     /// Get completion queue. This is used to receive I/O completion events from the kernel.
-    pub fn completion(&mut self) -> &mut CompletionQueue {
-        &mut self.cq
+    pub fn completion_mut(&mut self) -> cqueue::Mut<'_> {
+        cqueue::Mut(&mut self.cq)
     }
 }

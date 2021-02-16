@@ -38,7 +38,7 @@ impl AcceptCount {
         }
     }
 
-    pub fn push_to(&mut self, sq: &mut squeue::AvailableQueue) {
+    pub fn push_to(&mut self, mut sq: squeue::Mut<'_>) {
         while self.count > 0 {
             unsafe {
                 match sq.push(&self.entry) {
@@ -61,11 +61,11 @@ fn main() -> anyhow::Result<()> {
 
     println!("listen {}", listener.local_addr()?);
 
-    let (submitter, sq, cq) = ring.split();
+    let (submitter, mut sq, mut cq) = ring.split();
 
     let mut accept = AcceptCount::new(listener.as_raw_fd(), token_alloc.insert(Token::Accept), 3);
 
-    accept.push_to(&mut sq.available());
+    accept.push_to(sq.reborrow());
 
     loop {
         match submitter.submit_and_wait(1) {
@@ -74,7 +74,6 @@ fn main() -> anyhow::Result<()> {
             Err(err) => return Err(err.into()),
         }
 
-        let mut sq = sq.available();
         let mut iter = backlog.drain(..);
 
         // clean backlog
@@ -85,7 +84,6 @@ fn main() -> anyhow::Result<()> {
                     Err(ref err) if err.raw_os_error() == Some(libc::EBUSY) => break,
                     Err(err) => return Err(err.into()),
                 }
-                sq.sync();
             }
 
             match iter.next() {
@@ -98,9 +96,9 @@ fn main() -> anyhow::Result<()> {
 
         drop(iter);
 
-        accept.push_to(&mut sq);
+        accept.push_to(sq.reborrow());
 
-        for cqe in cq.available() {
+        for cqe in cq.reborrow() {
             let ret = cqe.result();
             let token_index = cqe.user_data() as usize;
 

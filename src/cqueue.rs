@@ -1,5 +1,8 @@
 //! Completion Queue
 
+#[cfg(feature = "unstable")]
+use std::mem::MaybeUninit;
+use std::ops::Deref;
 use std::sync::atomic;
 
 use crate::sys;
@@ -20,20 +23,16 @@ pub struct CompletionQueue {
     flags: *const atomic::AtomicU32,
 }
 
+/// A type that grants mutable access to an io_uring's [completion queue](CompletionQueue).
+///
+/// This is necessary to prevent users swapping out the completion queue, which can cause
+/// unsoundness.
+pub struct Mut<'a>(pub(crate) &'a mut CompletionQueue);
+
 /// An entry in the completion queue, representing a complete I/O operation.
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct Entry(pub(crate) sys::io_uring_cqe);
-
-/// A snapshot of the completion queue.
-pub struct AvailableQueue<'a> {
-    head: u32,
-    tail: u32,
-    ring_mask: u32,
-    ring_entries: u32,
-
-    queue: &'a mut CompletionQueue,
-}
 
 impl CompletionQueue {
     #[rustfmt::skip]
@@ -105,97 +104,71 @@ impl CompletionQueue {
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }
-
-    /// Take a snapshot of the completion queue.
-    #[inline]
-    pub fn available(&mut self) -> AvailableQueue<'_> {
-        unsafe {
-            AvailableQueue {
-                head: unsync_load(self.head),
-                tail: (*self.tail).load(atomic::Ordering::Acquire),
-                ring_mask: self.ring_mask.read(),
-                ring_entries: self.ring_entries.read(),
-                queue: self,
-            }
-        }
-    }
 }
 
-impl AvailableQueue<'_> {
-    /// Synchronize this snapshot with the real queue.
-    #[inline]
-    pub fn sync(&mut self) {
-        unsafe {
-            (*self.queue.head).store(self.head, atomic::Ordering::Release);
-            self.tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
-        }
-    }
-
-    /// Get the total number of entries in the completion queue ring buffer.
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.ring_entries as usize
-    }
-
-    /// Returns `true` if the completion queue is at maximum capacity. If
-    /// [`is_feature_nodrop`](crate::Parameters::is_feature_nodrop) is not set, this will cause any
-    /// new completion queue events to be dropped by the kernel.
-    #[inline]
-    pub fn is_full(&self) -> bool {
-        self.len() == self.capacity()
+impl Mut<'_> {
+    /// Reborrow this mutable accessor to a shorter lifetime.
+    ///
+    /// This can be used to avoid consuming the `Mut` when passing it to functions.
+    #[must_use]
+    pub fn reborrow(&mut self) -> Mut<'_> {
+        Mut(self.0)
     }
 
     #[cfg(feature = "unstable")]
     #[inline]
-    pub fn fill(&mut self, entries: &mut [std::mem::MaybeUninit<Entry>]) -> usize {
-        let len = std::cmp::min(self.len(), entries.len()) as u32;
+    pub fn fill(&mut self, entries: &mut [MaybeUninit<Entry>]) -> usize {
+        let mut head = unsafe { unsync_load(self.0.head) };
+        let tail = unsafe { &*self.0.tail }.load(atomic::Ordering::Acquire);
 
-        for i in 0..len {
-            unsafe {
-                let head = self.head + i;
-                let entry = self.queue.cqes.add((head & self.ring_mask) as usize);
-                entries[i as usize]
-                    .as_mut_ptr()
-                    .copy_from_nonoverlapping(entry.cast(), 1);
-            }
+        let len = std::cmp::min(tail.wrapping_sub(head) as usize, entries.len()) as u32;
+
+        for entry in &mut entries[..len as usize] {
+            *entry = MaybeUninit::new(Entry(unsafe {
+                *self.0.cqes.add((head & *self.ring_mask) as usize)
+            }));
+            head = head.wrapping_add(1);
         }
 
-        self.head = self.head.wrapping_add(len);
+        unsafe { &*self.0.head }.store(head, atomic::Ordering::Release);
 
         len as usize
     }
 }
 
-impl ExactSizeIterator for AvailableQueue<'_> {
-    #[inline]
-    fn len(&self) -> usize {
-        self.tail.wrapping_sub(self.head) as usize
-    }
-}
-
-impl Iterator for AvailableQueue<'_> {
+impl Iterator for Mut<'_> {
     type Item = Entry;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.head != self.tail {
-            unsafe {
-                let entry = *self.queue.cqes.add((self.head & self.ring_mask) as usize);
-                self.head = self.head.wrapping_add(1);
-                Some(Entry(entry))
-            }
+        let head = unsafe { unsync_load(self.0.head) };
+        let tail = unsafe { &*self.0.tail }.load(atomic::Ordering::Acquire);
+
+        if head != tail {
+            let entry = unsafe { *self.0.cqes.add((head & *self.ring_mask) as usize) };
+            unsafe { &*self.0.head }.fetch_add(1, atomic::Ordering::Release);
+            Some(Entry(entry))
         } else {
             None
         }
     }
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (
+            unsafe {
+                (*self.0.tail)
+                    .load(atomic::Ordering::Acquire)
+                    .wrapping_sub(unsync_load(self.0.head))
+            } as usize,
+            Some(self.capacity()),
+        )
+    }
 }
 
-impl Drop for AvailableQueue<'_> {
-    #[inline]
-    fn drop(&mut self) {
-        unsafe {
-            (*self.queue.head).store(self.head, atomic::Ordering::Release);
-        }
+impl Deref for Mut<'_> {
+    type Target = CompletionQueue;
+    fn deref(&self) -> &Self::Target {
+        self.0
     }
 }
 

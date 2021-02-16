@@ -8,13 +8,13 @@ pub fn test_nop(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
     let nop_e = opcode::Nop::new().build().user_data(0x42);
 
     unsafe {
-        let mut queue = ring.submission().available();
+        let mut queue = ring.submission_mut();
         queue.push(&nop_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().available().collect::<Vec<_>>();
+    let cqes = ring.completion_mut().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x42);
@@ -31,11 +31,11 @@ pub fn test_batch(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
 
     println!("test batch");
 
-    assert!(ring.completion().is_empty());
+    assert!(ring.completion_mut().is_empty());
 
     unsafe {
         let sqes = vec![opcode::Nop::new().build().user_data(0x09); 5];
-        let mut sq = ring.submission().available();
+        let mut sq = ring.submission_mut();
 
         assert_eq!(sq.capacity(), 8);
 
@@ -55,7 +55,7 @@ pub fn test_batch(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
 
     let mut cqes = (0..10).map(|_| MaybeUninit::uninit()).collect::<Vec<_>>();
 
-    let n = ring.completion().available().fill(&mut cqes);
+    let n = ring.completion_mut().fill(&mut cqes);
 
     assert_eq!(n, 8);
 

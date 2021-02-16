@@ -1,5 +1,6 @@
 //! Submission Queue
 
+use std::ops::Deref;
 use std::sync::atomic;
 
 use crate::sys;
@@ -7,8 +8,7 @@ use crate::util::{unsync_load, Mmap};
 
 use bitflags::bitflags;
 
-/// An io_uring instance's submission queue. This contains all the I/O operations the application
-/// sends to the kernel.
+/// An io_uring instance's submission queue. This is used to send I/O requests to the kernel.
 pub struct SubmissionQueue {
     pub(crate) head: *const atomic::AtomicU32,
     pub(crate) tail: *const atomic::AtomicU32,
@@ -20,14 +20,11 @@ pub struct SubmissionQueue {
     pub(crate) sqes: *mut sys::io_uring_sqe,
 }
 
-/// A snapshot of the submission queue.
-pub struct AvailableQueue<'a> {
-    head: u32,
-    tail: u32,
-    ring_mask: u32,
-    ring_entries: u32,
-    queue: &'a mut SubmissionQueue,
-}
+/// A type that grants mutable access to an io_uring's [submission queue](SubmissionQueue).
+///
+/// This is necessary to prevent users swapping out the submission queue, which can cause
+/// unsoundness.
+pub struct Mut<'a>(pub(crate) &'a mut SubmissionQueue);
 
 /// An entry in the submission queue, representing a request for an I/O operation.
 ///
@@ -178,55 +175,15 @@ impl SubmissionQueue {
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }
-
-    /// Take a snapshot of the submission queue.
-    #[inline]
-    pub fn available(&mut self) -> AvailableQueue<'_> {
-        unsafe {
-            AvailableQueue {
-                head: (*self.head).load(atomic::Ordering::Acquire),
-                tail: unsync_load(self.tail),
-                ring_mask: self.ring_mask.read(),
-                ring_entries: self.ring_entries.read(),
-                queue: self,
-            }
-        }
-    }
 }
 
-impl AvailableQueue<'_> {
-    /// Synchronize this snapshot with the real queue.
-    #[inline]
-    pub fn sync(&mut self) {
-        unsafe {
-            (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
-            self.head = (*self.queue.head).load(atomic::Ordering::Acquire);
-        }
-    }
-
-    /// Get the total number of entries in the submission queue ring buffer.
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.ring_entries as usize
-    }
-
-    /// Get the number of submission queue events in the ring buffer.
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.tail.wrapping_sub(self.head) as usize
-    }
-
-    /// Returns `true` if the submission queue ring buffer is empty.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.head == self.tail
-    }
-
-    /// Returns `true` if the submission queue ring buffer has reached capacity, and no more events
-    /// can be added before the kernel consumes some.
-    #[inline]
-    pub fn is_full(&self) -> bool {
-        self.tail.wrapping_sub(self.head) == self.ring_entries
+impl Mut<'_> {
+    /// Reborrow this mutable accessor to a shorter lifetime.
+    ///
+    /// This can be used to avoid consuming the `Mut` when passing it to functions.
+    #[must_use]
+    pub fn reborrow(&mut self) -> Mut<'_> {
+        Mut(self.0)
     }
 
     /// Attempts to push an [`Entry`] into the queue.
@@ -239,8 +196,11 @@ impl AvailableQueue<'_> {
     #[inline]
     pub unsafe fn push(&mut self, Entry(entry): &Entry) -> Result<(), Insufficient> {
         if !self.is_full() {
-            *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = *entry;
-            self.tail = self.tail.wrapping_add(1);
+            *self
+                .0
+                .sqes
+                .add((unsync_load(self.0.tail) & *self.ring_mask) as usize) = *entry;
+            (*self.0.tail).fetch_add(1, atomic::Ordering::Release);
             Ok(())
         } else {
             Err(Insufficient(()))
@@ -250,33 +210,28 @@ impl AvailableQueue<'_> {
     #[cfg(feature = "unstable")]
     #[inline]
     pub unsafe fn push_multiple(&mut self, entries: &[Entry]) -> Result<(), Insufficient> {
-        if (self.capacity() - self.len()) < entries.len() {
+        let head = (*self.0.head).load(atomic::Ordering::Acquire);
+        let mut tail = unsync_load(self.0.tail);
+
+        if self.capacity() - (tail.wrapping_sub(head) as usize) < entries.len() {
             return Err(Insufficient(()));
         }
 
-        let len = entries.len() as u32;
-
-        for i in 0..len {
-            let tail = self.tail + i;
-            let Entry(entry) = &entries[i as usize];
-            self.queue
-                .sqes
-                .add((tail & self.ring_mask) as usize)
-                .copy_from_nonoverlapping(entry, 1);
+        for Entry(entry) in entries {
+            *self.0.sqes.add((tail & *self.ring_mask) as usize) = *entry;
+            tail = tail.wrapping_add(1);
         }
 
-        self.tail = self.tail.wrapping_add(len);
+        (*self.0.tail).store(tail, atomic::Ordering::Release);
 
         Ok(())
     }
 }
 
-impl Drop for AvailableQueue<'_> {
-    #[inline]
-    fn drop(&mut self) {
-        unsafe {
-            (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
-        }
+impl Deref for Mut<'_> {
+    type Target = SubmissionQueue;
+    fn deref(&self) -> &Self::Target {
+        self.0
     }
 }
 

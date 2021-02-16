@@ -23,7 +23,7 @@ pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> an
     let read_e = opcode::Read::new(fd_out, output.as_mut_ptr(), output.len() as _);
 
     unsafe {
-        let mut queue = ring.submission().available();
+        let mut queue = ring.submission_mut();
         let write_e = write_e
             .build()
             .user_data(0x01)
@@ -36,7 +36,7 @@ pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> an
 
     assert_eq!(ring.submit_and_wait(2)?, 2);
 
-    let cqes = ring.completion().available().collect::<Vec<_>>();
+    let cqes = ring.completion_mut().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
@@ -62,7 +62,7 @@ pub fn writev_readv(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> 
     let read_e = opcode::Readv::new(fd_out, output3.as_mut_ptr().cast(), output3.len() as _);
 
     unsafe {
-        let mut queue = ring.submission().available();
+        let mut queue = ring.submission_mut();
         let write_e = write_e
             .build()
             .user_data(0x01)
@@ -75,7 +75,7 @@ pub fn writev_readv(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> 
 
     ring.submit_and_wait(2)?;
 
-    let cqes = ring.completion().available().collect::<Vec<_>>();
+    let cqes = ring.completion_mut().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
