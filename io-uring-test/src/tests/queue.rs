@@ -9,7 +9,7 @@ pub fn test_nop(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
 
     unsafe {
         let mut queue = ring.submission().available();
-        queue.push(nop_e).ok().expect("queue is full");
+        queue.push(&nop_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
@@ -39,7 +39,7 @@ pub fn test_batch(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
 
         assert_eq!(sq.capacity(), 8);
 
-        sq.push_multiple(&sqes).ok().unwrap();
+        sq.push_multiple(&sqes).unwrap();
 
         assert_eq!(sq.len(), 5);
 
@@ -48,7 +48,7 @@ pub fn test_batch(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
 
         assert_eq!(sq.len(), 5);
 
-        sq.push_multiple(&sqes[..3]).ok().unwrap();
+        sq.push_multiple(&sqes[..3]).unwrap();
     }
 
     ring.submit_and_wait(8)?;

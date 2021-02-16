@@ -27,8 +27,7 @@ pub fn test_eventfd_poll(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(poll_e.build().user_data(0x04))
-            .ok()
+            .push(&poll_e.build().user_data(0x04))
             .expect("queue is full");
     }
 
@@ -73,8 +72,7 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Re
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(poll_e.build().user_data(0x05))
-            .ok()
+            .push(&poll_e.build().user_data(0x05))
             .expect("queue is full");
     }
 
@@ -87,8 +85,7 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Re
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(poll_e.build().user_data(0x06))
-            .ok()
+            .push(&poll_e.build().user_data(0x06))
             .expect("queue is full");
     }
 
@@ -136,8 +133,7 @@ pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring, probe: &Probe) -> any
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(poll_e.build().user_data(0x07))
-            .ok()
+            .push(&poll_e.build().user_data(0x07))
             .expect("queue is full");
     }
 
@@ -152,8 +148,7 @@ pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring, probe: &Probe) -> any
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(poll_e.build().user_data(0x08))
-            .ok()
+            .push(&poll_e.build().user_data(0x08))
             .expect("queue is full");
     }
 

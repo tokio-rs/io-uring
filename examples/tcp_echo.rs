@@ -41,7 +41,7 @@ impl AcceptCount {
     pub fn push_to(&mut self, sq: &mut squeue::AvailableQueue) {
         while self.count > 0 {
             unsafe {
-                match sq.push(self.entry.clone()) {
+                match sq.push(&self.entry) {
                     Ok(_) => self.count -= 1,
                     Err(_) => break,
                 }
@@ -90,7 +90,7 @@ fn main() -> anyhow::Result<()> {
 
             match iter.next() {
                 Some(sqe) => unsafe {
-                    let _ = sq.push(sqe);
+                    let _ = sq.push(&sqe);
                 },
                 None => break,
             }
@@ -128,8 +128,8 @@ fn main() -> anyhow::Result<()> {
                         .user_data(poll_token as _);
 
                     unsafe {
-                        if let Err(entry) = sq.push(poll_e) {
-                            backlog.push(entry);
+                        if sq.push(&poll_e).is_err() {
+                            backlog.push(poll_e);
                         }
                     }
                 }
@@ -151,8 +151,8 @@ fn main() -> anyhow::Result<()> {
                         .user_data(token_index as _);
 
                     unsafe {
-                        if let Err(entry) = sq.push(read_e) {
-                            backlog.push(entry);
+                        if sq.push(&read_e).is_err() {
+                            backlog.push(read_e);
                         }
                     }
                 }
@@ -182,8 +182,8 @@ fn main() -> anyhow::Result<()> {
                             .user_data(token_index as _);
 
                         unsafe {
-                            if let Err(entry) = sq.push(write_e) {
-                                backlog.push(entry);
+                            if sq.push(&write_e).is_err() {
+                                backlog.push(write_e);
                             }
                         }
                     }
@@ -223,7 +223,7 @@ fn main() -> anyhow::Result<()> {
                     };
 
                     unsafe {
-                        if let Err(entry) = sq.push(entry) {
+                        if sq.push(&entry).is_err() {
                             backlog.push(entry);
                         }
                     }

@@ -237,13 +237,13 @@ impl AvailableQueue<'_> {
     /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     #[inline]
-    pub unsafe fn push(&mut self, Entry(entry): Entry) -> Result<(), Entry> {
+    pub unsafe fn push(&mut self, Entry(entry): &Entry) -> Result<(), Insufficient> {
         if !self.is_full() {
-            *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = entry;
+            *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = *entry;
             self.tail = self.tail.wrapping_add(1);
             Ok(())
         } else {
-            Err(Entry(entry))
+            Err(Insufficient(()))
         }
     }
 
@@ -307,4 +307,5 @@ impl Entry {
     }
 }
 
+#[derive(Debug)]
 pub struct Insufficient(());

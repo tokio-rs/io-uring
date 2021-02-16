@@ -54,8 +54,7 @@ pub fn test_file_fsync(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> 
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(fsync_e.build().user_data(0x03))
-            .ok()
+            .push(&fsync_e.build().user_data(0x03))
             .expect("queue is full");
     }
 
@@ -90,8 +89,7 @@ pub fn test_file_fsync_file_range(ring: &mut IoUring, probe: &Probe) -> anyhow::
     unsafe {
         let mut queue = ring.submission().available();
         queue
-            .push(fsync_e.build().user_data(0x04))
-            .ok()
+            .push(&fsync_e.build().user_data(0x04))
             .expect("queue is full");
     }
 
@@ -121,8 +119,7 @@ pub fn test_file_fallocate(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<
     unsafe {
         ring.submission()
             .available()
-            .push(falloc_e.build().user_data(0x10))
-            .ok()
+            .push(&falloc_e.build().user_data(0x10))
             .expect("queue is full");
     }
 
@@ -160,8 +157,7 @@ pub fn test_file_openat2(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     unsafe {
         ring.submission()
             .available()
-            .push(open_e.build().user_data(0x11))
-            .ok()
+            .push(&open_e.build().user_data(0x11))
             .expect("queue is full");
     }
 
@@ -195,8 +191,7 @@ pub fn test_file_close(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> 
     unsafe {
         ring.submission()
             .available()
-            .push(close_e.build().user_data(0x12))
-            .ok()
+            .push(&close_e.build().user_data(0x12))
             .expect("queue is full");
     }
 
@@ -234,8 +229,7 @@ pub fn test_file_cur_pos(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     unsafe {
         ring.submission()
             .available()
-            .push(write_e)
-            .ok()
+            .push(&write_e)
             .expect("queue is full");
     }
 
@@ -249,8 +243,7 @@ pub fn test_file_cur_pos(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     unsafe {
         ring.submission()
             .available()
-            .push(write_e)
-            .ok()
+            .push(&write_e)
             .expect("queue is full");
     }
 
@@ -261,8 +254,7 @@ pub fn test_file_cur_pos(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     unsafe {
         ring.submission()
             .available()
-            .push(read_e.build().user_data(0x03))
-            .ok()
+            .push(&read_e.build().user_data(0x03))
             .expect("queue is full");
     }
 
