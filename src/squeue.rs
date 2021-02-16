@@ -1,5 +1,7 @@
 //! Submission Queue
 
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
 use std::sync::atomic;
 
 use crate::sys;
@@ -237,21 +239,21 @@ impl AvailableQueue<'_> {
     /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     #[inline]
-    pub unsafe fn push(&mut self, Entry(entry): &Entry) -> Result<(), Insufficient> {
+    pub unsafe fn push(&mut self, Entry(entry): &Entry) -> Result<(), PushError> {
         if !self.is_full() {
             *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = *entry;
             self.tail = self.tail.wrapping_add(1);
             Ok(())
         } else {
-            Err(Insufficient(()))
+            Err(PushError)
         }
     }
 
     #[cfg(feature = "unstable")]
     #[inline]
-    pub unsafe fn push_multiple(&mut self, entries: &[Entry]) -> Result<(), Insufficient> {
+    pub unsafe fn push_multiple(&mut self, entries: &[Entry]) -> Result<(), PushError> {
         if (self.capacity() - self.len()) < entries.len() {
-            return Err(Insufficient(()));
+            return Err(PushError);
         }
 
         let len = entries.len() as u32;
@@ -307,5 +309,15 @@ impl Entry {
     }
 }
 
-#[derive(Debug)]
-pub struct Insufficient(());
+/// An error pushing to the submission queue due to it being full.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PushError;
+
+impl Display for PushError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("submission queue is full")
+    }
+}
+
+impl Error for PushError {}
