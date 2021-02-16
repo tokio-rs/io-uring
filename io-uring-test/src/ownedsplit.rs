@@ -1,7 +1,7 @@
-use io_uring::{opcode, IoUring};
+use io_uring::{opcode, IoUring, Probe};
 use std::thread;
 
-pub fn main(ring: IoUring) -> anyhow::Result<()> {
+pub fn main(ring: IoUring, _probe: &Probe) -> anyhow::Result<()> {
     test_nop(ring)?;
 
     Ok(())

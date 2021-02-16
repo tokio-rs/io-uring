@@ -1,5 +1,5 @@
 use crate::helper;
-use io_uring::{opcode, squeue, types, IoUring};
+use io_uring::{opcode, squeue, types, IoUring, Probe};
 use once_cell::sync::OnceCell;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::os::unix::io::AsRawFd;
@@ -7,7 +7,12 @@ use std::{io, mem, thread};
 
 static ECHO_TCP_SERVER: OnceCell<SocketAddr> = OnceCell::new();
 
-pub fn test_tcp_write_read(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_tcp_write_read(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Write::CODE);
+        probe.is_supported(opcode::Read::CODE);
+    );
+
     println!("test tcp_write_read");
 
     let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
@@ -20,7 +25,12 @@ pub fn test_tcp_write_read(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_tcp_writev_readv(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_tcp_writev_readv(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Writev::CODE);
+        probe.is_supported(opcode::Readv::CODE);
+    );
+
     println!("test tcp_writev_readv");
 
     let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
@@ -33,7 +43,12 @@ pub fn test_tcp_writev_readv(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_tcp_send_recv(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_tcp_send_recv(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Send::CODE);
+        probe.is_supported(opcode::Recv::CODE);
+    );
+
     println!("test tcp_send_recv");
 
     let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
@@ -72,8 +87,13 @@ pub fn test_tcp_send_recv(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
     use std::mem::MaybeUninit;
+
+    require!(
+        probe.is_supported(opcode::SendMsg::CODE);
+        probe.is_supported(opcode::RecvMsg::CODE);
+    );
 
     println!("test tcp_sendmsg_recvmsg");
 
@@ -148,7 +168,13 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_tcp_accept(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_tcp_accept(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Write::CODE);
+        probe.is_supported(opcode::Read::CODE);
+        probe.is_supported(opcode::Accept::CODE);
+    );
+
     println!("test tcp_accept");
 
     let listener = TcpListener::bind("0.0.0.0:0")?;
@@ -198,8 +224,14 @@ pub fn test_tcp_accept(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_tcp_connect(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_tcp_connect(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
     use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+
+    require!(
+        probe.is_supported(opcode::Write::CODE);
+        probe.is_supported(opcode::Read::CODE);
+        probe.is_supported(opcode::Connect::CODE);
+    );
 
     println!("test tcp_connect");
 

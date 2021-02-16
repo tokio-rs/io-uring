@@ -1,10 +1,11 @@
+#[macro_use]
 mod helper;
 mod tests;
 
 #[cfg(feature = "unstable")]
 mod ownedsplit;
 
-use io_uring::{opcode, IoUring, Probe};
+use io_uring::{IoUring, Probe};
 
 fn main() -> anyhow::Result<()> {
     let mut ring = IoUring::new(8)?;
@@ -14,89 +15,41 @@ fn main() -> anyhow::Result<()> {
         eprintln!("No probe supported");
     }
 
-    tests::queue::test_nop(&mut ring)?;
+    tests::queue::test_nop(&mut ring, &probe)?;
 
     #[cfg(feature = "unstable")]
-    tests::queue::test_batch(&mut ring)?;
+    tests::queue::test_batch(&mut ring, &probe)?;
 
-    if probe.is_supported(opcode::Write::CODE) && probe.is_supported(opcode::Read::CODE) {
-        tests::fs::test_file_write_read(&mut ring)?;
-        tests::net::test_tcp_write_read(&mut ring)?;
+    // fs
+    tests::fs::test_file_write_read(&mut ring, &probe)?;
+    tests::fs::test_file_writev_readv(&mut ring, &probe)?;
+    tests::fs::test_file_cur_pos(&mut ring, &probe)?;
+    tests::fs::test_file_fsync(&mut ring, &probe)?;tests::fs::test_file_fsync_file_range(&mut ring, &probe)?;
+    tests::fs::test_file_fallocate(&mut ring, &probe)?;
+    tests::fs::test_file_openat2(&mut ring, &probe)?;
+    tests::fs::test_file_close(&mut ring, &probe)?;
 
-        if ring.params().is_feature_rw_cur_pos() {
-            tests::fs::test_file_cur_pos(&mut ring)?;
-        }
-    }
+    // timeout
+    tests::timeout::test_timeout(&mut ring, &probe)?;
+    tests::timeout::test_timeout_count(&mut ring, &probe)?;
+    tests::timeout::test_timeout_remove(&mut ring, &probe)?;
+    tests::timeout::test_timeout_cancel(&mut ring, &probe)?;
 
-    if probe.is_supported(opcode::Writev::CODE) && probe.is_supported(opcode::Readv::CODE) {
-        tests::fs::test_file_writev_readv(&mut ring)?;
-        tests::net::test_tcp_writev_readv(&mut ring)?;
-    }
+    // net
+    tests::net::test_tcp_write_read(&mut ring, &probe)?;
+    tests::net::test_tcp_writev_readv(&mut ring, &probe)?;
+    tests::net::test_tcp_accept(&mut ring, &probe)?;
+    tests::net::test_tcp_connect(&mut ring, &probe)?;
+    tests::net::test_tcp_send_recv(&mut ring, &probe)?;
+    tests::net::test_tcp_sendmsg_recvmsg(&mut ring, &probe)?;
 
-    if probe.is_supported(opcode::Fsync::CODE) {
-        tests::fs::test_file_fsync(&mut ring)?;
-    }
-
-    if probe.is_supported(opcode::PollAdd::CODE) {
-        tests::poll::test_eventfd_poll(&mut ring)?;
-
-        if probe.is_supported(opcode::PollRemove::CODE) {
-            tests::poll::test_eventfd_poll_remove(&mut ring)?;
-            tests::poll::test_eventfd_poll_remove_failed(&mut ring)?;
-        }
-    }
-
-    if probe.is_supported(opcode::SyncFileRange::CODE) {
-        tests::fs::test_file_fsync_file_range(&mut ring)?;
-    }
-
-    if probe.is_supported(opcode::Timeout::CODE) {
-        tests::timeout::test_timeout(&mut ring)?;
-        tests::timeout::test_timeout_count(&mut ring)?;
-
-        if probe.is_supported(opcode::TimeoutRemove::CODE) {
-            tests::timeout::test_timeout_remove(&mut ring)?;
-        }
-
-        if probe.is_supported(opcode::AsyncCancel::CODE) {
-            tests::timeout::test_timeout_cancel(&mut ring)?;
-        }
-    }
-
-    if probe.is_supported(opcode::Accept::CODE) {
-        assert!(probe.is_supported(opcode::Write::CODE) && probe.is_supported(opcode::Read::CODE));
-
-        tests::net::test_tcp_accept(&mut ring)?;
-    }
-
-    if probe.is_supported(opcode::Connect::CODE) {
-        assert!(probe.is_supported(opcode::Write::CODE) && probe.is_supported(opcode::Read::CODE));
-
-        tests::net::test_tcp_connect(&mut ring)?;
-    }
-
-    if probe.is_supported(opcode::Fallocate::CODE) {
-        tests::fs::test_file_fallocate(&mut ring)?;
-    }
-
-    if probe.is_supported(opcode::OpenAt2::CODE) {
-        tests::fs::test_file_openat2(&mut ring)?;
-    }
-
-    if probe.is_supported(opcode::Close::CODE) {
-        tests::fs::test_file_close(&mut ring)?;
-    }
-
-    if probe.is_supported(opcode::Send::CODE) && probe.is_supported(opcode::Recv::CODE) {
-        tests::net::test_tcp_send_recv(&mut ring)?;
-    }
-
-    if probe.is_supported(opcode::SendMsg::CODE) && probe.is_supported(opcode::RecvMsg::CODE) {
-        tests::net::test_tcp_sendmsg_recvmsg(&mut ring)?;
-    }
+    // queue
+    tests::poll::test_eventfd_poll(&mut ring, &probe)?;
+    tests::poll::test_eventfd_poll_remove(&mut ring, &probe)?;
+    tests::poll::test_eventfd_poll_remove_failed(&mut ring, &probe)?;
 
     #[cfg(feature = "unstable")]
-    ownedsplit::main(ring)?;
+    ownedsplit::main(ring, &probe)?;
 
     Ok(())
 }

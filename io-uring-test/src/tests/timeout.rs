@@ -1,7 +1,11 @@
-use io_uring::{opcode, types, IoUring};
+use io_uring::{opcode, types, IoUring, Probe};
 use std::time::Instant;
 
-pub fn test_timeout(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_timeout(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Timeout::CODE);
+    );
+
     println!("test timeout");
 
     // add timeout
@@ -74,7 +78,11 @@ pub fn test_timeout(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_timeout_count(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_timeout_count(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Timeout::CODE);
+    );
+
     println!("test timeout_count");
 
     let ts = types::Timespec::new().sec(1);
@@ -110,7 +118,12 @@ pub fn test_timeout_count(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_timeout_remove(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_timeout_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Timeout::CODE);
+        probe.is_supported(opcode::TimeoutRemove::CODE);
+    );
+
     println!("test timeout_remove");
 
     // add timeout
@@ -157,7 +170,12 @@ pub fn test_timeout_remove(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_timeout_cancel(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_timeout_cancel(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Timeout::CODE);
+        probe.is_supported(opcode::AsyncCancel::CODE);
+    );
+
     println!("test timeout_cancel");
 
     // add timeout

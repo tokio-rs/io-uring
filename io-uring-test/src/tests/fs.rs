@@ -1,10 +1,15 @@
 use crate::helper;
-use io_uring::{opcode, types, IoUring};
+use io_uring::{opcode, types, IoUring, Probe};
 use std::fs;
 use std::io::Write;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 
-pub fn test_file_write_read(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_file_write_read(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Write::CODE);
+        probe.is_supported(opcode::Read::CODE);
+    );
+
     println!("test file_write_read");
 
     let fd = tempfile::tempfile()?;
@@ -15,7 +20,12 @@ pub fn test_file_write_read(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_file_writev_readv(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_file_writev_readv(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Writev::CODE);
+        probe.is_supported(opcode::Readv::CODE);
+    );
+
     println!("test file_writev_readv");
 
     let fd = tempfile::tempfile()?;
@@ -26,7 +36,11 @@ pub fn test_file_writev_readv(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_file_fsync(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_file_fsync(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Fsync::CODE);
+    );
+
     println!("test file_fsync");
 
     let mut fd = tempfile::tempfile()?;
@@ -56,7 +70,11 @@ pub fn test_file_fsync(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_file_fsync_file_range(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_file_fsync_file_range(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::SyncFileRange::CODE);
+    );
+
     println!("test file_fsync_file_range");
 
     let mut fd = tempfile::tempfile()?;
@@ -88,7 +106,11 @@ pub fn test_file_fsync_file_range(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_file_fallocate(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_file_fallocate(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Fallocate::CODE);
+    );
+
     println!("test file_fallocate");
 
     let fd = tempfile::tempfile()?;
@@ -115,7 +137,11 @@ pub fn test_file_fallocate(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_file_openat2(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_file_openat2(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::OpenAt2::CODE);
+    );
+
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
     use tempfile::tempdir;
@@ -154,7 +180,11 @@ pub fn test_file_openat2(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_file_close(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_file_close(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Close::CODE);
+    );
+
     println!("test file_cloes");
 
     let fd = tempfile::tempfile()?;
@@ -181,7 +211,13 @@ pub fn test_file_close(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_file_cur_pos(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_file_cur_pos(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::Write::CODE);
+        probe.is_supported(opcode::Read::CODE);
+        ring.params().is_feature_rw_cur_pos();
+    );
+
     println!("test file_cur_pos");
 
     let fd = tempfile::tempfile()?;

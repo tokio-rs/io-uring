@@ -1,11 +1,15 @@
-use io_uring::{opcode, types, IoUring};
+use io_uring::{opcode, types, IoUring, Probe};
 use std::fs::File;
 use std::io::{self, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::thread;
 use std::time::Duration;
 
-pub fn test_eventfd_poll(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_eventfd_poll(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::PollAdd::CODE);
+    );
+
     println!("test eventfd_poll");
 
     let mut fd = unsafe {
@@ -44,7 +48,12 @@ pub fn test_eventfd_poll(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_eventfd_poll_remove(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_eventfd_poll_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::PollAdd::CODE);
+        probe.is_supported(opcode::PollRemove::CODE);
+    );
+
     println!("test eventfd_poll_remove");
 
     let mut fd = unsafe {
@@ -102,7 +111,12 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+    require!(
+        probe.is_supported(opcode::PollAdd::CODE);
+        probe.is_supported(opcode::PollRemove::CODE);
+    );
+
     println!("test eventfd_poll_remove_failed");
 
     let mut fd = unsafe {

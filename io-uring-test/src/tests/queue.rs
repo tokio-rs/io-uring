@@ -1,6 +1,9 @@
-use io_uring::{opcode, IoUring};
+use io_uring::{opcode, IoUring, Probe};
 
-pub fn test_nop(ring: &mut IoUring) -> anyhow::Result<()> {
+
+pub fn test_nop(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
+    require!();
+
     println!("test nop");
 
     let nop_e = opcode::Nop::new().build().user_data(0x42);
@@ -22,8 +25,10 @@ pub fn test_nop(ring: &mut IoUring) -> anyhow::Result<()> {
 }
 
 #[cfg(feature = "unstable")]
-pub fn test_batch(ring: &mut IoUring) -> anyhow::Result<()> {
+pub fn test_batch(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
     use std::mem::MaybeUninit;
+
+    require!();
 
     println!("test batch");
 

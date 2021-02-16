@@ -1,6 +1,20 @@
 use io_uring::{opcode, squeue, types, IoUring};
 use std::io::{IoSlice, IoSliceMut};
 
+macro_rules! require {
+    ( $( $cond:expr ; )* ) => {
+        #[allow(unused_mut)]
+        let mut cond = true;
+        $(
+            cond &= $cond;
+        )*
+
+        if !cond {
+            return Ok(());
+        }
+    }
+}
+
 pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> anyhow::Result<()> {
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut output = vec![0; text.len()];

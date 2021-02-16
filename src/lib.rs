@@ -381,7 +381,6 @@ impl Parameters {
 
     /// Whether poll events are stored using 32 bits instead of 16. This allows the user to use
     /// `EPOLLEXCLUSIVE`.
-    #[cfg(feature = "unstable")]
     pub fn is_feature_poll_32bits(&self) -> bool {
         self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
     }
