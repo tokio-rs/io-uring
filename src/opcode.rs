@@ -337,8 +337,8 @@ opcode!(
         }
 
         #[cfg(target_endian = "big")] {
-            let x = a << 16;
-            let y = a >> 16;
+            let x = flags << 16;
+            let y = flags >> 16;
             let flags = x | y;
             sqe.__bindgen_anon_3.poll32_events = flags;
         }
