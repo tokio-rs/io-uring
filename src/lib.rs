@@ -30,8 +30,8 @@ use util::{Fd, Mmap};
 /// IoUring instance
 pub struct IoUring {
     inner: Inner,
-    sq: SubmissionQueue,
-    cq: CompletionQueue,
+    sq: squeue::Inner,
+    cq: cqueue::Inner,
 }
 
 struct Inner {
@@ -84,7 +84,7 @@ impl IoUring {
         unsafe fn setup_queue(
             fd: &Fd,
             p: &sys::io_uring_params,
-        ) -> io::Result<(MemoryMap, SubmissionQueue, CompletionQueue)> {
+        ) -> io::Result<(MemoryMap, squeue::Inner, cqueue::Inner)> {
             let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
             let cq_len = p.cq_off.cqes as usize
                 + p.cq_entries as usize * mem::size_of::<sys::io_uring_cqe>();
@@ -95,8 +95,8 @@ impl IoUring {
                 let scq_mmap =
                     Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, cmp::max(sq_len, cq_len))?;
 
-                let sq = SubmissionQueue::new(&scq_mmap, &sqe_mmap, p);
-                let cq = CompletionQueue::new(&scq_mmap, p);
+                let sq = squeue::Inner::new(&scq_mmap, &sqe_mmap, p);
+                let cq = cqueue::Inner::new(&scq_mmap, p);
                 let mm = MemoryMap {
                     sq_mmap: scq_mmap,
                     cq_mmap: None,
@@ -108,8 +108,8 @@ impl IoUring {
                 let sq_mmap = Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, sq_len)?;
                 let cq_mmap = Mmap::new(fd, sys::IORING_OFF_CQ_RING as _, cq_len)?;
 
-                let sq = SubmissionQueue::new(&sq_mmap, &sqe_mmap, p);
-                let cq = CompletionQueue::new(&cq_mmap, p);
+                let sq = squeue::Inner::new(&sq_mmap, &sqe_mmap, p);
+                let cq = cqueue::Inner::new(&cq_mmap, p);
                 let mm = MemoryMap {
                     cq_mmap: Some(cq_mmap),
                     sq_mmap,
@@ -173,7 +173,7 @@ impl IoUring {
 
     /// Get the submitter, submission queue and completion queue of the io_uring instance. This can
     /// be used to operate on the different parts of the io_uring instance independently.
-    pub fn split(&mut self) -> (Submitter<'_>, &mut SubmissionQueue, &mut CompletionQueue) {
+    pub fn split(&mut self) -> (Submitter<'_>, SubmissionQueue<'_>, CompletionQueue<'_>) {
         let submit = Submitter::new(
             &self.inner.fd,
             &self.inner.params,
@@ -181,18 +181,18 @@ impl IoUring {
             self.sq.tail,
             self.sq.flags,
         );
-        (submit, &mut self.sq, &mut self.cq)
+        (submit, self.sq.borrow(), self.cq.borrow())
     }
 
-    /// Get the submission queue of the io_uring instace. This is used to send I/O requests to the
+    /// Get the submission queue of the io_uring instance. This is used to send I/O requests to the
     /// kernel.
-    pub fn submission(&mut self) -> &mut SubmissionQueue {
-        &mut self.sq
+    pub fn submission(&mut self) -> SubmissionQueue<'_> {
+        self.sq.borrow()
     }
 
     /// Get completion queue. This is used to receive I/O completion events from the kernel.
-    pub fn completion(&mut self) -> &mut CompletionQueue {
-        &mut self.cq
+    pub fn completion(&mut self) -> CompletionQueue<'_> {
+        self.cq.borrow()
     }
 
     #[inline]
