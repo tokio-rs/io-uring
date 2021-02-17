@@ -8,17 +8,15 @@ use crate::sys;
 use crate::util::{unsync_load, Mmap};
 
 pub(crate) struct Inner {
-    head: *const atomic::AtomicU32,
-    tail: *const atomic::AtomicU32,
+    head: &'static atomic::AtomicU32,
+    tail: &'static atomic::AtomicU32,
     ring_mask: u32,
     ring_entries: u32,
-
-    overflow: *const atomic::AtomicU32,
+    #[allow(dead_code)]
+    flags: &'static atomic::AtomicU32,
+    overflow: &'static atomic::AtomicU32,
 
     cqes: *const sys::io_uring_cqe,
-
-    #[allow(dead_code)]
-    flags: *const atomic::AtomicU32,
 }
 
 /// An io_uring instance's completion queue. This stores all the I/O operations that have completed.
@@ -36,22 +34,23 @@ pub struct Entry(pub(crate) sys::io_uring_cqe);
 impl Inner {
     #[rustfmt::skip]
     pub(crate) unsafe fn new(cq_mmap: &Mmap, p: &sys::io_uring_params) -> Self {
-        let head         = cq_mmap.offset(p.cq_off.head         ) as *const atomic::AtomicU32;
-        let tail         = cq_mmap.offset(p.cq_off.tail         ) as *const atomic::AtomicU32;
-        let ring_mask    = cq_mmap.offset(p.cq_off.ring_mask    ).cast::<u32>().read();
-        let ring_entries = cq_mmap.offset(p.cq_off.ring_entries ).cast::<u32>().read();
-        let overflow     = cq_mmap.offset(p.cq_off.overflow     ) as *const atomic::AtomicU32;
-        let cqes         = cq_mmap.offset(p.cq_off.cqes         ) as *const sys::io_uring_cqe;
-        let flags        = cq_mmap.offset(p.cq_off.flags        ) as *const atomic::AtomicU32;
+        let head         = &*cq_mmap.offset(p.cq_off.head         ).cast::<atomic::AtomicU32>();
+        let tail         = &*cq_mmap.offset(p.cq_off.tail         ).cast::<atomic::AtomicU32>();
+        let ring_mask    =  *cq_mmap.offset(p.cq_off.ring_mask    ).cast::<u32>();
+        let ring_entries =  *cq_mmap.offset(p.cq_off.ring_entries ).cast::<u32>();
+        let flags        = &*cq_mmap.offset(p.cq_off.flags        ).cast::<atomic::AtomicU32>();
+        let overflow     = &*cq_mmap.offset(p.cq_off.overflow     ).cast::<atomic::AtomicU32>();
+
+        let cqes         =   cq_mmap.offset(p.cq_off.cqes         ).cast::<sys::io_uring_cqe>();
 
         Self {
             head,
             tail,
             ring_mask,
             ring_entries,
+            flags,
             overflow,
             cqes,
-            flags,
         }
     }
 
@@ -87,16 +86,14 @@ impl CompletionQueue<'_> {
     /// in the queue if the kernel has produced some entries in the meantime.
     #[inline]
     pub fn sync(&mut self) {
-        unsafe {
-            (*self.queue.head).store(self.head, atomic::Ordering::Release);
-            self.tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
-        }
+        self.queue.head.store(self.head, atomic::Ordering::Release);
+        self.tail = self.queue.tail.load(atomic::Ordering::Acquire);
     }
 
     /// If queue is full and [`is_feature_nodrop`](crate::Parameters::is_feature_nodrop) is not set,
     /// new events may be dropped. This records the number of dropped events.
     pub fn overflow(&self) -> u32 {
-        unsafe { (*self.queue.overflow).load(atomic::Ordering::Acquire) }
+        self.queue.overflow.load(atomic::Ordering::Acquire)
     }
 
     /// Whether eventfd notifications are disabled when a request is completed and queued to the CQ
@@ -106,10 +103,7 @@ impl CompletionQueue<'_> {
     /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn eventfd_disabled(&self) -> bool {
-        unsafe {
-            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_CQ_EVENTFD_DISABLED
-                != 0
-        }
+        self.queue.flags.load(atomic::Ordering::Acquire) & sys::IORING_CQ_EVENTFD_DISABLED != 0
     }
 
     /// Get the total number of entries in the completion queue ring buffer.
@@ -154,7 +148,7 @@ impl CompletionQueue<'_> {
 impl Drop for CompletionQueue<'_> {
     #[inline]
     fn drop(&mut self) {
-        unsafe { &*self.queue.head }.store(self.head, atomic::Ordering::Release);
+        self.queue.head.store(self.head, atomic::Ordering::Release);
     }
 }
 

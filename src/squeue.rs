@@ -10,14 +10,14 @@ use crate::util::{unsync_load, Mmap};
 use bitflags::bitflags;
 
 pub(crate) struct Inner {
-    pub(crate) head: *const atomic::AtomicU32,
-    pub(crate) tail: *const atomic::AtomicU32,
-    pub(crate) ring_mask: u32,
-    pub(crate) ring_entries: u32,
-    pub(crate) flags: *const atomic::AtomicU32,
-    dropped: *const atomic::AtomicU32,
+    pub(crate) head: &'static atomic::AtomicU32,
+    pub(crate) tail: &'static atomic::AtomicU32,
+    ring_mask: u32,
+    ring_entries: u32,
+    pub(crate) flags: &'static atomic::AtomicU32,
+    dropped: &'static atomic::AtomicU32,
 
-    pub(crate) sqes: *mut sys::io_uring_sqe,
+    sqes: *mut sys::io_uring_sqe,
 }
 
 /// An io_uring instance's submission queue. This is used to send I/O requests to the kernel.
@@ -101,13 +101,13 @@ impl Inner {
         sqe_mmap: &Mmap,
         p: &sys::io_uring_params,
     ) -> Self {
-        let head         = sq_mmap.offset(p.sq_off.head        ) as *const atomic::AtomicU32;
-        let tail         = sq_mmap.offset(p.sq_off.tail        ) as *const atomic::AtomicU32;
-        let ring_mask    = sq_mmap.offset(p.sq_off.ring_mask   ).cast::<u32>().read();
-        let ring_entries = sq_mmap.offset(p.sq_off.ring_entries).cast::<u32>().read();
-        let flags        = sq_mmap.offset(p.sq_off.flags       ) as *const atomic::AtomicU32;
-        let dropped      = sq_mmap.offset(p.sq_off.dropped     ) as *const atomic::AtomicU32;
-        let array        = sq_mmap.offset(p.sq_off.array       ) as *mut u32;
+        let head         = &*sq_mmap.offset(p.sq_off.head        ).cast::<atomic::AtomicU32>();
+        let tail         = &*sq_mmap.offset(p.sq_off.tail        ).cast::<atomic::AtomicU32>();
+        let ring_mask    =  *sq_mmap.offset(p.sq_off.ring_mask   ).cast::<u32>();
+        let ring_entries =  *sq_mmap.offset(p.sq_off.ring_entries).cast::<u32>();
+        let flags        = &*sq_mmap.offset(p.sq_off.flags       ).cast::<atomic::AtomicU32>();
+        let dropped      = &*sq_mmap.offset(p.sq_off.dropped     ).cast::<atomic::AtomicU32>();
+        let array        =   sq_mmap.offset(p.sq_off.array       ).cast::<u32>();
 
         let sqes         = sqe_mmap.as_mut_ptr() as *mut sys::io_uring_sqe;
 
@@ -160,25 +160,21 @@ impl SubmissionQueue<'_> {
     /// consumed some entries in the meantime.
     #[inline]
     pub fn sync(&mut self) {
-        unsafe {
-            (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
-            self.tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
-        }
+        self.queue.tail.store(self.tail, atomic::Ordering::Release);
+        self.head = self.queue.head.load(atomic::Ordering::Acquire);
     }
 
     /// When [`is_setup_sqpoll`](crate::Parameters::is_setup_sqpoll) is set, whether the kernel
     /// threads has gone to sleep and requires a system call to wake it up.
     #[inline]
     pub fn need_wakeup(&self) -> bool {
-        unsafe {
-            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
-        }
+        self.queue.flags.load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
     }
 
     /// The number of invalid submission queue entries that have been encountered in the ring
     /// buffer.
     pub fn dropped(&self) -> u32 {
-        unsafe { (*self.queue.dropped).load(atomic::Ordering::Acquire) }
+        self.queue.dropped.load(atomic::Ordering::Acquire)
     }
 
     /// Returns `true` if the completion queue ring is overflown.
@@ -186,9 +182,7 @@ impl SubmissionQueue<'_> {
     /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn cq_overflow(&self) -> bool {
-        unsafe {
-            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0
-        }
+        self.queue.flags.load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0
     }
 
     /// Get the total number of entries in the submission queue ring buffer.
@@ -259,7 +253,7 @@ impl SubmissionQueue<'_> {
 impl Drop for SubmissionQueue<'_> {
     #[inline]
     fn drop(&mut self) {
-        unsafe { &*self.queue.tail }.store(self.tail, atomic::Ordering::Release);
+        self.queue.tail.store(self.tail, atomic::Ordering::Release);
     }
 }
 

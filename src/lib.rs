@@ -17,7 +17,6 @@ pub mod types;
 pub mod ownedsplit;
 
 use std::convert::TryInto;
-use std::mem::ManuallyDrop;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{cmp, io, mem};
 
@@ -29,15 +28,17 @@ use util::{Fd, Mmap};
 
 /// IoUring instance
 pub struct IoUring {
-    inner: Inner,
     sq: squeue::Inner,
     cq: cqueue::Inner,
+    // Inner must be dropped after the submission and completion queues.
+    inner: Inner,
 }
 
 struct Inner {
+    // This must be dropped before the file descriptor.
+    memory: MemoryMap,
     fd: Fd,
     params: Parameters,
-    memory: ManuallyDrop<MemoryMap>,
 }
 
 #[allow(dead_code)]
@@ -126,13 +127,13 @@ impl IoUring {
                 .map_err(|_| io::Error::last_os_error())?
         };
 
-        let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
+        let (memory, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
         Ok(IoUring {
             inner: Inner {
+                memory,
                 fd,
                 params: Parameters(p),
-                memory: ManuallyDrop::new(mm),
             },
             sq,
             cq,
@@ -208,15 +209,6 @@ impl IoUring {
         ownedsplit::CompletionUring,
     ) {
         ownedsplit::split(self)
-    }
-}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        // Ensure that `MemoryMap` is released before `fd`.
-        unsafe {
-            ManuallyDrop::drop(&mut self.memory);
-        }
     }
 }
 
