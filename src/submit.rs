@@ -4,7 +4,7 @@ use std::{io, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
-use crate::util::{cast_ptr, unsync_load, Fd};
+use crate::util::{cast_ptr, Fd};
 use crate::Parameters;
 
 #[cfg(feature = "unstable")]
@@ -48,7 +48,7 @@ impl<'a> Submitter<'a> {
     fn sq_len(&self) -> usize {
         unsafe {
             let head = (*self.sq_head).load(atomic::Ordering::Acquire);
-            let tail = unsync_load(self.sq_tail);
+            let tail = (*self.sq_tail).load(atomic::Ordering::Acquire);
 
             tail.wrapping_sub(head) as usize
         }
