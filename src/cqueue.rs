@@ -56,14 +56,17 @@ impl Inner {
     }
 
     #[inline]
-    pub(crate) fn borrow(&mut self) -> CompletionQueue<'_> {
-        unsafe {
-            CompletionQueue {
-                head: unsync_load(self.head),
-                tail: (*self.tail).load(atomic::Ordering::Acquire),
-                queue: self,
-            }
+    pub(crate) unsafe fn borrow_shared(&self) -> CompletionQueue<'_> {
+        CompletionQueue {
+            head: unsync_load(self.head),
+            tail: (*self.tail).load(atomic::Ordering::Acquire),
+            queue: self,
         }
+    }
+
+    #[inline]
+    pub(crate) fn borrow(&mut self) -> CompletionQueue<'_> {
+        unsafe { self.borrow_shared() }
     }
 }
 
