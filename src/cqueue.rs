@@ -139,16 +139,16 @@ impl CompletionQueue<'_> {
     #[cfg(feature = "unstable")]
     #[inline]
     pub fn fill<'a>(&mut self, entries: &'a mut [MaybeUninit<Entry>]) -> &'a mut [Entry] {
-        let len = std::cmp::min(self.len(), entries.len()) as u32;
+        let len = std::cmp::min(self.len(), entries.len());
 
-        for entry in &mut entries[..len as usize] {
+        for entry in &mut entries[..len] {
             *entry = MaybeUninit::new(Entry(unsafe {
                 *self.queue.cqes.add((self.head & self.ring_mask) as usize)
             }));
             self.head = self.head.wrapping_add(1);
         }
 
-        unsafe { std::slice::from_raw_parts_mut(entries as *mut _ as *mut Entry, len as usize) }
+        unsafe { std::slice::from_raw_parts_mut(entries as *mut _ as *mut Entry, len) }
     }
 }
 
