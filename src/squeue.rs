@@ -12,8 +12,8 @@ use bitflags::bitflags;
 pub(crate) struct Inner {
     pub(crate) head: *const atomic::AtomicU32,
     pub(crate) tail: *const atomic::AtomicU32,
-    pub(crate) ring_mask: *const u32,
-    pub(crate) ring_entries: *const u32,
+    pub(crate) ring_mask: u32,
+    pub(crate) ring_entries: u32,
     pub(crate) flags: *const atomic::AtomicU32,
     dropped: *const atomic::AtomicU32,
 
@@ -24,8 +24,6 @@ pub(crate) struct Inner {
 pub struct SubmissionQueue<'a> {
     head: u32,
     tail: u32,
-    ring_mask: u32,
-    ring_entries: u32,
     queue: &'a Inner,
 }
 
@@ -105,8 +103,8 @@ impl Inner {
     ) -> Self {
         let head         = sq_mmap.offset(p.sq_off.head        ) as *const atomic::AtomicU32;
         let tail         = sq_mmap.offset(p.sq_off.tail        ) as *const atomic::AtomicU32;
-        let ring_mask    = sq_mmap.offset(p.sq_off.ring_mask   ) as *const u32;
-        let ring_entries = sq_mmap.offset(p.sq_off.ring_entries) as *const u32;
+        let ring_mask    = sq_mmap.offset(p.sq_off.ring_mask   ).cast::<u32>().read();
+        let ring_entries = sq_mmap.offset(p.sq_off.ring_entries).cast::<u32>().read();
         let flags        = sq_mmap.offset(p.sq_off.flags       ) as *const atomic::AtomicU32;
         let dropped      = sq_mmap.offset(p.sq_off.dropped     ) as *const atomic::AtomicU32;
         let array        = sq_mmap.offset(p.sq_off.array       ) as *mut u32;
@@ -114,7 +112,7 @@ impl Inner {
         let sqes         = sqe_mmap.as_mut_ptr() as *mut sys::io_uring_sqe;
 
         // To keep it simple, map it directly to `sqes`.
-        for i in 0..*ring_entries {
+        for i in 0..ring_entries {
             array.add(i as usize).write_volatile(i);
         }
 
@@ -134,8 +132,6 @@ impl Inner {
             SubmissionQueue {
                 head: (*self.head).load(atomic::Ordering::Acquire),
                 tail: unsync_load(self.tail),
-                ring_mask: self.ring_mask.read(),
-                ring_entries: self.ring_entries.read(),
                 queue: self,
             }
         }
@@ -151,8 +147,6 @@ impl SubmissionQueue<'_> {
         SubmissionQueue {
             head: self.head,
             tail: self.tail,
-            ring_mask: self.ring_mask,
-            ring_entries: self.ring_entries,
             queue: self.queue,
         }
     }
@@ -197,7 +191,7 @@ impl SubmissionQueue<'_> {
     /// Get the total number of entries in the submission queue ring buffer.
     #[inline]
     pub fn capacity(&self) -> usize {
-        self.ring_entries as usize
+        self.queue.ring_entries as usize
     }
 
     /// Get the number of submission queue events in the ring buffer.
@@ -229,7 +223,10 @@ impl SubmissionQueue<'_> {
     #[inline]
     pub unsafe fn push(&mut self, Entry(entry): &Entry) -> Result<(), PushError> {
         if !self.is_full() {
-            *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = *entry;
+            *self
+                .queue
+                .sqes
+                .add((self.tail & self.queue.ring_mask) as usize) = *entry;
             self.tail = self.tail.wrapping_add(1);
             Ok(())
         } else {
@@ -245,7 +242,10 @@ impl SubmissionQueue<'_> {
         }
 
         for Entry(entry) in entries {
-            *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = *entry;
+            *self
+                .queue
+                .sqes
+                .add((self.tail & self.queue.ring_mask) as usize) = *entry;
             self.tail = self.tail.wrapping_add(1);
         }
 

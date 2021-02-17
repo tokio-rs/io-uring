@@ -10,8 +10,8 @@ use crate::util::{unsync_load, Mmap};
 pub(crate) struct Inner {
     pub(crate) head: *const atomic::AtomicU32,
     pub(crate) tail: *const atomic::AtomicU32,
-    pub(crate) ring_mask: *const u32,
-    pub(crate) ring_entries: *const u32,
+    pub(crate) ring_mask: u32,
+    pub(crate) ring_entries: u32,
 
     overflow: *const atomic::AtomicU32,
 
@@ -25,8 +25,6 @@ pub(crate) struct Inner {
 pub struct CompletionQueue<'a> {
     head: u32,
     tail: u32,
-    ring_mask: u32,
-    ring_entries: u32,
     queue: &'a Inner,
 }
 
@@ -40,8 +38,8 @@ impl Inner {
     pub(crate) unsafe fn new(cq_mmap: &Mmap, p: &sys::io_uring_params) -> Self {
         let head         = cq_mmap.offset(p.cq_off.head         ) as *const atomic::AtomicU32;
         let tail         = cq_mmap.offset(p.cq_off.tail         ) as *const atomic::AtomicU32;
-        let ring_mask    = cq_mmap.offset(p.cq_off.ring_mask    ) as *const u32;
-        let ring_entries = cq_mmap.offset(p.cq_off.ring_entries ) as *const u32;
+        let ring_mask    = cq_mmap.offset(p.cq_off.ring_mask    ).cast::<u32>().read();
+        let ring_entries = cq_mmap.offset(p.cq_off.ring_entries ).cast::<u32>().read();
         let overflow     = cq_mmap.offset(p.cq_off.overflow     ) as *const atomic::AtomicU32;
         let cqes         = cq_mmap.offset(p.cq_off.cqes         ) as *const sys::io_uring_cqe;
         let flags        = cq_mmap.offset(p.cq_off.flags        ) as *const atomic::AtomicU32;
@@ -62,8 +60,6 @@ impl Inner {
             CompletionQueue {
                 head: unsync_load(self.head),
                 tail: (*self.tail).load(atomic::Ordering::Acquire),
-                ring_mask: self.ring_mask.read(),
-                ring_entries: self.ring_entries.read(),
                 queue: self,
             }
         }
@@ -79,8 +75,6 @@ impl CompletionQueue<'_> {
         CompletionQueue {
             head: self.head,
             tail: self.tail,
-            ring_mask: self.ring_mask,
-            ring_entries: self.ring_entries,
             queue: self.queue,
         }
     }
@@ -119,7 +113,7 @@ impl CompletionQueue<'_> {
     /// Get the total number of entries in the completion queue ring buffer.
     #[inline]
     pub fn capacity(&self) -> usize {
-        self.ring_entries as usize
+        self.queue.ring_entries as usize
     }
 
     /// Returns `true` if there are no completion queue events to be processed.
@@ -143,7 +137,10 @@ impl CompletionQueue<'_> {
 
         for entry in &mut entries[..len as usize] {
             *entry = MaybeUninit::new(Entry(unsafe {
-                *self.queue.cqes.add((self.head & self.ring_mask) as usize)
+                *self
+                    .queue
+                    .cqes
+                    .add((self.head & self.queue.ring_mask) as usize)
             }));
             self.head = self.head.wrapping_add(1);
         }
@@ -164,7 +161,12 @@ impl Iterator for CompletionQueue<'_> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.head != self.tail {
-            let entry = unsafe { *self.queue.cqes.add((self.head & self.ring_mask) as usize) };
+            let entry = unsafe {
+                *self
+                    .queue
+                    .cqes
+                    .add((self.head & self.queue.ring_mask) as usize)
+            };
             self.head = self.head.wrapping_add(1);
             Some(Entry(entry))
         } else {
