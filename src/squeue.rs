@@ -127,6 +127,7 @@ impl Inner {
         }
     }
 
+    #[inline]
     pub(crate) fn borrow(&mut self) -> SubmissionQueue<'_> {
         unsafe {
             SubmissionQueue {
@@ -143,6 +144,7 @@ impl SubmissionQueue<'_> {
     ///
     /// This can be used to avoid consuming the `SubmissionQueue` when passing it to functions.
     #[must_use]
+    #[inline]
     pub fn reborrow(&mut self) -> SubmissionQueue<'_> {
         SubmissionQueue {
             head: self.head,
@@ -166,6 +168,7 @@ impl SubmissionQueue<'_> {
 
     /// When [`is_setup_sqpoll`](crate::Parameters::is_setup_sqpoll) is set, whether the kernel
     /// threads has gone to sleep and requires a system call to wake it up.
+    #[inline]
     pub fn need_wakeup(&self) -> bool {
         unsafe {
             (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
@@ -254,6 +257,7 @@ impl SubmissionQueue<'_> {
 }
 
 impl Drop for SubmissionQueue<'_> {
+    #[inline]
     fn drop(&mut self) {
         unsafe { &*self.queue.tail }.store(self.tail, atomic::Ordering::Release);
     }

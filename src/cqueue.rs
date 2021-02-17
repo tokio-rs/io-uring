@@ -55,6 +55,7 @@ impl Inner {
         }
     }
 
+    #[inline]
     pub(crate) fn borrow(&mut self) -> CompletionQueue<'_> {
         unsafe {
             CompletionQueue {
@@ -71,6 +72,7 @@ impl CompletionQueue<'_> {
     ///
     /// This can be used to avoid consuming the `CompletionQueue` when passing it to functions.
     #[must_use]
+    #[inline]
     pub fn reborrow(&mut self) -> CompletionQueue<'_> {
         CompletionQueue {
             head: self.head,
@@ -150,6 +152,7 @@ impl CompletionQueue<'_> {
 }
 
 impl Drop for CompletionQueue<'_> {
+    #[inline]
     fn drop(&mut self) {
         unsafe { &*self.queue.head }.store(self.head, atomic::Ordering::Release);
     }
@@ -180,6 +183,7 @@ impl Iterator for CompletionQueue<'_> {
 }
 
 impl ExactSizeIterator for CompletionQueue<'_> {
+    #[inline]
     fn len(&self) -> usize {
         self.tail.wrapping_sub(self.head) as usize
     }
