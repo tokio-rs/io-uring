@@ -9,7 +9,7 @@ fn bench_io_uring() {
     let mut io_uring = IoUring::new(N as _).unwrap();
 
     for _ in 0..ITER {
-        let mut sq = io_uring.submission_mut();
+        let mut sq = io_uring.submission();
 
         for i in 0..N {
             let nop_e = opcode::Nop::new().build().user_data(black_box(i as _));
@@ -22,7 +22,7 @@ fn bench_io_uring() {
 
         io_uring.submit_and_wait(N).unwrap();
 
-        io_uring.completion_mut().map(black_box).for_each(drop);
+        io_uring.completion().map(black_box).for_each(drop);
     }
 }
 
@@ -55,12 +55,12 @@ fn bench_io_uring_batch() {
 
     for _ in 0..ITER {
         unsafe {
-            io_uring.submission_mut().push_multiple(&sqes).ok().unwrap();
+            io_uring.submission().push_multiple(&sqes).ok().unwrap();
         }
 
         io_uring.submit_and_wait(N).unwrap();
 
-        let n = io_uring.completion_mut().fill(&mut cqes);
+        let n = io_uring.completion().fill(&mut cqes);
 
         assert_eq!(n, N);
 

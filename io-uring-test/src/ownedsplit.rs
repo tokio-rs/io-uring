@@ -17,7 +17,7 @@ fn test_nop(ring: IoUring) -> anyhow::Result<()> {
 
     let sj = thread::spawn(move || {
         unsafe {
-            su.submission_mut().push(&nop_e).expect("queue is full");
+            su.submission().push(&nop_e).expect("queue is full");
         }
         stu2.submitter().submit()?;
         Ok(()) as std::io::Result<()>
@@ -25,7 +25,7 @@ fn test_nop(ring: IoUring) -> anyhow::Result<()> {
 
     stu.submitter().submit_and_wait(1)?;
 
-    let cqes = cu.completion_mut().collect::<Vec<_>>();
+    let cqes = cu.completion().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x42);

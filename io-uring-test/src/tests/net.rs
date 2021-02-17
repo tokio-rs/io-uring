@@ -63,7 +63,7 @@ pub fn test_tcp_send_recv(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<(
     let recv_e = opcode::Recv::new(fd, output.as_mut_ptr(), output.len() as _);
 
     unsafe {
-        let mut queue = ring.submission_mut();
+        let mut queue = ring.submission();
         let send_e = send_e.build().user_data(0x01).flags(squeue::Flags::IO_LINK);
         queue.push(&send_e).expect("queue is full");
         queue
@@ -73,7 +73,7 @@ pub fn test_tcp_send_recv(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<(
 
     ring.submit_and_wait(2)?;
 
-    let cqes = ring.completion_mut().collect::<Vec<_>>();
+    let cqes = ring.completion().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
@@ -135,7 +135,7 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, probe: &Probe) -> anyhow::Re
 
     // submit
     unsafe {
-        let mut queue = ring.submission_mut();
+        let mut queue = ring.submission();
         queue
             .push(
                 &sendmsg_e
@@ -152,7 +152,7 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, probe: &Probe) -> anyhow::Re
     ring.submit_and_wait(2)?;
 
     // complete
-    let cqes = ring.completion_mut().collect::<Vec<_>>();
+    let cqes = ring.completion().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
@@ -193,14 +193,14 @@ pub fn test_tcp_accept(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> 
     let accept_e = opcode::Accept::new(fd, &mut sockaddr, &mut addrlen);
 
     unsafe {
-        ring.submission_mut()
+        ring.submission()
             .push(&accept_e.build().user_data(0x0e))
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion_mut().collect::<Vec<_>>();
+    let cqes = ring.completion().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0e);
@@ -242,14 +242,14 @@ pub fn test_tcp_connect(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()>
     );
 
     unsafe {
-        ring.submission_mut()
+        ring.submission()
             .push(&connect_e.build().user_data(0x0f))
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion_mut().collect::<Vec<_>>();
+    let cqes = ring.completion().collect::<Vec<_>>();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0f);

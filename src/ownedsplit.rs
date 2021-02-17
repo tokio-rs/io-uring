@@ -12,12 +12,12 @@ pub struct SubmitterUring {
 
 pub struct SubmissionUring {
     _inner: Arc<Inner>,
-    sq: SubmissionQueue,
+    sq: squeue::Inner,
 }
 
 pub struct CompletionUring {
     _inner: Arc<Inner>,
-    cq: CompletionQueue,
+    cq: cqueue::Inner,
 }
 
 /// Safety: This only allows execution of syscall and atomic reads, so it is thread-safe.
@@ -69,14 +69,14 @@ impl SubmitterUring {
 impl SubmissionUring {
     /// Get the submission queue of the io_uring instace. This is used to send I/O requests to the
     /// kernel.
-    pub fn submission_mut(&mut self) -> squeue::Mut<'_> {
-        squeue::Mut(&mut self.sq)
+    pub fn submission(&mut self) -> SubmissionQueue<'_> {
+        self.sq.borrow()
     }
 }
 
 impl CompletionUring {
     /// Get completion queue. This is used to receive I/O completion events from the kernel.
-    pub fn completion_mut(&mut self) -> cqueue::Mut<'_> {
-        cqueue::Mut(&mut self.cq)
+    pub fn completion(&mut self) -> CompletionQueue<'_> {
+        self.cq.borrow()
     }
 }

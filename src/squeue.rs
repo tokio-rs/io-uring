@@ -1,6 +1,5 @@
 //! Submission Queue
 
-use std::ops::Deref;
 use std::sync::atomic;
 
 use crate::sys;
@@ -8,8 +7,7 @@ use crate::util::{unsync_load, Mmap};
 
 use bitflags::bitflags;
 
-/// An io_uring instance's submission queue. This is used to send I/O requests to the kernel.
-pub struct SubmissionQueue {
+pub(crate) struct Inner {
     pub(crate) head: *const atomic::AtomicU32,
     pub(crate) tail: *const atomic::AtomicU32,
     pub(crate) ring_mask: *const u32,
@@ -20,11 +18,14 @@ pub struct SubmissionQueue {
     pub(crate) sqes: *mut sys::io_uring_sqe,
 }
 
-/// A type that grants mutable access to an io_uring's [submission queue](SubmissionQueue).
-///
-/// This is necessary to prevent users swapping out the submission queue, which can cause
-/// unsoundness.
-pub struct Mut<'a>(pub(crate) &'a mut SubmissionQueue);
+/// An io_uring instance's submission queue. This is used to send I/O requests to the kernel.
+pub struct SubmissionQueue<'a> {
+    head: u32,
+    tail: u32,
+    ring_mask: u32,
+    ring_entries: u32,
+    queue: &'a Inner,
+}
 
 /// An entry in the submission queue, representing a request for an I/O operation.
 ///
@@ -93,13 +94,13 @@ bitflags! {
     }
 }
 
-impl SubmissionQueue {
+impl Inner {
     #[rustfmt::skip]
     pub(crate) unsafe fn new(
         sq_mmap: &Mmap,
         sqe_mmap: &Mmap,
         p: &sys::io_uring_params,
-    ) -> SubmissionQueue {
+    ) -> Self {
         let head         = sq_mmap.offset(p.sq_off.head        ) as *const atomic::AtomicU32;
         let tail         = sq_mmap.offset(p.sq_off.tail        ) as *const atomic::AtomicU32;
         let ring_mask    = sq_mmap.offset(p.sq_off.ring_mask   ) as *const u32;
@@ -115,7 +116,7 @@ impl SubmissionQueue {
             array.add(i as usize).write_volatile(i);
         }
 
-        SubmissionQueue {
+        Self {
             head,
             tail,
             ring_mask,
@@ -126,16 +127,59 @@ impl SubmissionQueue {
         }
     }
 
+    pub(crate) fn borrow(&mut self) -> SubmissionQueue<'_> {
+        unsafe {
+            SubmissionQueue {
+                head: (*self.head).load(atomic::Ordering::Acquire),
+                tail: unsync_load(self.tail),
+                ring_mask: self.ring_mask.read(),
+                ring_entries: self.ring_entries.read(),
+                queue: self,
+            }
+        }
+    }
+}
+
+impl SubmissionQueue<'_> {
+    /// Reborrow this queue to a shorter lifetime.
+    ///
+    /// This can be used to avoid consuming the `SubmissionQueue` when passing it to functions.
+    #[must_use]
+    pub fn reborrow(&mut self) -> SubmissionQueue<'_> {
+        SubmissionQueue {
+            head: self.head,
+            tail: self.tail,
+            ring_mask: self.ring_mask,
+            ring_entries: self.ring_entries,
+            queue: self.queue,
+        }
+    }
+
+    /// Synchronize this type with the real submission queue.
+    ///
+    /// This will flush any entries added by [`push`](Self::push) or
+    /// [`push_multiple`](Self::push_multiple) and will update the queue's length if the kernel has
+    /// consumed some entries in the meantime.
+    #[inline]
+    pub fn sync(&mut self) {
+        unsafe {
+            (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
+            self.tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
+        }
+    }
+
     /// When [`is_setup_sqpoll`](crate::Parameters::is_setup_sqpoll) is set, whether the kernel
     /// threads has gone to sleep and requires a system call to wake it up.
     pub fn need_wakeup(&self) -> bool {
-        unsafe { (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0 }
+        unsafe {
+            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
+        }
     }
 
     /// The number of invalid submission queue entries that have been encountered in the ring
     /// buffer.
     pub fn dropped(&self) -> u32 {
-        unsafe { (*self.dropped).load(atomic::Ordering::Acquire) }
+        unsafe { (*self.queue.dropped).load(atomic::Ordering::Acquire) }
     }
 
     /// Returns `true` if the completion queue ring is overflown.
@@ -143,24 +187,21 @@ impl SubmissionQueue {
     /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn cq_overflow(&self) -> bool {
-        unsafe { (*self.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0 }
+        unsafe {
+            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0
+        }
     }
 
     /// Get the total number of entries in the submission queue ring buffer.
     #[inline]
     pub fn capacity(&self) -> usize {
-        unsafe { self.ring_entries.read() as usize }
+        self.ring_entries as usize
     }
 
     /// Get the number of submission queue events in the ring buffer.
     #[inline]
     pub fn len(&self) -> usize {
-        unsafe {
-            let head = (*self.head).load(atomic::Ordering::Acquire);
-            let tail = unsync_load(self.tail);
-
-            tail.wrapping_sub(head) as usize
-        }
+        self.tail.wrapping_sub(self.head) as usize
     }
 
     /// Returns `true` if the submission queue ring buffer is empty.
@@ -175,16 +216,6 @@ impl SubmissionQueue {
     pub fn is_full(&self) -> bool {
         self.len() == self.capacity()
     }
-}
-
-impl Mut<'_> {
-    /// Reborrow this mutable accessor to a shorter lifetime.
-    ///
-    /// This can be used to avoid consuming the `Mut` when passing it to functions.
-    #[must_use]
-    pub fn reborrow(&mut self) -> Mut<'_> {
-        Mut(self.0)
-    }
 
     /// Attempts to push an [`Entry`] into the queue.
     /// If the queue is full, the element is returned back as an error.
@@ -196,11 +227,8 @@ impl Mut<'_> {
     #[inline]
     pub unsafe fn push(&mut self, Entry(entry): &Entry) -> Result<(), Insufficient> {
         if !self.is_full() {
-            *self
-                .0
-                .sqes
-                .add((unsync_load(self.0.tail) & *self.ring_mask) as usize) = *entry;
-            (*self.0.tail).fetch_add(1, atomic::Ordering::Release);
+            *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = *entry;
+            self.tail = self.tail.wrapping_add(1);
             Ok(())
         } else {
             Err(Insufficient(()))
@@ -210,28 +238,22 @@ impl Mut<'_> {
     #[cfg(feature = "unstable")]
     #[inline]
     pub unsafe fn push_multiple(&mut self, entries: &[Entry]) -> Result<(), Insufficient> {
-        let head = (*self.0.head).load(atomic::Ordering::Acquire);
-        let mut tail = unsync_load(self.0.tail);
-
-        if self.capacity() - (tail.wrapping_sub(head) as usize) < entries.len() {
+        if self.capacity() - self.len() < entries.len() {
             return Err(Insufficient(()));
         }
 
         for Entry(entry) in entries {
-            *self.0.sqes.add((tail & *self.ring_mask) as usize) = *entry;
-            tail = tail.wrapping_add(1);
+            *self.queue.sqes.add((self.tail & self.ring_mask) as usize) = *entry;
+            self.tail = self.tail.wrapping_add(1);
         }
-
-        (*self.0.tail).store(tail, atomic::Ordering::Release);
 
         Ok(())
     }
 }
 
-impl Deref for Mut<'_> {
-    type Target = SubmissionQueue;
-    fn deref(&self) -> &Self::Target {
-        self.0
+impl Drop for SubmissionQueue<'_> {
+    fn drop(&mut self) {
+        unsafe { &*self.queue.tail }.store(self.tail, atomic::Ordering::Release);
     }
 }
 

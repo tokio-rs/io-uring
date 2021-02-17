@@ -22,7 +22,7 @@ fn bench_normal(c: &mut Criterion) {
 
             while queue.want() {
                 {
-                    let mut sq = io_uring.submission_mut();
+                    let mut sq = io_uring.submission();
                     while queue.want() {
                         unsafe {
                             match sq.push(&black_box(opcode::Nop::new()).build()) {
@@ -35,7 +35,7 @@ fn bench_normal(c: &mut Criterion) {
 
                 io_uring.submit_and_wait(16).unwrap();
 
-                io_uring.completion_mut().map(black_box).for_each(drop);
+                io_uring.completion().map(black_box).for_each(drop);
             }
         });
     });

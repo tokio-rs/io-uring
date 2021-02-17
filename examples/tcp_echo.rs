@@ -2,7 +2,7 @@ use std::net::TcpListener;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, ptr};
 
-use io_uring::{opcode, squeue, types, IoUring};
+use io_uring::{opcode, squeue, types, IoUring, SubmissionQueue};
 use slab::Slab;
 
 #[derive(Clone, Debug)]
@@ -38,7 +38,7 @@ impl AcceptCount {
         }
     }
 
-    pub fn push_to(&mut self, mut sq: squeue::Mut<'_>) {
+    pub fn push_to(&mut self, mut sq: SubmissionQueue<'_>) {
         while self.count > 0 {
             unsafe {
                 match sq.push(&self.entry) {
@@ -85,6 +85,7 @@ fn main() -> anyhow::Result<()> {
                     Err(err) => return Err(err.into()),
                 }
             }
+            sq.sync();
 
             match iter.next() {
                 Some(sqe) => unsafe {
