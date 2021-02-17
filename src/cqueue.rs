@@ -8,14 +8,14 @@ use crate::sys;
 use crate::util::{unsync_load, Mmap};
 
 pub(crate) struct Inner {
-    pub(crate) head: *const atomic::AtomicU32,
-    pub(crate) tail: *const atomic::AtomicU32,
-    pub(crate) ring_mask: *const u32,
-    pub(crate) ring_entries: *const u32,
+    head: *const atomic::AtomicU32,
+    tail: *const atomic::AtomicU32,
+    ring_mask: *const u32,
+    ring_entries: *const u32,
 
     overflow: *const atomic::AtomicU32,
 
-    pub(crate) cqes: *const sys::io_uring_cqe,
+    cqes: *const sys::io_uring_cqe,
 
     #[allow(dead_code)]
     flags: *const atomic::AtomicU32,
@@ -138,7 +138,7 @@ impl CompletionQueue<'_> {
 
     #[cfg(feature = "unstable")]
     #[inline]
-    pub fn fill(&mut self, entries: &mut [MaybeUninit<Entry>]) -> usize {
+    pub fn fill<'a>(&mut self, entries: &'a mut [MaybeUninit<Entry>]) -> &'a mut [Entry] {
         let len = std::cmp::min(self.len(), entries.len()) as u32;
 
         for entry in &mut entries[..len as usize] {
@@ -148,7 +148,7 @@ impl CompletionQueue<'_> {
             self.head = self.head.wrapping_add(1);
         }
 
-        len as usize
+        unsafe { std::slice::from_raw_parts_mut(entries as *mut _ as *mut Entry, len as usize) }
     }
 }
 

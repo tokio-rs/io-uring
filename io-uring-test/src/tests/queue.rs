@@ -55,13 +55,11 @@ pub fn test_batch(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
 
     let mut cqes = (0..10).map(|_| MaybeUninit::uninit()).collect::<Vec<_>>();
 
-    let n = ring.completion().fill(&mut cqes);
+    let cqes = ring.completion().fill(&mut cqes);
 
-    assert_eq!(n, 8);
+    assert_eq!(cqes.len(), 8);
 
-    for entry in cqes.into_iter().take(8) {
-        let entry = unsafe { entry.assume_init() };
-
+    for entry in cqes {
         assert_eq!(entry.user_data(), 0x09);
     }
 

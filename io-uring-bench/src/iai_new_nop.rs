@@ -60,9 +60,9 @@ fn bench_io_uring_batch() {
 
         io_uring.submit_and_wait(N).unwrap();
 
-        let n = io_uring.completion().fill(&mut cqes);
+        let init_cqes = io_uring.completion().fill(&mut cqes);
 
-        assert_eq!(n, N);
+        assert_eq!(init_cqes.len(), N);
 
         cqes.iter().map(black_box).for_each(drop);
     }
