@@ -45,6 +45,7 @@ impl<'a> Submitter<'a> {
         }
     }
 
+    #[inline]
     fn sq_len(&self) -> usize {
         unsafe {
             let head = (*self.sq_head).load(atomic::Ordering::Acquire);
@@ -56,6 +57,7 @@ impl<'a> Submitter<'a> {
 
     /// Whether the kernel thread has gone to sleep because it waited for too long without
     /// submission queue entries.
+    #[inline]
     fn sq_need_wakeup(&self) -> bool {
         unsafe {
             (*self.sq_flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0

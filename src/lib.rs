@@ -173,6 +173,7 @@ impl IoUring {
 
     /// Get the submitter, submission queue and completion queue of the io_uring instance. This can
     /// be used to operate on the different parts of the io_uring instance independently.
+    #[inline]
     pub fn split(&mut self) -> (Submitter<'_>, SubmissionQueue<'_>, CompletionQueue<'_>) {
         let submit = Submitter::new(
             &self.inner.fd,
@@ -186,11 +187,13 @@ impl IoUring {
 
     /// Get the submission queue of the io_uring instance. This is used to send I/O requests to the
     /// kernel.
+    #[inline]
     pub fn submission(&mut self) -> SubmissionQueue<'_> {
         self.sq.borrow()
     }
 
     /// Get completion queue. This is used to receive I/O completion events from the kernel.
+    #[inline]
     pub fn completion(&mut self) -> CompletionQueue<'_> {
         self.cq.borrow()
     }
