@@ -8,14 +8,14 @@ use crate::sys;
 use crate::util::{unsync_load, Mmap};
 
 pub(crate) struct Inner {
-    pub(crate) head: *const atomic::AtomicU32,
-    pub(crate) tail: *const atomic::AtomicU32,
-    pub(crate) ring_mask: u32,
-    pub(crate) ring_entries: u32,
+    head: *const atomic::AtomicU32,
+    tail: *const atomic::AtomicU32,
+    ring_mask: u32,
+    ring_entries: u32,
 
     overflow: *const atomic::AtomicU32,
 
-    pub(crate) cqes: *const sys::io_uring_cqe,
+    cqes: *const sys::io_uring_cqe,
 
     #[allow(dead_code)]
     flags: *const atomic::AtomicU32,
@@ -132,10 +132,10 @@ impl CompletionQueue<'_> {
 
     #[cfg(feature = "unstable")]
     #[inline]
-    pub fn fill(&mut self, entries: &mut [MaybeUninit<Entry>]) -> usize {
-        let len = std::cmp::min(self.len(), entries.len()) as u32;
+    pub fn fill<'a>(&mut self, entries: &'a mut [MaybeUninit<Entry>]) -> &'a mut [Entry] {
+        let len = std::cmp::min(self.len(), entries.len());
 
-        for entry in &mut entries[..len as usize] {
+        for entry in &mut entries[..len] {
             *entry = MaybeUninit::new(Entry(unsafe {
                 *self
                     .queue
@@ -145,7 +145,7 @@ impl CompletionQueue<'_> {
             self.head = self.head.wrapping_add(1);
         }
 
-        len as usize
+        unsafe { std::slice::from_raw_parts_mut(entries as *mut _ as *mut Entry, len) }
     }
 }
 
