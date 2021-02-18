@@ -1,13 +1,15 @@
 use crate::{CompletionQueue, IoUring, SubmissionQueue, Submitter};
 use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SubmitterUring {
     inner: Arc<IoUring>,
 }
+#[derive(Debug)]
 pub struct SubmissionUring {
     inner: Arc<IoUring>,
 }
+#[derive(Debug)]
 pub struct CompletionUring {
     inner: Arc<IoUring>,
 }

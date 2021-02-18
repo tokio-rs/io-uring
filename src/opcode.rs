@@ -502,6 +502,7 @@ opcode!(
 
 opcode!(
     /// Attempt to remove an existing [timeout operation](Timeout).
+    #[derive(Debug)]
     pub struct TimeoutRemove {
         user_data: { u64 },
         ;;
@@ -524,6 +525,7 @@ opcode!(
 
 opcode!(
     /// Accept a new connection on a socket, equivalent to `accept4(2)`.
+    #[derive(Debug)]
     pub struct Accept {
         fd: { impl sealed::UseFixed },
         addr: { *mut libc::sockaddr },
@@ -549,6 +551,7 @@ opcode!(
 
 opcode!(
     /// Attempt to cancel an already issued request.
+    #[derive(Debug)]
     pub struct AsyncCancel {
         user_data: { u64 }
         ;;
@@ -573,6 +576,7 @@ opcode!(
     /// This request must be linked with another request through
     /// [`Flags::IO_LINK`](crate::squeue::Flags::IO_LINK) which is described below.
     /// Unlike [`Timeout`], [`LinkTimeout`] acts on the linked request, not the completion queue.
+    #[derive(Debug)]
     pub struct LinkTimeout {
         timespec: { *const types::Timespec },
         ;;
@@ -596,6 +600,7 @@ opcode!(
 
 opcode!(
     /// Connect a socket, equivalent to `connect(2)`.
+    #[derive(Debug)]
     pub struct Connect {
         fd: { impl sealed::UseFixed },
         addr: { *const libc::sockaddr },
@@ -621,6 +626,7 @@ opcode!(
 
 opcode!(
     /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
+    #[derive(Debug)]
     pub struct Fallocate {
         fd: { impl sealed::UseFixed },
         len: { libc::off_t },
@@ -646,6 +652,7 @@ opcode!(
 
 opcode!(
     /// Open a file, equivalent to `openat(2)`.
+    #[derive(Debug)]
     pub struct OpenAt {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -671,6 +678,7 @@ opcode!(
 
 opcode!(
     /// Close a file descriptor, equivalent to `close(2)`.
+    #[derive(Debug)]
     pub struct Close {
         fd: { impl sealed::UseFd }
         ;;
@@ -692,6 +700,7 @@ opcode!(
     /// This command is an alternative to using
     /// [`Submitter::register_files_update`](crate::Submitter::register_files_update) which then
     /// works in an async fashion, like the rest of the io_uring commands.
+    #[derive(Debug)]
     pub struct FilesUpdate {
         fds: { *const RawFd },
         len: { u32 },
@@ -716,6 +725,7 @@ opcode!(
 
 opcode!(
     /// Get file status, equivalent to `statx(2)`.
+    #[derive(Debug)]
     pub struct Statx {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -746,6 +756,7 @@ opcode!(
 
 opcode!(
     /// Read from a file descriptor, equivalent to `read(2)`.
+    #[derive(Debug)]
     pub struct Read {
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
@@ -782,6 +793,7 @@ opcode!(
 
 opcode!(
     /// Write to a file descriptor, equivalent to `write(2)`.
+    #[derive(Debug)]
     pub struct Write {
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
@@ -815,6 +827,7 @@ opcode!(
 
 opcode!(
     /// Predeclare an access pattern for file data, equivalent to `posix_fadvise(2)`.
+    #[derive(Debug)]
     pub struct Fadvise {
         fd: { impl sealed::UseFixed },
         len: { libc::off_t },
@@ -840,6 +853,7 @@ opcode!(
 
 opcode!(
     /// Give advice about use of memory, equivalent to `madvise(2)`.
+    #[derive(Debug)]
     pub struct Madvise {
         addr: { *const libc::c_void },
         len: { libc::off_t },
@@ -864,6 +878,7 @@ opcode!(
 
 opcode!(
     /// Send a message on a socket, equivalent to `send(2)`.
+    #[derive(Debug)]
     pub struct Send {
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
@@ -889,6 +904,7 @@ opcode!(
 
 opcode!(
     /// Receive a message from a socket, equivalent to `recv(2)`.
+    #[derive(Debug)]
     pub struct Recv {
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
@@ -916,6 +932,7 @@ opcode!(
 
 opcode!(
     /// Open a file, equivalent to `openat2(2)`.
+    #[derive(Debug)]
     pub struct OpenAt2 {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -940,6 +957,7 @@ opcode!(
 
 opcode!(
     /// Modify an epoll file descriptor, equivalent to `epoll_ctl(2)`.
+    #[derive(Debug)]
     pub struct EpollCtl {
         epfd: { impl sealed::UseFixed },
         fd: { impl sealed::UseFd },
@@ -970,6 +988,7 @@ opcode!(
     /// Splice data to/from a pipe, equivalent to `splice(2)`.
     ///
     /// Requires the `unstable` feature.
+    #[derive(Debug)]
     pub struct Splice {
         fd_in: { impl sealed::UseFixed },
         off_in: { i64 },
@@ -1012,6 +1031,7 @@ opcode!(
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     ///
     /// Requires the `unstable` feature.
+    #[derive(Debug)]
     pub struct ProvideBuffers {
         addr: { *mut u8 },
         len: { i32 },
@@ -1043,6 +1063,7 @@ opcode!(
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     ///
     /// Requires the `unstable` feature.
+    #[derive(Debug)]
     pub struct RemoveBuffers {
         nbufs: { u16 },
         bgid: { u16 }
@@ -1069,6 +1090,7 @@ opcode!(
     /// Duplicate pipe content, equivalent to `tee(2)`.
     ///
     /// Requires the `unstable` feature.
+    #[derive(Debug)]
     pub struct Tee {
         fd_in: { impl sealed::UseFixed },
         fd_out: { impl sealed::UseFixed },
@@ -1106,6 +1128,7 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    #[derive(Debug)]
     pub struct Shutdown {
         fd: { impl sealed::UseFixed },
         how: { i32 },
@@ -1127,6 +1150,7 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    #[derive(Debug)]
     pub struct RenameAt {
         olddirfd: { impl sealed::UseFd },
         oldpath: { *const libc::c_char },
@@ -1158,6 +1182,7 @@ opcode!(
 
 #[cfg(feature = "unstable")]
 opcode!(
+    #[derive(Debug)]
     pub struct UnlinkAt {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },

@@ -1,7 +1,7 @@
 //! Submission Queue
 
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::atomic;
 
 use crate::sys;
@@ -21,6 +21,7 @@ pub(crate) struct Inner {
 }
 
 /// An io_uring instance's submission queue. This is used to send I/O requests to the kernel.
+#[derive(Debug)]
 pub struct SubmissionQueue<'a> {
     head: u32,
     tail: u32,
@@ -139,6 +140,20 @@ impl Inner {
     #[inline]
     pub(crate) fn borrow(&mut self) -> SubmissionQueue<'_> {
         unsafe { self.borrow_shared() }
+    }
+}
+
+impl Debug for Inner {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SubmissionQueueInner")
+            .field("head", unsafe { &*self.head })
+            .field("tail", unsafe { &*self.tail })
+            .field("ring_mask", &self.ring_mask)
+            .field("ring_entries", &self.ring_entries)
+            .field("flags", unsafe { &*self.flags })
+            .field("dropped", unsafe { &*self.dropped })
+            .field("sqes", &self.sqes)
+            .finish()
     }
 }
 
@@ -298,6 +313,20 @@ impl Entry {
     pub fn personality(mut self, personality: u16) -> Entry {
         self.0.__bindgen_anon_4.__bindgen_anon_1.personality = personality;
         self
+    }
+}
+
+impl Debug for Entry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Entry")
+            .field("opcode", &self.0.opcode)
+            .field("fd", &self.0.fd)
+            .field("flags", &Flags::from_bits(self.0.flags).unwrap())
+            .field("user_data", &self.0.user_data)
+            .field("personality", unsafe {
+                &self.0.__bindgen_anon_4.__bindgen_anon_1.personality
+            })
+            .finish()
     }
 }
 

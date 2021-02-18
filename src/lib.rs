@@ -2,7 +2,7 @@
 //!
 //! The crate only provides a summary of the parameters.
 //! For more detailed documentation, see manpage.
-#![warn(rust_2018_idioms, unused_qualifications)]
+#![warn(rust_2018_idioms, unused_qualifications, missing_debug_implementations)]
 
 #[macro_use]
 mod util;
@@ -19,6 +19,7 @@ pub mod types;
 pub mod ownedsplit;
 
 use std::convert::TryInto;
+use std::fmt::{self, Debug, Formatter};
 use std::mem::ManuallyDrop;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{cmp, io, mem};
@@ -30,6 +31,7 @@ pub use submit::Submitter;
 use util::{Fd, Mmap};
 
 /// IoUring instance
+#[derive(Debug)]
 pub struct IoUring {
     sq: squeue::Inner,
     cq: cqueue::Inner,
@@ -38,7 +40,7 @@ pub struct IoUring {
     memory: ManuallyDrop<MemoryMap>,
 }
 
-#[allow(dead_code)]
+#[derive(Debug)]
 struct MemoryMap {
     sq_mmap: Mmap,
     sqe_mmap: Mmap,
@@ -334,6 +336,57 @@ impl Builder {
     }
 }
 
+impl Debug for Builder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let sqpoll = self.params.flags & sys::IORING_SETUP_SQPOLL != 0;
+        f.debug_struct("Builder")
+            .field("dontfork", &self.dontfork)
+            .field(
+                "iopoll",
+                &(self.params.flags & sys::IORING_SETUP_IOPOLL != 0),
+            )
+            .field("sqpoll", &sqpoll)
+            .field(
+                "sq_thread_idle",
+                if sqpoll {
+                    &self.params.sq_thread_idle
+                } else {
+                    &None::<()>
+                },
+            )
+            .field(
+                "sqpoll_cpu",
+                if sqpoll && self.params.flags & sys::IORING_SETUP_SQ_AFF != 0 {
+                    &self.params.sq_thread_cpu
+                } else {
+                    &None::<()>
+                },
+            )
+            .field(
+                "cqsize",
+                if self.params.flags & sys::IORING_SETUP_CQSIZE != 0 {
+                    &self.params.cq_entries
+                } else {
+                    &None::<()>
+                },
+            )
+            .field("clamp", &(self.params.flags & sys::IORING_SETUP_CLAMP != 0))
+            .field(
+                "attach_wq_fd",
+                if self.params.flags & sys::IORING_SETUP_ATTACH_WQ != 0 {
+                    &self.params.wq_fd
+                } else {
+                    &None::<()>
+                },
+            )
+            .field(
+                "r_disabled",
+                &(self.params.flags & sys::IORING_SETUP_R_DISABLED != 0),
+            )
+            .finish()
+    }
+}
+
 impl Parameters {
     /// Whether a kernel thread is performing queue polling. Enabled with [`Builder::setup_sqpoll`].
     pub fn is_setup_sqpoll(&self) -> bool {
@@ -425,6 +478,26 @@ impl Parameters {
     /// The number of completion queue entries allocated.
     pub fn cq_entries(&self) -> u32 {
         self.0.cq_entries
+    }
+}
+
+impl Debug for Parameters {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Parameters")
+            .field("is_setup_sqpoll", &self.is_setup_sqpoll())
+            .field("is_setup_iopoll", &self.is_setup_iopoll())
+            .field("is_feature_single_mmap", &self.is_feature_single_mmap())
+            .field("is_feature_nodrop", &self.is_feature_nodrop())
+            .field("is_feature_submit_stable", &self.is_feature_submit_stable())
+            .field("is_feature_rw_cur_pos", &self.is_feature_rw_cur_pos())
+            .field(
+                "is_feature_cur_personality",
+                &self.is_feature_cur_personality(),
+            )
+            .field("is_feature_poll_32bits", &self.is_feature_poll_32bits())
+            .field("sq_entries", &self.0.sq_entries)
+            .field("cq_entries", &self.0.cq_entries)
+            .finish()
     }
 }
 

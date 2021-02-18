@@ -4,6 +4,7 @@ use std::sync::atomic;
 use std::{io, mem, ptr};
 
 /// A region of memory mapped using `mmap(2)`.
+#[derive(Debug)]
 pub struct Mmap {
     addr: ptr::NonNull<libc::c_void>,
     len: usize,
@@ -61,6 +62,7 @@ impl Drop for Mmap {
 }
 
 /// An owned file descriptor.
+#[derive(Debug)]
 pub struct Fd(pub RawFd);
 
 impl TryFrom<RawFd> for Fd {

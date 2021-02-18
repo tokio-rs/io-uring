@@ -1,3 +1,4 @@
+use std::fmt::{self, Debug, Formatter};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, ptr};
@@ -371,5 +372,17 @@ impl<'a> Submitter<'a> {
             0,
         )
         .map(drop)
+    }
+}
+
+impl Debug for Submitter<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Submitter")
+            .field("fd", self.fd)
+            .field("params", self.params)
+            .field("sq_head", unsafe { &*self.sq_head })
+            .field("sq_tail", unsafe { &*self.sq_tail })
+            .field("sq_flags", unsafe { &*self.sq_flags })
+            .finish()
     }
 }

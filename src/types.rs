@@ -54,12 +54,14 @@ pub use sys::__kernel_rwf_t as RwFlags;
 
 /// Opaque types, you should use [`statx`](struct@libc::statx) instead.
 #[repr(C)]
+#[allow(missing_debug_implementations)]
 pub struct statx {
     _priv: (),
 }
 
 /// Opaque types, you should use [`epoll_event`](libc::epoll_event) instead.
 #[repr(C)]
+#[allow(missing_debug_implementations)]
 pub struct epoll_event {
     _priv: (),
 }
