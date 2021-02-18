@@ -1,23 +1,15 @@
-use crate::{cqueue, squeue, CompletionQueue, Inner, IoUring, SubmissionQueue, Submitter};
-use std::sync::{atomic, Arc};
+use crate::{CompletionQueue, IoUring, SubmissionQueue, Submitter};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct SubmitterUring {
-    inner: Arc<Inner>,
-
-    sq_head: *const atomic::AtomicU32,
-    sq_tail: *const atomic::AtomicU32,
-    sq_flags: *const atomic::AtomicU32,
+    inner: Arc<IoUring>,
 }
-
 pub struct SubmissionUring {
-    _inner: Arc<Inner>,
-    sq: squeue::Inner,
+    inner: Arc<IoUring>,
 }
-
 pub struct CompletionUring {
-    _inner: Arc<Inner>,
-    cq: cqueue::Inner,
+    inner: Arc<IoUring>,
 }
 
 /// Safety: This only allows execution of syscall and atomic reads, so it is thread-safe.
@@ -28,27 +20,16 @@ unsafe impl Send for SubmissionUring {}
 unsafe impl Send for CompletionUring {}
 
 pub(crate) fn split(ring: IoUring) -> (SubmitterUring, SubmissionUring, CompletionUring) {
-    let inner = Arc::new(ring.inner);
-    let inner2 = Arc::clone(&inner);
-    let inner3 = Arc::clone(&inner);
-
-    let stu = SubmitterUring {
-        inner,
-
-        sq_head: ring.sq.head,
-        sq_tail: ring.sq.tail,
-        sq_flags: ring.sq.flags,
-    };
-    let su = SubmissionUring {
-        _inner: inner2,
-        sq: ring.sq,
-    };
-    let cu = CompletionUring {
-        _inner: inner3,
-        cq: ring.cq,
-    };
-
-    (stu, su, cu)
+    let inner = Arc::new(ring);
+    (
+        SubmitterUring {
+            inner: Arc::clone(&inner),
+        },
+        SubmissionUring {
+            inner: Arc::clone(&inner),
+        },
+        CompletionUring { inner },
+    )
 }
 
 impl SubmitterUring {
@@ -56,13 +37,7 @@ impl SubmitterUring {
     /// events to the kernel for execution and to register files or buffers with it.
     #[inline]
     pub fn submitter(&self) -> Submitter<'_> {
-        Submitter::new(
-            &self.inner.fd,
-            &self.inner.params,
-            self.sq_head,
-            self.sq_tail,
-            self.sq_flags,
-        )
+        self.inner.submitter()
     }
 }
 
@@ -70,13 +45,13 @@ impl SubmissionUring {
     /// Get the submission queue of the io_uring instace. This is used to send I/O requests to the
     /// kernel.
     pub fn submission(&mut self) -> SubmissionQueue<'_> {
-        self.sq.borrow()
+        unsafe { self.inner.submission_shared() }
     }
 }
 
 impl CompletionUring {
     /// Get completion queue. This is used to receive I/O completion events from the kernel.
     pub fn completion(&mut self) -> CompletionQueue<'_> {
-        self.cq.borrow()
+        unsafe { self.inner.completion_shared() }
     }
 }

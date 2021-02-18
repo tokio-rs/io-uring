@@ -128,14 +128,17 @@ impl Inner {
     }
 
     #[inline]
-    pub(crate) fn borrow(&mut self) -> SubmissionQueue<'_> {
-        unsafe {
-            SubmissionQueue {
-                head: (*self.head).load(atomic::Ordering::Acquire),
-                tail: unsync_load(self.tail),
-                queue: self,
-            }
+    pub(crate) unsafe fn borrow_shared(&self) -> SubmissionQueue<'_> {
+        SubmissionQueue {
+            head: (*self.head).load(atomic::Ordering::Acquire),
+            tail: unsync_load(self.tail),
+            queue: self,
         }
+    }
+
+    #[inline]
+    pub(crate) fn borrow(&mut self) -> SubmissionQueue<'_> {
+        unsafe { self.borrow_shared() }
     }
 }
 

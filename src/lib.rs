@@ -31,12 +31,8 @@ use util::{Fd, Mmap};
 
 /// IoUring instance
 pub struct IoUring {
-    inner: Inner,
     sq: squeue::Inner,
     cq: cqueue::Inner,
-}
-
-struct Inner {
     fd: Fd,
     params: Parameters,
     memory: ManuallyDrop<MemoryMap>,
@@ -131,13 +127,11 @@ impl IoUring {
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
         Ok(IoUring {
-            inner: Inner {
-                fd,
-                params: Parameters(p),
-                memory: ManuallyDrop::new(mm),
-            },
             sq,
             cq,
+            fd,
+            params: Parameters(p),
+            memory: ManuallyDrop::new(mm),
         })
     }
 
@@ -146,8 +140,8 @@ impl IoUring {
     #[inline]
     pub fn submitter(&self) -> Submitter<'_> {
         Submitter::new(
-            &self.inner.fd,
-            &self.inner.params,
+            &self.fd,
+            &self.params,
             self.sq.head,
             self.sq.tail,
             self.sq.flags,
@@ -157,7 +151,7 @@ impl IoUring {
     /// Get the parameters that were used to construct this instance.
     #[inline]
     pub fn params(&self) -> &Parameters {
-        &self.inner.params
+        &self.params
     }
 
     /// Initiate asynchronous I/O. See [`Submitter::submit`] for more details.
@@ -178,8 +172,8 @@ impl IoUring {
     #[inline]
     pub fn split(&mut self) -> (Submitter<'_>, SubmissionQueue<'_>, CompletionQueue<'_>) {
         let submit = Submitter::new(
-            &self.inner.fd,
-            &self.inner.params,
+            &self.fd,
+            &self.params,
             self.sq.head,
             self.sq.tail,
             self.sq.flags,
@@ -194,10 +188,33 @@ impl IoUring {
         self.sq.borrow()
     }
 
-    /// Get completion queue. This is used to receive I/O completion events from the kernel.
+    /// Get the submission queue of the io_uring instance from a shared reference.
+    ///
+    /// # Safety
+    ///
+    /// No other [`SubmissionQueue`]s may exist when calling this function.
+    #[inline]
+    #[cfg(feature = "unstable")]
+    pub unsafe fn submission_shared(&self) -> SubmissionQueue<'_> {
+        self.sq.borrow_shared()
+    }
+
+    /// Get completion queue of the io_uring instance. This is used to receive I/O completion
+    /// events from the kernel.
     #[inline]
     pub fn completion(&mut self) -> CompletionQueue<'_> {
         self.cq.borrow()
+    }
+
+    /// Get the completion queue of the io_uring instance from a shared reference.
+    ///
+    /// # Safety
+    ///
+    /// No other [`CompletionQueue`]s may exist when calling this function.
+    #[inline]
+    #[cfg(feature = "unstable")]
+    pub unsafe fn completion_shared(&self) -> CompletionQueue<'_> {
+        self.cq.borrow_shared()
     }
 
     #[inline]
@@ -213,7 +230,7 @@ impl IoUring {
     }
 }
 
-impl Drop for Inner {
+impl Drop for IoUring {
     fn drop(&mut self) {
         // Ensure that `MemoryMap` is released before `fd`.
         unsafe {
@@ -306,9 +323,9 @@ impl Builder {
         let ring = IoUring::with_params(entries, self.params)?;
 
         if self.dontfork {
-            ring.inner.memory.sq_mmap.dontfork()?;
-            ring.inner.memory.sqe_mmap.dontfork()?;
-            if let Some(cq_mmap) = ring.inner.memory.cq_mmap.as_ref() {
+            ring.memory.sq_mmap.dontfork()?;
+            ring.memory.sqe_mmap.dontfork()?;
+            if let Some(cq_mmap) = ring.memory.cq_mmap.as_ref() {
                 cq_mmap.dontfork()?;
             }
         }
@@ -413,6 +430,6 @@ impl Parameters {
 
 impl AsRawFd for IoUring {
     fn as_raw_fd(&self) -> RawFd {
-        self.inner.fd.as_raw_fd()
+        self.fd.as_raw_fd()
     }
 }
