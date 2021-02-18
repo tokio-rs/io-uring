@@ -192,6 +192,7 @@ impl IoUring {
     ///
     /// No other [`SubmissionQueue`]s may exist when calling this function.
     #[inline]
+    #[cfg(feature = "unstable")]
     pub unsafe fn submission_shared(&self) -> SubmissionQueue<'_> {
         self.sq.borrow_shared()
     }
@@ -209,6 +210,7 @@ impl IoUring {
     ///
     /// No other [`CompletionQueue`]s may exist when calling this function.
     #[inline]
+    #[cfg(feature = "unstable")]
     pub unsafe fn completion_shared(&self) -> CompletionQueue<'_> {
         self.cq.borrow_shared()
     }
