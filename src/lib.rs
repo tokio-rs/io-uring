@@ -2,6 +2,7 @@
 //!
 //! The crate only provides a summary of the parameters.
 //! For more detailed documentation, see manpage.
+#![warn(rust_2018_idioms, unused_qualifications)]
 
 #[macro_use]
 mod util;
@@ -10,6 +11,7 @@ pub mod opcode;
 mod register;
 pub mod squeue;
 mod submit;
+#[allow(warnings)]
 mod sys;
 pub mod types;
 

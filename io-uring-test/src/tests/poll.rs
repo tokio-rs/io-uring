@@ -35,7 +35,7 @@ pub fn test_eventfd_poll(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     thread::sleep(Duration::from_millis(200));
     assert_eq!(ring.completion().len(), 0);
 
-    fd.write(&0x1u64.to_ne_bytes())?;
+    fd.write_all(&0x1u64.to_ne_bytes())?;
     ring.submit_and_wait(1)?;
 
     let cqes = ring.completion().collect::<Vec<_>>();
@@ -93,7 +93,7 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Re
 
     thread::sleep(Duration::from_millis(200));
 
-    fd.write(&0x1u64.to_ne_bytes())?;
+    fd.write_all(&0x1u64.to_ne_bytes())?;
     ring.submit_and_wait(2)?;
 
     let mut cqes = ring.completion().collect::<Vec<_>>();
@@ -137,7 +137,7 @@ pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring, probe: &Probe) -> any
             .expect("queue is full");
     }
 
-    fd.write(&0x1u64.to_ne_bytes())?;
+    fd.write_all(&0x1u64.to_ne_bytes())?;
     ring.submit_and_wait(1)?;
     assert_eq!(ring.completion().len(), 1);
 

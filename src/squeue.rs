@@ -217,7 +217,7 @@ impl SubmissionQueue<'_> {
     }
 
     /// Attempts to push an [`Entry`] into the queue.
-    /// If the queue is full, the element is returned back as an error.
+    /// If the queue is full, an error is returned.
     ///
     /// # Safety
     ///
@@ -237,6 +237,14 @@ impl SubmissionQueue<'_> {
         }
     }
 
+    /// Attempts to push several [entries](Entry) into the queue.
+    /// If the queue does not have space for all of the entries, an error is returned.
+    ///
+    /// # Safety
+    ///
+    /// Developers must ensure that parameters of all the entries (such as buffer) are valid and
+    /// will be valid for the entire duration of the operation, otherwise it may cause memory
+    /// problems.
     #[cfg(feature = "unstable")]
     #[inline]
     pub unsafe fn push_multiple(&mut self, entries: &[Entry]) -> Result<(), PushError> {

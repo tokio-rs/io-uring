@@ -132,7 +132,11 @@ impl<'a> Submitter<'a> {
     }
 
     #[cfg(feature = "unstable")]
-    pub fn submit_with_args(&self, want: usize, args: &types::SubmitArgs) -> io::Result<usize> {
+    pub fn submit_with_args(
+        &self,
+        want: usize,
+        args: &types::SubmitArgs<'_, '_>,
+    ) -> io::Result<usize> {
         let len = self.sq_len();
         let mut flags = sys::IORING_ENTER_EXT_ARG;
 
