@@ -38,7 +38,7 @@ impl AcceptCount {
         }
     }
 
-    pub fn push_to(&mut self, mut sq: SubmissionQueue<'_>) {
+    pub fn push_to(&mut self, sq: &mut SubmissionQueue<'_>) {
         while self.count > 0 {
             unsafe {
                 match sq.push(&self.entry) {
@@ -65,7 +65,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut accept = AcceptCount::new(listener.as_raw_fd(), token_alloc.insert(Token::Accept), 3);
 
-    accept.push_to(sq.reborrow());
+    accept.push_to(&mut sq);
 
     loop {
         match submitter.submit_and_wait(1) {
@@ -97,9 +97,9 @@ fn main() -> anyhow::Result<()> {
 
         drop(iter);
 
-        accept.push_to(sq.reborrow());
+        accept.push_to(&mut sq);
 
-        for cqe in cq.reborrow() {
+        for cqe in &mut cq {
             let ret = cqe.result();
             let token_index = cqe.user_data() as usize;
 
