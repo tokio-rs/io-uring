@@ -70,6 +70,15 @@ impl IoUring {
         IoUring::with_params(entries, Default::default())
     }
 
+    /// Create a [`Builder`] for an `IoUring` instance.
+    ///
+    /// This allows for further customization than [`new`](Self::new).
+    #[inline]
+    #[must_use]
+    pub fn builder() -> Builder {
+        Builder::default()
+    }
+
     fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<IoUring> {
         // NOTE: The `SubmissionQueue` and `CompletionQueue` are references,
         // and their lifetime can never exceed `MemoryMap`.
