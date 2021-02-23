@@ -296,9 +296,22 @@ impl Builder {
         self
     }
 
+    /// Share the asynchronous worker thread backend of this io_uring with the specified exisiting
+    /// [`IoUring`] instance instead of creating a new thread pool.
+    ///
+    /// If you only have a raw file descriptor, for example if you obtained an `io_uring` from
+    /// another library, you can call [`setup_attach_wq_raw`](Self::setup_attach_wq_raw) instead.
+    pub fn setup_attach_wq(&mut self, existing: &IoUring) -> &mut Self {
+        self.setup_attach_wq_raw(existing.as_raw_fd())
+    }
+
     /// Share the asynchronous worker thread backend of this io_uring with the specified io_uring
     /// file descriptor instead of creating a new thread pool.
-    pub fn setup_attach_wq(&mut self, fd: RawFd) -> &mut Self {
+    ///
+    /// You will generally only need to call this when receiving an `io_uring` instance over FFI or
+    /// from another library. When using this library, you can call
+    /// [`setup_attach_wq`](Self::setup_attach_wq) instead.
+    pub fn setup_attach_wq_raw(&mut self, fd: RawFd) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_ATTACH_WQ;
         self.params.wq_fd = fd as _;
         self
