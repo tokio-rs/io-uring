@@ -143,19 +143,6 @@ impl Inner {
 }
 
 impl SubmissionQueue<'_> {
-    /// Reborrow this queue to a shorter lifetime.
-    ///
-    /// This can be used to avoid consuming the `SubmissionQueue` when passing it to functions.
-    #[must_use]
-    #[inline]
-    pub fn reborrow(&mut self) -> SubmissionQueue<'_> {
-        SubmissionQueue {
-            head: self.head,
-            tail: self.tail,
-            queue: self.queue,
-        }
-    }
-
     /// Synchronize this type with the real submission queue.
     ///
     /// This will flush any entries added by [`push`](Self::push) or

@@ -71,19 +71,6 @@ impl Inner {
 }
 
 impl CompletionQueue<'_> {
-    /// Reborrow this queue to a shorter lifetime.
-    ///
-    /// This can be used to avoid consuming the `CompletionQueue` when passing it to functions.
-    #[must_use]
-    #[inline]
-    pub fn reborrow(&mut self) -> CompletionQueue<'_> {
-        CompletionQueue {
-            head: self.head,
-            tail: self.tail,
-            queue: self.queue,
-        }
-    }
-
     /// Synchronize this type with the real completion queue.
     ///
     /// This will flush any entries consumed in this iterator and will make available new entries
