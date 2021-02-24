@@ -15,6 +15,10 @@ fn main() -> anyhow::Result<()> {
         eprintln!("No probe supported");
     }
 
+    println!("params: {:#?}", ring.params());
+    println!("probe: {:?}", probe);
+    println!();
+
     tests::queue::test_nop(&mut ring, &probe)?;
 
     #[cfg(feature = "unstable")]
