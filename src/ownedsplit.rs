@@ -5,19 +5,14 @@ use std::sync::Arc;
 pub struct SubmitterUring {
     inner: Arc<IoUring>,
 }
+
 pub struct SubmissionUring {
     inner: Arc<IoUring>,
 }
+
 pub struct CompletionUring {
     inner: Arc<IoUring>,
 }
-
-/// Safety: This only allows execution of syscall and atomic reads, so it is thread-safe.
-unsafe impl Send for SubmitterUring {}
-unsafe impl Sync for SubmitterUring {}
-
-unsafe impl Send for SubmissionUring {}
-unsafe impl Send for CompletionUring {}
 
 pub(crate) fn split(ring: IoUring) -> (SubmitterUring, SubmissionUring, CompletionUring) {
     let inner = Arc::new(ring);
