@@ -1,13 +1,15 @@
-use io_uring::{opcode, types, IoUring, Probe};
+use io_uring::{opcode, types, IoUring};
 use std::fs::File;
 use std::io::{self, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::thread;
 use std::time::Duration;
+use crate::Test;
 
-pub fn test_eventfd_poll(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_eventfd_poll(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::PollAdd::CODE);
+        test;
+        test.probe.is_supported(opcode::PollAdd::CODE);
     );
 
     println!("test eventfd_poll");
@@ -47,10 +49,11 @@ pub fn test_eventfd_poll(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     Ok(())
 }
 
-pub fn test_eventfd_poll_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_eventfd_poll_remove(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::PollAdd::CODE);
-        probe.is_supported(opcode::PollRemove::CODE);
+        test;
+        test.probe.is_supported(opcode::PollAdd::CODE);
+        test.probe.is_supported(opcode::PollRemove::CODE);
     );
 
     println!("test eventfd_poll_remove");
@@ -108,10 +111,11 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Re
     Ok(())
 }
 
-pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::PollAdd::CODE);
-        probe.is_supported(opcode::PollRemove::CODE);
+        test;
+        test.probe.is_supported(opcode::PollAdd::CODE);
+        test.probe.is_supported(opcode::PollRemove::CODE);
     );
 
     println!("test eventfd_poll_remove_failed");

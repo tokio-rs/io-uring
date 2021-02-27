@@ -47,6 +47,8 @@ impl AcceptCount {
                 }
             }
         }
+
+        sq.sync();
     }
 }
 
@@ -73,6 +75,7 @@ fn main() -> anyhow::Result<()> {
             Err(ref err) if err.raw_os_error() == Some(libc::EBUSY) => (),
             Err(err) => return Err(err.into()),
         }
+        cq.sync();
 
         let mut iter = backlog.drain(..);
 

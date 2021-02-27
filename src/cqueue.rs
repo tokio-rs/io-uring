@@ -3,6 +3,7 @@
 #[cfg(feature = "unstable")]
 use std::mem::MaybeUninit;
 use std::sync::atomic;
+use std::fmt;
 
 use crate::sys;
 use crate::util::{unsync_load, Mmap};
@@ -202,6 +203,16 @@ impl Entry {
     #[inline]
     pub fn flags(&self) -> u32 {
         self.0.flags
+    }
+}
+
+impl fmt::Debug for Entry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Entry")
+            .field("result", &self.0.res)
+            .field("user_data", &self.0.user_data)
+            .field("flags", &self.0.flags)
+            .finish()
     }
 }
 

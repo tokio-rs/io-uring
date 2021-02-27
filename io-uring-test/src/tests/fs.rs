@@ -1,13 +1,15 @@
-use crate::helper;
-use io_uring::{opcode, types, IoUring, Probe};
+use crate::utils;
+use io_uring::{opcode, types, IoUring};
 use std::fs;
 use std::io::Write;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
+use crate::Test;
 
-pub fn test_file_write_read(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_file_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Write::CODE);
-        probe.is_supported(opcode::Read::CODE);
+        test;
+        test.probe.is_supported(opcode::Write::CODE);
+        test.probe.is_supported(opcode::Read::CODE);
     );
 
     println!("test file_write_read");
@@ -15,15 +17,16 @@ pub fn test_file_write_read(ring: &mut IoUring, probe: &Probe) -> anyhow::Result
     let fd = tempfile::tempfile()?;
     let fd = types::Fd(fd.as_raw_fd());
 
-    helper::write_read(ring, fd, fd)?;
+    utils::write_read(ring, fd, fd)?;
 
     Ok(())
 }
 
-pub fn test_file_writev_readv(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_file_writev_readv(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Writev::CODE);
-        probe.is_supported(opcode::Readv::CODE);
+        test;
+        test.probe.is_supported(opcode::Writev::CODE);
+        test.probe.is_supported(opcode::Readv::CODE);
     );
 
     println!("test file_writev_readv");
@@ -31,14 +34,15 @@ pub fn test_file_writev_readv(ring: &mut IoUring, probe: &Probe) -> anyhow::Resu
     let fd = tempfile::tempfile()?;
     let fd = types::Fd(fd.as_raw_fd());
 
-    helper::writev_readv(ring, fd, fd)?;
+    utils::writev_readv(ring, fd, fd)?;
 
     Ok(())
 }
 
-pub fn test_file_fsync(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_file_fsync(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Fsync::CODE);
+        test;
+        test.probe.is_supported(opcode::Fsync::CODE);
     );
 
     println!("test file_fsync");
@@ -68,9 +72,10 @@ pub fn test_file_fsync(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> 
     Ok(())
 }
 
-pub fn test_file_fsync_file_range(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_file_fsync_file_range(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::SyncFileRange::CODE);
+        test;
+        test.probe.is_supported(opcode::SyncFileRange::CODE);
     );
 
     println!("test file_fsync_file_range");
@@ -102,9 +107,10 @@ pub fn test_file_fsync_file_range(ring: &mut IoUring, probe: &Probe) -> anyhow::
     Ok(())
 }
 
-pub fn test_file_fallocate(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_file_fallocate(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Fallocate::CODE);
+        test;
+        test.probe.is_supported(opcode::Fallocate::CODE);
     );
 
     println!("test file_fallocate");
@@ -131,9 +137,10 @@ pub fn test_file_fallocate(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<
     Ok(())
 }
 
-pub fn test_file_openat2(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_file_openat2(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::OpenAt2::CODE);
+        test;
+        test.probe.is_supported(opcode::OpenAt2::CODE);
     );
 
     use std::ffi::CString;
@@ -172,9 +179,10 @@ pub fn test_file_openat2(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()
     Ok(())
 }
 
-pub fn test_file_close(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_file_close(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Close::CODE);
+        test;
+        test.probe.is_supported(opcode::Close::CODE);
     );
 
     println!("test file_cloes");
@@ -201,10 +209,11 @@ pub fn test_file_close(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> 
     Ok(())
 }
 
-pub fn test_file_cur_pos(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_file_cur_pos(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Write::CODE);
-        probe.is_supported(opcode::Read::CODE);
+        test;
+        test.probe.is_supported(opcode::Write::CODE);
+        test.probe.is_supported(opcode::Read::CODE);
         ring.params().is_feature_rw_cur_pos();
     );
 

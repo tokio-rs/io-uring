@@ -1,13 +1,18 @@
-use io_uring::{opcode, IoUring, Probe};
+use io_uring::{opcode, IoUring};
 use std::thread;
+use crate::Test;
 
-pub fn main(ring: IoUring, _probe: &Probe) -> anyhow::Result<()> {
-    test_nop(ring)?;
+pub fn main(ring: IoUring, test: &Test) -> anyhow::Result<()> {
+    test_nop(ring, test)?;
 
     Ok(())
 }
 
-fn test_nop(ring: IoUring) -> anyhow::Result<()> {
+fn test_nop(ring: IoUring, test: &Test) -> anyhow::Result<()> {
+    require!{
+        test;
+    }
+
     println!("test ownedsplit nop");
 
     let (stu, mut su, mut cu) = ring.owned_split();

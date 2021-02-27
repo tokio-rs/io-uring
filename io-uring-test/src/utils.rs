@@ -2,9 +2,16 @@ use io_uring::{opcode, squeue, types, IoUring};
 use std::io::{IoSlice, IoSliceMut};
 
 macro_rules! require {
-    ( $( $cond:expr ; )* ) => {
-        #[allow(unused_mut)]
+    (
+        $test:expr;
+        $( $cond:expr ; )*
+    ) => {
         let mut cond = true;
+
+        if let Some(target) = $test.target.as_ref() {
+            cond &= function_name!().contains(target);
+        }
+
         $(
             cond &= $cond;
         )*
@@ -13,6 +20,18 @@ macro_rules! require {
             return Ok(());
         }
     }
+}
+
+macro_rules! function_name {
+    () => {{
+        fn f() {}
+        let name = crate::utils::type_name_of(f);
+        name.strip_suffix("::f").unwrap_or(name)
+    }}
+}
+
+pub fn type_name_of<T>(_f: T) -> &'static str {
+    std::any::type_name::<T>()
 }
 
 pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> anyhow::Result<()> {

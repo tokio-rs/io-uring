@@ -1,7 +1,10 @@
-use io_uring::{opcode, IoUring, Probe};
+use io_uring::{opcode, IoUring};
+use crate::Test;
 
-pub fn test_nop(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
-    require!();
+pub fn test_nop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+    require!{
+        test;
+    }
 
     println!("test nop");
 
@@ -24,10 +27,12 @@ pub fn test_nop(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
 }
 
 #[cfg(feature = "unstable")]
-pub fn test_batch(ring: &mut IoUring, _probe: &Probe) -> anyhow::Result<()> {
+pub fn test_batch(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     use std::mem::MaybeUninit;
 
-    require!();
+    require!{
+        test;
+    }
 
     println!("test batch");
 

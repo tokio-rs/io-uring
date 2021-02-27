@@ -1,9 +1,11 @@
-use io_uring::{opcode, types, IoUring, Probe};
+use io_uring::{opcode, types, IoUring};
 use std::time::Instant;
+use crate::Test;
 
-pub fn test_timeout(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_timeout(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Timeout::CODE);
+        test;
+        test.probe.is_supported(opcode::Timeout::CODE);
     );
 
     println!("test timeout");
@@ -75,9 +77,10 @@ pub fn test_timeout(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_timeout_count(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_timeout_count(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Timeout::CODE);
+        test;
+        test.probe.is_supported(opcode::Timeout::CODE);
     );
 
     println!("test timeout_count");
@@ -113,10 +116,11 @@ pub fn test_timeout_count(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<(
     Ok(())
 }
 
-pub fn test_timeout_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_timeout_remove(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Timeout::CODE);
-        probe.is_supported(opcode::TimeoutRemove::CODE);
+        test;
+        test.probe.is_supported(opcode::Timeout::CODE);
+        test.probe.is_supported(opcode::TimeoutRemove::CODE);
     );
 
     println!("test timeout_remove");
@@ -163,10 +167,11 @@ pub fn test_timeout_remove(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<
     Ok(())
 }
 
-pub fn test_timeout_cancel(ring: &mut IoUring, probe: &Probe) -> anyhow::Result<()> {
+pub fn test_timeout_cancel(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
-        probe.is_supported(opcode::Timeout::CODE);
-        probe.is_supported(opcode::AsyncCancel::CODE);
+        test;
+        test.probe.is_supported(opcode::Timeout::CODE);
+        test.probe.is_supported(opcode::AsyncCancel::CODE);
     );
 
     println!("test timeout_cancel");
