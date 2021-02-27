@@ -111,7 +111,6 @@ impl<'a> Submitter<'a> {
     /// completion events to complete.
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         let len = self.sq_len();
-
         let mut flags = 0;
 
         if want > 0 {
