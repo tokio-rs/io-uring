@@ -54,10 +54,10 @@ fn main() -> anyhow::Result<()> {
     // net
     tests::net::test_tcp_write_read(&mut ring, &test)?;
     tests::net::test_tcp_writev_readv(&mut ring, &test)?;
-    tests::net::test_tcp_accept(&mut ring, &test)?;
-    tests::net::test_tcp_connect(&mut ring, &test)?;
     tests::net::test_tcp_send_recv(&mut ring, &test)?;
     tests::net::test_tcp_sendmsg_recvmsg(&mut ring, &test)?;
+    tests::net::test_tcp_accept(&mut ring, &test)?;
+    tests::net::test_tcp_connect(&mut ring, &test)?;
 
     // queue
     tests::poll::test_eventfd_poll(&mut ring, &test)?;

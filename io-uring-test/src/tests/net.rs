@@ -1,12 +1,10 @@
 use crate::utils;
 use io_uring::{opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream};
 use std::os::unix::io::AsRawFd;
-use std::{io, mem, thread};
+use std::{io, mem};
 use crate::Test;
-
-static ECHO_TCP_SERVER: OnceCell<SocketAddr> = OnceCell::new();
 
 pub fn test_tcp_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
@@ -17,12 +15,12 @@ pub fn test_tcp_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
 
     println!("test tcp_write_read");
 
-    let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
+    let (send_stream, recv_stream) = tcp_pair()?;
 
-    let stream = TcpStream::connect(addr)?;
-    let fd = types::Fd(stream.as_raw_fd());
+    let send_fd = types::Fd(send_stream.as_raw_fd());
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
 
-    utils::write_read(ring, fd, fd)?;
+    utils::write_read(ring, send_fd, recv_fd)?;
 
     Ok(())
 }
@@ -36,12 +34,12 @@ pub fn test_tcp_writev_readv(ring: &mut IoUring, test: &Test) -> anyhow::Result<
 
     println!("test tcp_writev_readv");
 
-    let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
+    let (send_stream, recv_stream) = tcp_pair()?;
 
-    let stream = TcpStream::connect(addr)?;
-    let fd = types::Fd(stream.as_raw_fd());
+    let send_fd = types::Fd(send_stream.as_raw_fd());
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
 
-    utils::writev_readv(ring, fd, fd)?;
+    utils::writev_readv(ring, send_fd, recv_fd)?;
 
     Ok(())
 }
@@ -55,16 +53,16 @@ pub fn test_tcp_send_recv(ring: &mut IoUring, test: &Test) -> anyhow::Result<()>
 
     println!("test tcp_send_recv");
 
-    let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
+    let (send_stream, recv_stream) = tcp_pair()?;
 
-    let stream = TcpStream::connect(addr)?;
-    let fd = types::Fd(stream.as_raw_fd());
+    let send_fd = types::Fd(send_stream.as_raw_fd());
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
 
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut output = vec![0; text.len()];
 
-    let send_e = opcode::Send::new(fd, text.as_ptr(), text.len() as _);
-    let recv_e = opcode::Recv::new(fd, output.as_mut_ptr(), output.len() as _);
+    let send_e = opcode::Send::new(send_fd, text.as_ptr(), text.len() as _);
+    let recv_e = opcode::Recv::new(recv_fd, output.as_mut_ptr(), output.len() as _);
 
     unsafe {
         let mut queue = ring.submission();
@@ -101,11 +99,12 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, test: &Test) -> anyhow::Resu
 
     println!("test tcp_sendmsg_recvmsg");
 
-    let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
+    let (send_stream, recv_stream) = tcp_pair()?;
 
-    let sockaddr = socket2::SockAddr::from(*addr);
-    let stream = TcpStream::connect(addr)?;
-    let fd = types::Fd(stream.as_raw_fd());
+    let addr = recv_stream.local_addr()?;
+    let sockaddr = socket2::SockAddr::from(addr);
+    let send_fd = types::Fd(send_stream.as_raw_fd());
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
 
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut buf2 = vec![0; text.len()];
@@ -123,7 +122,7 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, test: &Test) -> anyhow::Resu
         (*p).msg_iovlen = 1;
     }
 
-    let sendmsg_e = opcode::SendMsg::new(fd, msg.as_ptr());
+    let sendmsg_e = opcode::SendMsg::new(send_fd, msg.as_ptr());
 
     // build recvmsg
     let mut msg = MaybeUninit::<libc::msghdr>::zeroed();
@@ -136,7 +135,7 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, test: &Test) -> anyhow::Resu
         (*p).msg_iovlen = 1;
     }
 
-    let recvmsg_e = opcode::RecvMsg::new(fd, msg.as_mut_ptr());
+    let recvmsg_e = opcode::RecvMsg::new(recv_fd, msg.as_mut_ptr());
 
     // submit
     unsafe {
@@ -180,18 +179,11 @@ pub fn test_tcp_accept(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     println!("test tcp_accept");
 
-    let listener = TcpListener::bind("0.0.0.0:0")?;
+    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("0.0.0.0:0"))?;
     let addr = listener.local_addr()?;
-
-    let handle = thread::spawn(move || {
-        let stream = TcpStream::connect(addr)?;
-
-        let mut stream2 = &stream;
-        let mut stream3 = &stream;
-        io::copy(&mut stream2, &mut stream3)
-    });
-
     let fd = types::Fd(listener.as_raw_fd());
+
+    let _stream = TcpStream::connect(addr)?;
 
     let mut sockaddr: libc::sockaddr = unsafe { mem::zeroed() };
     let mut addrlen: libc::socklen_t = mem::size_of::<libc::sockaddr>() as _;
@@ -214,13 +206,9 @@ pub fn test_tcp_accept(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     let fd = cqes[0].result();
 
-    utils::write_read(ring, types::Fd(fd), types::Fd(fd))?;
-
     unsafe {
         libc::close(fd);
     }
-
-    handle.join().unwrap()?;
 
     Ok(())
 }
@@ -237,9 +225,10 @@ pub fn test_tcp_connect(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     println!("test tcp_connect");
 
-    let addr = ECHO_TCP_SERVER.get_or_try_init(init_echo_tcp_server)?;
+    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("0.0.0.0:0"))?;
+    let addr = listener.local_addr()?;
 
-    let sockaddr = SockAddr::from(*addr);
+    let sockaddr = SockAddr::from(addr);
     let stream = Socket::new(Domain::ipv4(), Type::stream(), Some(Protocol::tcp()))?;
 
     let connect_e = opcode::Connect::new(
@@ -262,25 +251,19 @@ pub fn test_tcp_connect(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     assert_eq!(cqes[0].user_data(), 0x0f);
     assert_eq!(cqes[0].result(), 0);
 
-    let stream = stream.into_tcp_stream();
-    let fd = types::Fd(stream.as_raw_fd());
-
-    utils::write_read(ring, fd, fd)?;
+    let _ = listener.accept()?;
 
     Ok(())
 }
 
-fn init_echo_tcp_server() -> io::Result<SocketAddr> {
-    let listener = TcpListener::bind("0.0.0.0:0")?;
+static TCP_LISTENER: OnceCell<TcpListener> = OnceCell::new();
+
+fn tcp_pair() -> io::Result<(TcpStream, TcpStream)> {
+    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("0.0.0.0:0"))?;
+
     let addr = listener.local_addr()?;
+    let send_stream = TcpStream::connect(addr)?;
+    let (recv_stream, _) = listener.accept()?;
 
-    thread::spawn(move || {
-        while let Ok((stream, _)) = listener.accept() {
-            let mut stream2 = &stream;
-            let mut stream3 = &stream;
-            io::copy(&mut stream2, &mut stream3).unwrap();
-        }
-    });
-
-    Ok(addr)
+    Ok((send_stream, recv_stream))
 }
