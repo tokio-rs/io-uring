@@ -1,8 +1,8 @@
-use io_uring::{opcode, IoUring};
 use crate::Test;
+use io_uring::{opcode, IoUring};
 
 pub fn test_nop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
-    require!{
+    require! {
         test;
     }
 
@@ -30,7 +30,7 @@ pub fn test_nop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 pub fn test_batch(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     use std::mem::MaybeUninit;
 
-    require!{
+    require! {
         test;
     }
 

@@ -1,9 +1,9 @@
 //! Completion Queue
 
+use std::fmt;
 #[cfg(feature = "unstable")]
 use std::mem::MaybeUninit;
 use std::sync::atomic;
-use std::fmt;
 
 use crate::sys;
 use crate::util::{unsync_load, Mmap};

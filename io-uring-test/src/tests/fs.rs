@@ -1,9 +1,9 @@
 use crate::utils;
+use crate::Test;
 use io_uring::{opcode, types, IoUring};
 use std::fs;
 use std::io::Write;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
-use crate::Test;
 
 pub fn test_file_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(

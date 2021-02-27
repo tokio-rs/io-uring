@@ -1,10 +1,10 @@
 use crate::utils;
+use crate::Test;
 use io_uring::{opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
 use std::net::{TcpListener, TcpStream};
 use std::os::unix::io::AsRawFd;
 use std::{io, mem};
-use crate::Test;
 
 pub fn test_tcp_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(

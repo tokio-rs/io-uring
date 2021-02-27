@@ -27,7 +27,7 @@ macro_rules! function_name {
         fn f() {}
         let name = crate::utils::type_name_of(f);
         name.strip_suffix("::f").unwrap_or(name)
-    }}
+    }};
 }
 
 pub fn type_name_of<T>(_f: T) -> &'static str {

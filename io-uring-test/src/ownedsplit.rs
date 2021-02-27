@@ -1,6 +1,6 @@
+use crate::Test;
 use io_uring::{opcode, IoUring};
 use std::thread;
-use crate::Test;
 
 pub fn main(ring: IoUring, test: &Test) -> anyhow::Result<()> {
     test_nop(ring, test)?;
@@ -9,7 +9,7 @@ pub fn main(ring: IoUring, test: &Test) -> anyhow::Result<()> {
 }
 
 fn test_nop(ring: IoUring, test: &Test) -> anyhow::Result<()> {
-    require!{
+    require! {
         test;
     }
 

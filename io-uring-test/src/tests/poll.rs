@@ -1,10 +1,10 @@
+use crate::Test;
 use io_uring::{opcode, types, IoUring};
 use std::fs::File;
 use std::io::{self, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::thread;
 use std::time::Duration;
-use crate::Test;
 
 pub fn test_eventfd_poll(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(

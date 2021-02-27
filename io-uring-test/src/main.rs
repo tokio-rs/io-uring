@@ -9,7 +9,7 @@ use io_uring::{IoUring, Probe};
 
 pub struct Test {
     probe: Probe,
-    target: Option<String>
+    target: Option<String>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -26,9 +26,8 @@ fn main() -> anyhow::Result<()> {
 
     let test = Test {
         probe,
-        target: std::env::args().nth(1)
+        target: std::env::args().nth(1),
     };
-
 
     tests::queue::test_nop(&mut ring, &test)?;
 

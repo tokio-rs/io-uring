@@ -1,6 +1,6 @@
+use crate::Test;
 use io_uring::{opcode, types, IoUring};
 use std::time::Instant;
-use crate::Test;
 
 pub fn test_timeout(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
