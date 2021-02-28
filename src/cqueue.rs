@@ -167,6 +167,7 @@ impl Iterator for CompletionQueue<'_> {
             None
         }
     }
+
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.len(), Some(self.len()))

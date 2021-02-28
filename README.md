@@ -5,24 +5,63 @@
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/tokio-rs/io-uring/blob/master/LICENSE-APACHE)
 [![docs.rs](https://docs.rs/io-uring/badge.svg)](https://docs.rs/io-uring/)
 
-The [`io_uring`](https://kernel.dk/io_uring.pdf) userspace interface for Rust.
+The low-level [`io_uring`](https://kernel.dk/io_uring.pdf) userspace interface for Rust.
 
-## Safety
+## Usage
 
-All APIs are safe except for pushing entries into submission queue.
-This means that the developer must ensure that entry is valid, otherwise it will cause UB.
+To use `io-uring` crate, first add this to your `Cargo.toml`:
 
-I am trying to develop a proactor library to provide a safety abstraction.
+```toml
+[dependencies]
+io-uring = "0.5"
+```
 
-## Why Rust ?
+Next we can start using `io-uring` crate.
+The following is quick introduction using `Read` for file.
 
-I don't think it needs a special reason.
+```rust
+use io_uring::{opcode, types, IoUring};
+use std::os::unix::io::AsRawFd;
+use std::{fs, io};
 
-The `io_uring` api design is so simple and elegant
-that implementing the new `io_uring` library is not much more complicated than wrapping `liburing`.
+fn main() -> io::Result<()> {
+    let mut ring = IoUring::new(8)?;
 
-This has some advantages over wrapping c library,
-it have more freedom (see concurrent mod), and it can be easier to static link.
+    let fd = fs::File::open("README.md")?;
+    let mut buf = vec![0; 1024];
+
+    let read_e = opcode::Read::new(types::Fd(fd.as_raw_fd()), buf.as_mut_ptr(), buf.len() as _)
+        .build()
+        .user_data(0x42);
+
+    // Note that the developer needs to ensure
+    // that the entry pushed into submission queue is valid (e.g. fd, buffer).
+    unsafe {
+        ring.submission()
+            .push(&read_e)
+            .expect("submission queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe = ring.completion().next().expect("completion queue is empty");
+
+    assert_eq!(cqe.user_data(), 0x42);
+    assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+
+    Ok(())
+}
+```
+
+## Test and Benchmarks
+
+You can run the test and benchmark of the library with the following commands.
+
+```
+$ cargo run --package io-uring-test
+$ cargo bench --package io-uring-bench
+```
+
 
 ### License
 
@@ -34,3 +73,10 @@ This project is licensed under either of
    http://opensource.org/licenses/MIT)
 
 at your option.
+
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in io-uring by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.

@@ -1,13 +1,13 @@
 [package]
 name = "io-uring"
-version = "0.5.0-alpha.4"
+version = "0.5.0"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/tokio-rs/io-uring"
 homepage = "https://github.com/tokio-rs/io-uring"
 documentation = "https://docs.rs/io-uring"
-description = "The `io_uring` library for Rust."
+description = "The low-level `io_uring` userspace interface for Rust"
 categories = [ "asynchronous", "network-programming", "filesystem" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -24,7 +24,6 @@ direct-syscall = [ "sc" ]
 [dependencies]
 libc = "0.2"
 bitflags = "1"
-parking_lot = { version = "0.11", optional = true }
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]

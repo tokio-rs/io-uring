@@ -65,7 +65,6 @@ impl IoUring {
     ///
     /// The `entries` sets the size of queue,
     /// and its value should be the power of two.
-    #[inline]
     pub fn new(entries: u32) -> io::Result<IoUring> {
         IoUring::with_params(entries, Default::default())
     }
@@ -73,7 +72,6 @@ impl IoUring {
     /// Create a [`Builder`] for an `IoUring` instance.
     ///
     /// This allows for further customization than [`new`](Self::new).
-    #[inline]
     #[must_use]
     pub fn builder() -> Builder {
         Builder::default()
@@ -178,6 +176,10 @@ impl IoUring {
 
     /// Get the submitter, submission queue and completion queue of the io_uring instance. This can
     /// be used to operate on the different parts of the io_uring instance independently.
+    ///
+    /// If you use this method to obtain `sq` and `cq`,
+    /// please note that you need to `drop` or `sync` the queue before and after submit,
+    /// otherwise the queue will not be updated.
     #[inline]
     pub fn split(&mut self) -> (Submitter<'_>, SubmissionQueue<'_>, CompletionQueue<'_>) {
         let submit = Submitter::new(
