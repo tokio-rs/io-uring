@@ -30,7 +30,7 @@ jobs:
         with:
           command: run
           use-cross: true
-          args: --package io-uring-test --target ${{ matrix.target }}
+          args: --package io-uring-test --features io-uring-test/ci --target ${{ matrix.target }}
 
   check-bench:
     runs-on: ubuntu-latest

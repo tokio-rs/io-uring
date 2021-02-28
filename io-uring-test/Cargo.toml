@@ -18,3 +18,4 @@ socket2 = "0.3"
 default = [ "unstable", "direct-syscall" ]
 unstable = [ "io-uring/unstable" ]
 direct-syscall = [ "io-uring/direct-syscall" ]
+ci = []

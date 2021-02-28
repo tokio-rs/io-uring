@@ -272,6 +272,7 @@ pub fn test_file_cur_pos(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
     Ok(())
 }
 
+#[cfg(not(feature = "ci"))]
 pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
         test;

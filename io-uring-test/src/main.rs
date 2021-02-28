@@ -43,6 +43,7 @@ fn main() -> anyhow::Result<()> {
     tests::fs::test_file_fallocate(&mut ring, &test)?;
     tests::fs::test_file_openat2(&mut ring, &test)?;
     tests::fs::test_file_close(&mut ring, &test)?;
+    #[cfg(not(feature = "ci"))]
     tests::fs::test_statx(&mut ring, &test)?;
 
     // timeout
