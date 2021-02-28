@@ -1,9 +1,9 @@
 use crate::utils;
 use crate::Test;
 use io_uring::{opcode, types, IoUring};
+use std::ffi::CString;
 use std::fs;
 use std::io::Write;
-use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 
@@ -290,16 +290,14 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     let statx_e = opcode::Statx::new(
         types::Fd(libc::AT_FDCWD),
         pathbuf.as_ptr(),
-        &mut statxbuf as *mut libc::statx as *mut _
+        &mut statxbuf as *mut libc::statx as *mut _,
     )
-        .mask(libc::STATX_ALL)
-        .build()
-        .user_data(0x99);
+    .mask(libc::STATX_ALL)
+    .build()
+    .user_data(0x99);
 
     unsafe {
-        ring.submission()
-            .push(&statx_e)
-            .expect("queue is full");
+        ring.submission().push(&statx_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
@@ -313,12 +311,17 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     // check
     let mut statxbuf2 = unsafe { std::mem::zeroed() };
     let ret = unsafe {
-        libc::statx(libc::AT_FDCWD, pathbuf.as_ptr(), 0, libc::STATX_ALL, &mut statxbuf2)
+        libc::statx(
+            libc::AT_FDCWD,
+            pathbuf.as_ptr(),
+            0,
+            libc::STATX_ALL,
+            &mut statxbuf2,
+        )
     };
 
     assert_eq!(ret, 0);
     assert_eq!(statxbuf, statxbuf2);
-
 
     // statx fd
     let fd = fs::File::open(&path)?;
@@ -327,17 +330,15 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     let statx_e = opcode::Statx::new(
         types::Fd(fd.as_raw_fd()),
         b"\0".as_ptr().cast(),
-        &mut statxbuf3 as *mut libc::statx as *mut _
+        &mut statxbuf3 as *mut libc::statx as *mut _,
     )
-        .flags(libc::AT_EMPTY_PATH)
-        .mask(libc::STATX_ALL)
-        .build()
-        .user_data(0x9a);
+    .flags(libc::AT_EMPTY_PATH)
+    .mask(libc::STATX_ALL)
+    .build()
+    .user_data(0x9a);
 
     unsafe {
-        ring.submission()
-            .push(&statx_e)
-            .expect("queue is full");
+        ring.submission().push(&statx_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
