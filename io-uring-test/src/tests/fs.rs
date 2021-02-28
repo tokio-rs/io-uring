@@ -3,6 +3,8 @@ use crate::Test;
 use io_uring::{opcode, types, IoUring};
 use std::fs;
 use std::io::Write;
+use std::ffi::CString;
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 
 pub fn test_file_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
@@ -143,8 +145,6 @@ pub fn test_file_openat2(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
         test.probe.is_supported(opcode::OpenAt2::CODE);
     );
 
-    use std::ffi::CString;
-    use std::os::unix::ffi::OsStrExt;
     use tempfile::tempdir;
 
     println!("test file_openat2");
@@ -268,6 +268,87 @@ pub fn test_file_cur_pos(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
     assert_eq!(cqes[2].result(), text.len() as i32);
 
     assert_eq!(&output, text);
+
+    Ok(())
+}
+
+pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Statx::CODE);
+    );
+
+    println!("test statx");
+
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("test-io-uring-statx");
+    let pathbuf = CString::new(path.as_os_str().as_bytes())?;
+    fs::write(&path, "1")?;
+
+    let mut statxbuf: libc::statx = unsafe { std::mem::zeroed() };
+
+    let statx_e = opcode::Statx::new(
+        types::Fd(libc::AT_FDCWD),
+        pathbuf.as_ptr(),
+        &mut statxbuf as *mut libc::statx as *mut _
+    )
+        .mask(libc::STATX_ALL)
+        .build()
+        .user_data(0x99);
+
+    unsafe {
+        ring.submission()
+            .push(&statx_e)
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes = ring.completion().collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x99);
+    assert_eq!(cqes[0].result(), 0);
+
+    // check
+    let mut statxbuf2 = unsafe { std::mem::zeroed() };
+    let ret = unsafe {
+        libc::statx(libc::AT_FDCWD, pathbuf.as_ptr(), 0, libc::STATX_ALL, &mut statxbuf2)
+    };
+
+    assert_eq!(ret, 0);
+    assert_eq!(statxbuf, statxbuf2);
+
+
+    // statx fd
+    let fd = fs::File::open(&path)?;
+    let mut statxbuf3: libc::statx = unsafe { std::mem::zeroed() };
+
+    let statx_e = opcode::Statx::new(
+        types::Fd(fd.as_raw_fd()),
+        b"\0".as_ptr().cast(),
+        &mut statxbuf3 as *mut libc::statx as *mut _
+    )
+        .flags(libc::AT_EMPTY_PATH)
+        .mask(libc::STATX_ALL)
+        .build()
+        .user_data(0x9a);
+
+    unsafe {
+        ring.submission()
+            .push(&statx_e)
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes = ring.completion().collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x9a);
+    assert_eq!(cqes[0].result(), 0);
+
+    assert_eq!(statxbuf3, statxbuf2);
 
     Ok(())
 }
