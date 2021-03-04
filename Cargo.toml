@@ -22,8 +22,8 @@ overwrite = [ "bindgen" ]
 direct-syscall = [ "sc" ]
 
 [dependencies]
-libc = "0.2"
 bitflags = "1"
+libc = { version = "0.2", default-features = false }
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]
