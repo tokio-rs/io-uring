@@ -64,6 +64,8 @@ pub const IORING_FEAT_FAST_POLL: u32 = 32;
 pub const IORING_FEAT_POLL_32BITS: u32 = 64;
 pub const IORING_FEAT_SQPOLL_NONFIXED: u32 = 128;
 pub const IORING_FEAT_EXT_ARG: u32 = 256;
+pub const IORING_FEAT_NATIVE_WORKERS: u32 = 512;
+pub const IORING_REGISTER_FILES_SKIP: i32 = -2;
 pub const IO_URING_OP_SUPPORTED: u32 = 1;
 pub type __u8 = libc::c_uchar;
 pub type __u16 = libc::c_ushort;
@@ -1247,6 +1249,56 @@ fn bindgen_test_layout_io_uring_files_update() {
             stringify!(io_uring_files_update),
             "::",
             stringify!(fds)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct io_uring_rsrc_update {
+    pub offset: __u32,
+    pub resv: __u32,
+    pub data: __u64,
+}
+#[test]
+fn bindgen_test_layout_io_uring_rsrc_update() {
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_rsrc_update>(),
+        16usize,
+        concat!("Size of: ", stringify!(io_uring_rsrc_update))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_rsrc_update>(),
+        8usize,
+        concat!("Alignment of ", stringify!(io_uring_rsrc_update))
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_rsrc_update>())).offset as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_rsrc_update),
+            "::",
+            stringify!(offset)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_rsrc_update>())).resv as *const _ as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_rsrc_update),
+            "::",
+            stringify!(resv)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::core::ptr::null::<io_uring_rsrc_update>())).data as *const _ as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_rsrc_update),
+            "::",
+            stringify!(data)
         )
     );
 }

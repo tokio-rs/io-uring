@@ -428,6 +428,11 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_EXT_ARG != 0
     }
 
+    #[cfg(feature = "unstable")]
+    pub fn is_feature_native_workers(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_NATIVE_WORKERS != 0
+    }
+
     /// The number of submission queue entries allocated.
     pub fn sq_entries(&self) -> u32 {
         self.0.sq_entries
