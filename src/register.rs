@@ -1,3 +1,5 @@
+//! Some register syscall related types or parameters.
+
 use std::os::unix::io::RawFd;
 use std::{fmt, io, mem, ptr};
 
@@ -157,3 +159,11 @@ impl Restriction {
         Restriction(res)
     }
 }
+
+/// A RawFd, which can be used for
+/// [register_files_update](crate::Submitter::register_files_update).
+///
+/// File descriptors can be skipped if they are set to `SKIP_FILE`.
+/// Skipping an fd will not touch the file associated with the previous fd at that index.
+#[cfg(feature = "unstable")]
+pub const SKIP_FILE: RawFd = sys::IORING_REGISTER_FILES_SKIP;

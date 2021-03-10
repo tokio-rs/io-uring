@@ -8,7 +8,7 @@
 mod util;
 pub mod cqueue;
 pub mod opcode;
-mod register;
+pub mod register;
 pub mod squeue;
 mod submit;
 #[allow(warnings)]

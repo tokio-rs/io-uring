@@ -372,13 +372,3 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 }
-
-/// Return a RawFd, which can be used for
-/// [register_files_update](Submitter::register_files_update).
-///
-/// File descriptors can be skipped if they are set to `skip_file()`.
-/// Skipping an fd will not touch the file associated with the previous fd at that index.
-#[cfg(feature = "unstable")]
-const fn skip_file() -> RawFd {
-    sys::IORING_REGISTER_FILES_SKIP
-}
