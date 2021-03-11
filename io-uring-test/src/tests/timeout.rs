@@ -228,12 +228,10 @@ pub fn test_timeout_abs(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     let mut now = libc::timespec {
         tv_sec: 0,
-        tv_nsec: 0
+        tv_nsec: 0,
     };
 
-    let ret = unsafe {
-        libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut now)
-    };
+    let ret = unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut now) };
 
     assert_eq!(ret, 0);
 
@@ -241,8 +239,7 @@ pub fn test_timeout_abs(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
         .sec(now.tv_sec as u64 + 1)
         .nsec(now.tv_nsec as u32);
 
-    let timeout_e = opcode::Timeout::new(&ts)
-        .flags(types::TimeoutFlags::ABS);
+    let timeout_e = opcode::Timeout::new(&ts).flags(types::TimeoutFlags::ABS);
 
     unsafe {
         let mut queue = ring.submission();

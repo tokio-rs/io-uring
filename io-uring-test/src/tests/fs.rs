@@ -437,7 +437,6 @@ pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::R
     Ok(())
 }
 
-
 pub fn test_file_splice(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     use std::io::Read;
 
@@ -455,16 +454,10 @@ pub fn test_file_splice(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     let (pipe_in, mut pipe_out) = {
         let mut pipes = [0, 0];
-        let ret = unsafe {
-            libc::pipe(pipes.as_mut_ptr())
-        };
+        let ret = unsafe { libc::pipe(pipes.as_mut_ptr()) };
         assert_eq!(ret, 0);
-        let pipe_out = unsafe {
-            fs::File::from_raw_fd(pipes[0])
-        };
-        let pipe_in = unsafe {
-            fs::File::from_raw_fd(pipes[1])
-        };
+        let pipe_out = unsafe { fs::File::from_raw_fd(pipes[0]) };
+        let pipe_in = unsafe { fs::File::from_raw_fd(pipes[1]) };
         (pipe_in, pipe_out)
     };
 
@@ -476,7 +469,7 @@ pub fn test_file_splice(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
         0,
         types::Fd(pipe_in.as_raw_fd()),
         -1,
-        1024
+        1024,
     );
 
     unsafe {
