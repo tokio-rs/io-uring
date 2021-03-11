@@ -356,8 +356,8 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 }
 
 pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
-    use tempfile::TempDir;
     use std::os::unix::fs::OpenOptionsExt;
+    use tempfile::TempDir;
 
     #[repr(align(4096))]
     struct AlignedBuffer([u8; 4096]);
