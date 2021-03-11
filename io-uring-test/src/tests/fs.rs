@@ -355,6 +355,7 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(not(feature = "ci"))]
 pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     use std::os::unix::fs::OpenOptionsExt;
     use tempfile::TempDir;

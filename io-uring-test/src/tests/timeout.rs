@@ -236,7 +236,7 @@ pub fn test_timeout_abs(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     assert_eq!(ret, 0);
 
     let ts = types::Timespec::new()
-        .sec(now.tv_sec as u64 + 1)
+        .sec(now.tv_sec as u64 + 2)
         .nsec(now.tv_nsec as u32);
 
     let timeout_e = opcode::Timeout::new(&ts).flags(types::TimeoutFlags::ABS);
@@ -251,7 +251,7 @@ pub fn test_timeout_abs(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     let start = Instant::now();
     ring.submit_and_wait(1)?;
 
-    assert_eq!(start.elapsed().as_secs(), 1);
+    assert!(start.elapsed().as_secs() >= 1);
 
     let cqes = ring.completion().collect::<Vec<_>>();
 
