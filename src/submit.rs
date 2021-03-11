@@ -96,8 +96,10 @@ impl<'a> Submitter<'a> {
         );
         if result >= 0 {
             Ok(result as _)
-        } else {
+        } else if result == -1 {
             Err(io::Error::last_os_error())
+        } else {
+            Err(io::Error::from_raw_os_error(-result))
         }
     }
 

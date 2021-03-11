@@ -52,6 +52,8 @@ fn main() -> anyhow::Result<()> {
     tests::timeout::test_timeout_count(&mut ring, &test)?;
     tests::timeout::test_timeout_remove(&mut ring, &test)?;
     tests::timeout::test_timeout_cancel(&mut ring, &test)?;
+    #[cfg(feature = "unstable")]
+    tests::timeout::test_timeout_submit_args(&mut ring, &test)?;
 
     // net
     tests::net::test_tcp_write_read(&mut ring, &test)?;
