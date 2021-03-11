@@ -11,7 +11,6 @@ pub mod opcode;
 pub mod register;
 pub mod squeue;
 mod submit;
-#[allow(warnings)]
 mod sys;
 pub mod types;
 

@@ -354,3 +354,85 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     Ok(())
 }
+
+pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+    use tempfile::TempDir;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    #[repr(align(4096))]
+    struct AlignedBuffer([u8; 4096]);
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::Write::CODE);
+        test.probe.is_supported(opcode::Read::CODE);
+    );
+
+    println!("test file_direct_write_read");
+
+    let dir = TempDir::new_in(".")?;
+    let fd = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .custom_flags(libc::O_DIRECT)
+        .open(dir.path().join("io-uring-test-file"))?;
+    let fd = types::Fd(fd.as_raw_fd());
+
+    // ok
+
+    let input = Box::new(AlignedBuffer([0xf9; 4096]));
+    let mut output = Box::new(AlignedBuffer([0x0; 4096]));
+
+    let write_e = opcode::Write::new(fd, input.0.as_ptr(), input.0.len() as _);
+    let read_e = opcode::Read::new(fd, output.0.as_mut_ptr(), output.0.len() as _);
+
+    unsafe {
+        ring.submission()
+            .push(&write_e.build().user_data(0x01))
+            .expect("queue is full");
+    }
+
+    assert_eq!(ring.submit_and_wait(1)?, 1);
+
+    unsafe {
+        ring.submission()
+            .push(&read_e.build().user_data(0x02))
+            .expect("queue is full");
+    }
+
+    assert_eq!(ring.submit_and_wait(2)?, 1);
+
+    let cqes = ring.completion().collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 2);
+    assert_eq!(cqes[0].user_data(), 0x01);
+    assert_eq!(cqes[1].user_data(), 0x02);
+    assert_eq!(cqes[0].result(), input.0.len() as i32);
+    assert_eq!(cqes[1].result(), input.0.len() as i32);
+
+    assert_eq!(input.0[..], output.0[..]);
+    assert_eq!(input.0[0], 0xf9);
+
+    // fail
+
+    let mut buf = vec![0; 4097];
+
+    let read_e = opcode::Read::new(fd, buf[1..].as_mut_ptr(), buf[1..].len() as _);
+
+    unsafe {
+        ring.submission()
+            .push(&read_e.build().user_data(0x03))
+            .expect("queue is full");
+    }
+
+    assert_eq!(ring.submit_and_wait(1)?, 1);
+
+    let cqes = ring.completion().collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x03);
+    assert_eq!(cqes[0].result(), -libc::EINVAL);
+
+    Ok(())
+}
