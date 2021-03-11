@@ -969,6 +969,9 @@ opcode!(
 opcode!(
     /// Splice data to/from a pipe, equivalent to `splice(2)`.
     ///
+    /// if `fd_in` refers to a pipe, `off_in` must be `-1`;
+    /// The description of `off_in` also applied to `off_out`.
+    ///
     /// Requires the `unstable` feature.
     pub struct Splice {
         fd_in: { impl sealed::UseFixed },
@@ -977,6 +980,7 @@ opcode!(
         off_out: { i64 },
         len: { u32 },
         ;;
+        /// see man `splice(2)` for description of flags.
         flags: u32 = 0
     }
 

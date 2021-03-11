@@ -46,6 +46,8 @@ fn main() -> anyhow::Result<()> {
     tests::fs::test_file_direct_write_read(&mut ring, &test)?;
     #[cfg(not(feature = "ci"))]
     tests::fs::test_statx(&mut ring, &test)?;
+    #[cfg(feature = "unstable")]
+    tests::fs::test_file_splice(&mut ring, &test)?;
 
     // timeout
     tests::timeout::test_timeout(&mut ring, &test)?;
