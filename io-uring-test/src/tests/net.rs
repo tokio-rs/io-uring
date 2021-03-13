@@ -266,8 +266,8 @@ pub fn test_tcp_connect(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
 #[cfg(feature = "unstable")]
 pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
-    use std::io::Write;
     use io_uring::cqueue;
+    use std::io::Write;
 
     require!(
         test;
@@ -288,13 +288,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
     let mut bufs = vec![0; 1024];
 
     // provide bufs
-    let provide_bufs_e = opcode::ProvideBuffers::new(
-        bufs.as_mut_ptr(),
-        1024,
-        1,
-        0xdead,
-        0
-    );
+    let provide_bufs_e = opcode::ProvideBuffers::new(bufs.as_mut_ptr(), 1024, 1, 0xdead, 0);
 
     unsafe {
         ring.submission()
@@ -319,9 +313,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
         .user_data(0x22);
 
     unsafe {
-        ring.submission()
-            .push(&recv_e)
-            .expect("queue is full");
+        ring.submission().push(&recv_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
@@ -340,9 +332,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
         .user_data(0x23);
 
     unsafe {
-        ring.submission()
-            .push(&recv_e)
-            .expect("queue is full");
+        ring.submission().push(&recv_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
@@ -354,13 +344,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
     // provides bufs 2
     bufs.extend_from_slice(&[0; 1024]);
 
-    let provide_bufs_e = opcode::ProvideBuffers::new(
-        bufs.as_mut_ptr(),
-        1024,
-        2,
-        0xdeae,
-        0
-    );
+    let provide_bufs_e = opcode::ProvideBuffers::new(bufs.as_mut_ptr(), 1024, 2, 0xdeae, 0);
 
     unsafe {
         ring.submission()
@@ -382,9 +366,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
         .user_data(0x25);
 
     unsafe {
-        ring.submission()
-            .push(&recv_e)
-            .expect("queue is full");
+        ring.submission().push(&recv_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
@@ -398,7 +380,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
     match bid {
         0 => assert_eq!(&buf0[..256], &input[1024..]),
         1 => assert_eq!(&buf1[..256], &input[1024..]),
-        _ => panic!("{}", cqe.flags())
+        _ => panic!("{}", cqe.flags()),
     }
 
     // remove bufs
