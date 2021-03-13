@@ -66,6 +66,8 @@ fn main() -> anyhow::Result<()> {
     tests::net::test_tcp_sendmsg_recvmsg(&mut ring, &test)?;
     tests::net::test_tcp_accept(&mut ring, &test)?;
     tests::net::test_tcp_connect(&mut ring, &test)?;
+    #[cfg(feature = "unstable")]
+    tests::net::test_tcp_buffer_select(&mut ring, &test)?;
 
     // queue
     tests::poll::test_eventfd_poll(&mut ring, &test)?;

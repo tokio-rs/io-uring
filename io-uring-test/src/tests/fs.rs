@@ -272,6 +272,7 @@ pub fn test_file_cur_pos(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
     Ok(())
 }
 
+/// Skip ci, because statx does not exist in old release.
 #[cfg(not(feature = "ci"))]
 pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
@@ -355,6 +356,7 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Skip ci, because direct IO does not work on qemu.
 #[cfg(not(feature = "ci"))]
 pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     use std::os::unix::fs::OpenOptionsExt;

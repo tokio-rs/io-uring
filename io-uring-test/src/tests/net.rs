@@ -6,6 +6,18 @@ use std::net::{TcpListener, TcpStream};
 use std::os::unix::io::AsRawFd;
 use std::{io, mem};
 
+static TCP_LISTENER: OnceCell<TcpListener> = OnceCell::new();
+
+fn tcp_pair() -> io::Result<(TcpStream, TcpStream)> {
+    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("127.0.0.1:0"))?;
+
+    let addr = listener.local_addr()?;
+    let send_stream = TcpStream::connect(addr)?;
+    let (recv_stream, _) = listener.accept()?;
+
+    Ok((send_stream, recv_stream))
+}
+
 pub fn test_tcp_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
         test;
@@ -172,14 +184,12 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, test: &Test) -> anyhow::Resu
 pub fn test_tcp_accept(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require!(
         test;
-        test.probe.is_supported(opcode::Write::CODE);
-        test.probe.is_supported(opcode::Read::CODE);
         test.probe.is_supported(opcode::Accept::CODE);
     );
 
     println!("test tcp_accept");
 
-    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("0.0.0.0:0"))?;
+    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("127.0.0.1:0"))?;
     let addr = listener.local_addr()?;
     let fd = types::Fd(listener.as_raw_fd());
 
@@ -218,14 +228,12 @@ pub fn test_tcp_connect(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     require!(
         test;
-        test.probe.is_supported(opcode::Write::CODE);
-        test.probe.is_supported(opcode::Read::CODE);
         test.probe.is_supported(opcode::Connect::CODE);
     );
 
     println!("test tcp_connect");
 
-    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("0.0.0.0:0"))?;
+    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("127.0.0.1:0"))?;
     let addr = listener.local_addr()?;
 
     let sockaddr = SockAddr::from(addr);
@@ -256,14 +264,172 @@ pub fn test_tcp_connect(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
-static TCP_LISTENER: OnceCell<TcpListener> = OnceCell::new();
+#[cfg(feature = "unstable")]
+pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+    use std::io::Write;
+    use io_uring::cqueue;
 
-fn tcp_pair() -> io::Result<(TcpStream, TcpStream)> {
-    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("0.0.0.0:0"))?;
+    require!(
+        test;
+        test.probe.is_supported(opcode::Send::CODE);
+        test.probe.is_supported(opcode::Recv::CODE);
+        test.probe.is_supported(opcode::ProvideBuffers::CODE);
+        test.probe.is_supported(opcode::RemoveBuffers::CODE);
+    );
 
-    let addr = listener.local_addr()?;
-    let send_stream = TcpStream::connect(addr)?;
-    let (recv_stream, _) = listener.accept()?;
+    println!("test tcp_buffer_select");
 
-    Ok((send_stream, recv_stream))
+    let (mut send_stream, recv_stream) = tcp_pair()?;
+
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+
+    let mut input = vec![0xde; 1024];
+    input.extend_from_slice(&[0xad; 256]);
+    let mut bufs = vec![0; 1024];
+
+    // provide bufs
+    let provide_bufs_e = opcode::ProvideBuffers::new(
+        bufs.as_mut_ptr(),
+        1024,
+        1,
+        0xdead,
+        0
+    );
+
+    unsafe {
+        ring.submission()
+            .push(&provide_bufs_e.build().user_data(0x21))
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe = ring.completion().next().expect("cqueue is empty");
+    assert_eq!(cqe.user_data(), 0x21);
+    assert_eq!(cqe.result(), 0xdead);
+
+    // write 1024 + 256
+    send_stream.write_all(&input)?;
+
+    // recv 1024
+    let recv_e = opcode::Recv::new(recv_fd, std::ptr::null_mut(), 1024)
+        .buf_group(0xdead)
+        .build()
+        .flags(squeue::Flags::BUFFER_SELECT)
+        .user_data(0x22);
+
+    unsafe {
+        ring.submission()
+            .push(&recv_e)
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe = ring.completion().next().expect("cqueue is empty");
+    assert_eq!(cqe.user_data(), 0x22);
+    assert_eq!(cqe.result(), 1024);
+    assert_eq!(cqueue::buffer_select(cqe.flags()), Some(0));
+    assert_eq!(&bufs[..1024], &input[..1024]);
+
+    // recv fail
+    let recv_e = opcode::Recv::new(recv_fd, std::ptr::null_mut(), 1024)
+        .buf_group(0xdead)
+        .build()
+        .flags(squeue::Flags::BUFFER_SELECT)
+        .user_data(0x23);
+
+    unsafe {
+        ring.submission()
+            .push(&recv_e)
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe = ring.completion().next().expect("cqueue is empty");
+    assert_eq!(cqe.user_data(), 0x23);
+    assert_eq!(cqe.result(), -libc::ENOBUFS);
+
+    // provides bufs 2
+    bufs.extend_from_slice(&[0; 1024]);
+
+    let provide_bufs_e = opcode::ProvideBuffers::new(
+        bufs.as_mut_ptr(),
+        1024,
+        2,
+        0xdeae,
+        0
+    );
+
+    unsafe {
+        ring.submission()
+            .push(&provide_bufs_e.build().user_data(0x24))
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe = ring.completion().next().expect("cqueue is empty");
+    assert_eq!(cqe.user_data(), 0x24);
+    assert_eq!(cqe.result(), 0xdeae);
+
+    // recv 2
+    let recv_e = opcode::Recv::new(recv_fd, std::ptr::null_mut(), 1024)
+        .buf_group(0xdeae)
+        .build()
+        .flags(squeue::Flags::BUFFER_SELECT)
+        .user_data(0x25);
+
+    unsafe {
+        ring.submission()
+            .push(&recv_e)
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe = ring.completion().next().expect("cqueue is empty");
+    assert_eq!(cqe.user_data(), 0x25);
+    assert_eq!(cqe.result(), 256);
+
+    let (buf0, buf1) = bufs.split_at(1024);
+    let bid = cqueue::buffer_select(cqe.flags()).expect("no buffer id");
+    match bid {
+        0 => assert_eq!(&buf0[..256], &input[1024..]),
+        1 => assert_eq!(&buf1[..256], &input[1024..]),
+        _ => panic!("{}", cqe.flags())
+    }
+
+    // remove bufs
+    let remove_bufs_e = opcode::RemoveBuffers::new(1, 0xdeae);
+
+    unsafe {
+        ring.submission()
+            .push(&remove_bufs_e.build().user_data(0x26))
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe = ring.completion().next().expect("cqueue is empty");
+    assert_eq!(cqe.user_data(), 0x26);
+    assert_eq!(cqe.result(), 1);
+
+    // remove bufs fail
+    let remove_bufs_e = opcode::RemoveBuffers::new(1, 0xdead);
+
+    unsafe {
+        ring.submission()
+            .push(&remove_bufs_e.build().user_data(0x27))
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe = ring.completion().next().expect("cqueue is empty");
+    assert_eq!(cqe.user_data(), 0x27);
+    assert_eq!(cqe.result(), -libc::ENOENT);
+
+    Ok(())
 }
