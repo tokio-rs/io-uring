@@ -44,13 +44,20 @@ fn main() -> anyhow::Result<()> {
     tests::fs::test_file_openat2(&mut ring, &test)?;
     tests::fs::test_file_close(&mut ring, &test)?;
     #[cfg(not(feature = "ci"))]
+    tests::fs::test_file_direct_write_read(&mut ring, &test)?;
+    #[cfg(not(feature = "ci"))]
     tests::fs::test_statx(&mut ring, &test)?;
+    #[cfg(feature = "unstable")]
+    tests::fs::test_file_splice(&mut ring, &test)?;
 
     // timeout
     tests::timeout::test_timeout(&mut ring, &test)?;
     tests::timeout::test_timeout_count(&mut ring, &test)?;
     tests::timeout::test_timeout_remove(&mut ring, &test)?;
     tests::timeout::test_timeout_cancel(&mut ring, &test)?;
+    tests::timeout::test_timeout_abs(&mut ring, &test)?;
+    #[cfg(feature = "unstable")]
+    tests::timeout::test_timeout_submit_args(&mut ring, &test)?;
 
     // net
     tests::net::test_tcp_write_read(&mut ring, &test)?;
@@ -59,6 +66,8 @@ fn main() -> anyhow::Result<()> {
     tests::net::test_tcp_sendmsg_recvmsg(&mut ring, &test)?;
     tests::net::test_tcp_accept(&mut ring, &test)?;
     tests::net::test_tcp_connect(&mut ring, &test)?;
+    #[cfg(feature = "unstable")]
+    tests::net::test_tcp_buffer_select(&mut ring, &test)?;
 
     // queue
     tests::poll::test_eventfd_poll(&mut ring, &test)?;
