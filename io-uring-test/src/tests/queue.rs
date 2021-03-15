@@ -84,8 +84,7 @@ pub fn test_queue_split(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     for _ in 0..sq.capacity() {
         unsafe {
-            sq.push(&opcode::Nop::new().build())
-                .expect("queue is full");
+            sq.push(&opcode::Nop::new().build()).expect("queue is full");
         }
     }
 
@@ -127,7 +126,7 @@ pub fn test_queue_nodrop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
                     Ok(_) => sq.sync(),
                     // backpressure
                     Err(ref err) if err.raw_os_error() == Some(libc::EBUSY) => break,
-                    Err(err) => return Err(err.into())
+                    Err(err) => return Err(err.into()),
                 }
             }
         }
@@ -135,14 +134,18 @@ pub fn test_queue_nodrop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
 
     cq.sync();
 
-    let cqes = cq.by_ref().collect::<Vec<_>>();
+    let cqes_count = cq.by_ref().count();
     assert_eq!(cq.overflow(), 0);
-    assert_eq!(cqes.len(), cq.capacity());
+    assert_eq!(cqes_count, cq.capacity());
 
     cq.sync();
 
     assert!(sq.len() > 0);
     assert!(submitter.submit()? >= 1);
+
+    // clean cq
+    cq.sync();
+    cq.by_ref().count();
 
     Ok(())
 }
