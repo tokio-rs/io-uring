@@ -152,7 +152,7 @@ impl SubmissionQueue<'_> {
     pub fn sync(&mut self) {
         unsafe {
             (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
-            self.tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
+            self.head = (*self.queue.head).load(atomic::Ordering::Acquire);
         }
     }
 
@@ -172,9 +172,6 @@ impl SubmissionQueue<'_> {
     }
 
     /// Returns `true` if the completion queue ring is overflown.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn cq_overflow(&self) -> bool {
         unsafe {
             (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0

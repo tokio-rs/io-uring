@@ -30,6 +30,8 @@ fn main() -> anyhow::Result<()> {
     };
 
     tests::queue::test_nop(&mut ring, &test)?;
+    tests::queue::test_queue_split(&mut ring, &test)?;
+    tests::queue::test_queue_nodrop(&mut ring, &test)?;
 
     #[cfg(feature = "unstable")]
     tests::queue::test_batch(&mut ring, &test)?;

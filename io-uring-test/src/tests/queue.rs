@@ -70,3 +70,79 @@ pub fn test_batch(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     Ok(())
 }
+
+pub fn test_queue_split(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+    require! {
+        test;
+    }
+
+    println!("test queue_split");
+
+    let (submitter, mut sq, mut cq) = ring.split();
+
+    assert!(sq.is_empty());
+
+    for _ in 0..sq.capacity() {
+        unsafe {
+            sq.push(&opcode::Nop::new().build())
+                .expect("queue is full");
+        }
+    }
+
+    assert!(sq.is_full());
+
+    sq.sync();
+
+    assert_eq!(submitter.submit()?, sq.capacity());
+    assert!(sq.is_full());
+    sq.sync();
+    assert!(sq.is_empty());
+
+    assert!(cq.is_empty());
+    cq.sync();
+    assert_eq!(cq.len(), sq.capacity());
+    assert_eq!(cq.by_ref().count(), sq.capacity());
+
+    cq.sync();
+
+    Ok(())
+}
+
+pub fn test_queue_nodrop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+    require! {
+        test;
+        ring.params().is_feature_nodrop();
+    }
+
+    println!("test queue_nodrop");
+
+    let (submitter, mut sq, mut cq) = ring.split();
+
+    loop {
+        unsafe {
+            if sq.push(&opcode::Nop::new().build()).is_err() {
+                sq.sync();
+
+                match submitter.submit() {
+                    Ok(_) => sq.sync(),
+                    // backpressure
+                    Err(ref err) if err.raw_os_error() == Some(libc::EBUSY) => break,
+                    Err(err) => return Err(err.into())
+                }
+            }
+        }
+    }
+
+    cq.sync();
+
+    let cqes = cq.by_ref().collect::<Vec<_>>();
+    assert_eq!(cq.overflow(), 0);
+    assert_eq!(cqes.len(), cq.capacity());
+
+    cq.sync();
+
+    assert!(sq.len() > 0);
+    assert!(submitter.submit()? >= 1);
+
+    Ok(())
+}
