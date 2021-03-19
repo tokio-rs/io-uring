@@ -237,7 +237,7 @@ pub fn test_tcp_connect(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     let addr = listener.local_addr()?;
 
     let sockaddr = SockAddr::from(addr);
-    let stream = Socket::new(Domain::ipv4(), Type::stream(), Some(Protocol::tcp()))?;
+    let stream = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
 
     let connect_e = opcode::Connect::new(
         types::Fd(stream.as_raw_fd()),
