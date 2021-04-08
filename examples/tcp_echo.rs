@@ -1,6 +1,7 @@
 use std::net::TcpListener;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, ptr};
+use std::collections::VecDeque;
 
 use io_uring::{opcode, squeue, types, IoUring, SubmissionQueue};
 use slab::Slab;
@@ -56,7 +57,7 @@ fn main() -> anyhow::Result<()> {
     let mut ring = IoUring::new(256)?;
     let listener = TcpListener::bind(("127.0.0.1", 3456))?;
 
-    let mut backlog = Vec::new();
+    let mut backlog = VecDeque::new();
     let mut bufpool = Vec::with_capacity(64);
     let mut buf_alloc = Slab::with_capacity(64);
     let mut token_alloc = Slab::with_capacity(64);
@@ -77,8 +78,6 @@ fn main() -> anyhow::Result<()> {
         }
         cq.sync();
 
-        let mut iter = backlog.drain(..);
-
         // clean backlog
         loop {
             if sq.is_full() {
@@ -90,15 +89,13 @@ fn main() -> anyhow::Result<()> {
             }
             sq.sync();
 
-            match iter.next() {
+            match backlog.pop_front() {
                 Some(sqe) => unsafe {
                     let _ = sq.push(&sqe);
                 },
                 None => break,
             }
         }
-
-        drop(iter);
 
         accept.push_to(&mut sq);
 
@@ -131,7 +128,7 @@ fn main() -> anyhow::Result<()> {
 
                     unsafe {
                         if sq.push(&poll_e).is_err() {
-                            backlog.push(poll_e);
+                            backlog.push_back(poll_e);
                         }
                     }
                 }
@@ -154,7 +151,7 @@ fn main() -> anyhow::Result<()> {
 
                     unsafe {
                         if sq.push(&read_e).is_err() {
-                            backlog.push(read_e);
+                            backlog.push_back(read_e);
                         }
                     }
                 }
@@ -185,7 +182,7 @@ fn main() -> anyhow::Result<()> {
 
                         unsafe {
                             if sq.push(&write_e).is_err() {
-                                backlog.push(write_e);
+                                backlog.push_back(write_e);
                             }
                         }
                     }
@@ -226,7 +223,7 @@ fn main() -> anyhow::Result<()> {
 
                     unsafe {
                         if sq.push(&entry).is_err() {
-                            backlog.push(entry);
+                            backlog.push_back(entry);
                         }
                     }
                 }

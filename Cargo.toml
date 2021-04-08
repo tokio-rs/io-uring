@@ -31,8 +31,6 @@ bindgen = { version = "0.57", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
-nix = "0.19"
-lazy_static = "1"
 socket2 = "0.4"
 slab = "0.4"
 
