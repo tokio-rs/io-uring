@@ -1,7 +1,7 @@
+use std::collections::VecDeque;
 use std::net::TcpListener;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, ptr};
-use std::collections::VecDeque;
 
 use io_uring::{opcode, squeue, types, IoUring, SubmissionQueue};
 use slab::Slab;
