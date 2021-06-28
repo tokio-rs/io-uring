@@ -269,7 +269,7 @@ impl Builder {
     /// issue I/O without ever context switching into the kernel, however it does use up a lot more
     /// CPU. You should use it when you are expecting very large amounts of I/O.
     ///
-    /// After `idle` seconds, the kernel thread will go to sleep and you will have to wake it up
+    /// After `idle` milliseconds, the kernel thread will go to sleep and you will have to wake it up
     /// again with a system call (this is handled by [`Submitter::submit`] and
     /// [`Submitter::submit_and_wait`] automatically).
     ///
