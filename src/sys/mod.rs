@@ -80,7 +80,7 @@ pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int 
             libc::SYS_io_uring_setup as usize
         },
         entries as usize,
-        p as usize
+        p as usize,
     ) as _
 }
 
