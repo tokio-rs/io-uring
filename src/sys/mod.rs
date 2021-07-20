@@ -26,7 +26,11 @@ pub unsafe fn io_uring_register(
     nr_args: c_uint,
 ) -> c_int {
     syscall(
-        __NR_io_uring_register as c_long,
+        if cfg!(feature = "bindgen") {
+            __NR_io_uring_register as c_long
+        } else {
+            libc::SYS_io_uring_register
+        },
         fd as c_long,
         opcode as c_long,
         arg as c_long,
@@ -42,7 +46,11 @@ pub unsafe fn io_uring_register(
     nr_args: c_uint,
 ) -> c_int {
     sc::syscall4(
-        __NR_io_uring_register as usize,
+        if cfg!(feature = "bindgen") {
+            __NR_io_uring_register as usize
+        } else {
+            libc::SYS_io_uring_register as usize
+        },
         fd as usize,
         opcode as usize,
         arg as usize,
@@ -53,7 +61,11 @@ pub unsafe fn io_uring_register(
 #[cfg(not(feature = "direct-syscall"))]
 pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int {
     syscall(
-        __NR_io_uring_setup as c_long,
+        if cfg!(feature = "bindgen") {
+            __NR_io_uring_setup as c_long
+        } else {
+            libc::SYS_io_uring_setup
+        },
         entries as c_long,
         p as c_long,
     ) as _
@@ -61,7 +73,15 @@ pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int 
 
 #[cfg(feature = "direct-syscall")]
 pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int {
-    sc::syscall2(__NR_io_uring_setup as usize, entries as usize, p as usize) as _
+    sc::syscall2(
+        if cfg!(feature = "bindgen") {
+            __NR_io_uring_setup as usize
+        } else {
+            libc::SYS_io_uring_setup as usize
+        },
+        entries as usize,
+        p as usize,
+    ) as _
 }
 
 #[cfg(not(feature = "direct-syscall"))]
@@ -74,7 +94,11 @@ pub unsafe fn io_uring_enter(
     size: usize,
 ) -> c_int {
     syscall(
-        __NR_io_uring_enter as c_long,
+        if cfg!(feature = "bindgen") {
+            __NR_io_uring_enter as c_long
+        } else {
+            libc::SYS_io_uring_enter
+        },
         fd as c_long,
         to_submit as c_long,
         min_complete as c_long,
@@ -94,7 +118,11 @@ pub unsafe fn io_uring_enter(
     size: usize,
 ) -> c_int {
     sc::syscall6(
-        __NR_io_uring_enter as usize,
+        if cfg!(feature = "bindgen") {
+            __NR_io_uring_enter as usize
+        } else {
+            libc::SYS_io_uring_enter as usize
+        },
         fd as usize,
         to_submit as usize,
         min_complete as usize,
