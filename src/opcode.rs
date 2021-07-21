@@ -260,7 +260,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
-        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_index = buf_index;
+        sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
 );
@@ -304,7 +304,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
-        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_index = buf_index;
+        sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
 );
@@ -775,7 +775,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
-        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_group = buf_group;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 );
@@ -909,7 +909,7 @@ opcode!(
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_3.msg_flags = flags as _;
-        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_group = buf_group;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 );
@@ -992,7 +992,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = off_out as _;
 
-        sqe.__bindgen_anon_4.__bindgen_anon_1.splice_fd_in = match fd_in {
+        sqe.splice_fd_in = match fd_in {
             sealed::Target::Fd(fd) => fd,
             sealed::Target::Fixed(i) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;
@@ -1033,7 +1033,7 @@ opcode!(
         sqe.__bindgen_anon_2.addr = addr as _;
         sqe.len = len as _;
         sqe.__bindgen_anon_1.off = bid as _;
-        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_group = bgid;
+        sqe.__bindgen_anon_4.buf_group = bgid;
         Entry(sqe)
     }
 );
@@ -1058,7 +1058,7 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = nbufs as _;
-        sqe.__bindgen_anon_4.__bindgen_anon_1.__bindgen_anon_1.buf_group = bgid;
+        sqe.__bindgen_anon_4.buf_group = bgid;
         Entry(sqe)
     }
 );
@@ -1089,7 +1089,7 @@ opcode!(
         assign_fd!(sqe.fd = fd_out);
         sqe.len = len;
 
-        sqe.__bindgen_anon_4.__bindgen_anon_1.splice_fd_in = match fd_in {
+        sqe.splice_fd_in = match fd_in {
             sealed::Target::Fd(fd) => fd,
             sealed::Target::Fixed(i) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;

@@ -280,7 +280,7 @@ impl Entry {
     /// Requires the `unstable` feature.
     #[cfg(feature = "unstable")]
     pub fn personality(mut self, personality: u16) -> Entry {
-        self.0.__bindgen_anon_4.__bindgen_anon_1.personality = personality;
+        self.0.personality = personality;
         self
     }
 }
