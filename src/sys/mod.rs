@@ -36,7 +36,6 @@ const SYSCALL_ENTER: c_long = __NR_io_uring_enter as _;
 #[cfg(not(feature = "bindgen"))]
 const SYSCALL_ENTER: c_long = libc::SYS_io_uring_enter;
 
-
 #[cfg(not(feature = "direct-syscall"))]
 pub unsafe fn io_uring_register(
     fd: c_int,
@@ -71,20 +70,12 @@ pub unsafe fn io_uring_register(
 
 #[cfg(not(feature = "direct-syscall"))]
 pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int {
-    syscall(
-        SYSCALL_SETUP,
-        entries as c_long,
-        p as c_long,
-    ) as _
+    syscall(SYSCALL_SETUP, entries as c_long, p as c_long) as _
 }
 
 #[cfg(feature = "direct-syscall")]
 pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int {
-    sc::syscall2(
-        SYSCALL_SETUP as usize,
-        entries as usize,
-        p as usize,
-    ) as _
+    sc::syscall2(SYSCALL_SETUP as usize, entries as usize, p as usize) as _
 }
 
 #[cfg(not(feature = "direct-syscall"))]
