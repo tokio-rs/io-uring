@@ -27,7 +27,7 @@ libc = { version = "0.2.98", default-features = false }
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]
-bindgen = { version = "0.58", optional = true }
+bindgen = { version = "0.59", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
