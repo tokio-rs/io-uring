@@ -746,10 +746,9 @@ opcode!(
 
 opcode!(
     /// Read from a file descriptor, equivalent to `read(2)`.
-    pub struct Read {
+    pub struct Read<'a> {
         fd: { impl sealed::UseFixed },
-        buf: { *mut u8 },
-        len: { u32 },
+        buf: { &'a mut [u8] },
         ;;
         offset: libc::off_t = 0,
         ioprio: u16 = 0,
@@ -762,7 +761,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Read {
             fd,
-            buf, len, offset,
+            buf, offset,
             ioprio, rw_flags,
             buf_group
         } = self;
@@ -771,8 +770,8 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.__bindgen_anon_2.addr = buf as _;
-        sqe.len = len;
+        sqe.__bindgen_anon_2.addr = buf.as_mut_ptr() as _;
+        sqe.len = buf.len().try_into().unwrap();
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_group = buf_group;

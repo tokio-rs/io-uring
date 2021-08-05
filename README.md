@@ -30,7 +30,7 @@ fn main() -> io::Result<()> {
     let fd = fs::File::open("README.md")?;
     let mut buf = vec![0; 16];
 
-    let read_e = opcode::Read::new(types::Fd(fd.as_raw_fd()), buf.as_mut_ptr(), buf.len() as _)
+    let read_e = opcode::Read::new(types::Fd(fd.as_raw_fd()), &mut buf)
         .build()
         .user_data(0x42);
 
