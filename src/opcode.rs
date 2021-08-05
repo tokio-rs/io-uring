@@ -2,6 +2,8 @@
 
 #![allow(clippy::new_without_default)]
 
+use std::convert::TryInto;
+use std::io::IoSliceMut;
 use std::mem;
 use std::os::unix::io::RawFd;
 
@@ -33,7 +35,7 @@ macro_rules! opcode {
     };
     (
         $( #[$outer:meta] )*
-        pub struct $name:ident {
+        pub struct $name:ident$(<$a:lifetime>)? {
             $( #[$new_meta:meta] )*
 
             $( $field:ident : { $( $tnt:tt )+ } ),*
@@ -56,12 +58,12 @@ macro_rules! opcode {
         pub fn build($self:ident) -> Entry $build_block:block
     ) => {
         $( #[$outer] )*
-        pub struct $name {
+        pub struct $name$(<$a>)? {
             $( $field : opcode!(@type $( $tnt )*), )*
             $( $opt_field : $opt_tname, )*
         }
 
-        impl $name {
+        impl$(<$a>)? $name$(<$a>)? {
             $( #[$new_meta] )*
             #[inline]
             pub fn new($( $field : $( $tnt )* ),*) -> Self {
@@ -120,10 +122,9 @@ opcode!(
 opcode!(
     /// Vectored read, equivalent to `preadv2(2)`.
     #[derive(Debug)]
-    pub struct Readv {
+    pub struct Readv<'a> {
         fd: { impl sealed::UseFixed },
-        iovec: { *const libc::iovec },
-        len: { u32 },
+        iovec: { &'a mut [IoSliceMut<'a>] },
         ;;
         ioprio: u16 = 0,
         offset: libc::off_t = 0,
@@ -137,7 +138,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Readv {
             fd,
-            iovec, len, offset,
+            iovec, offset,
             ioprio, rw_flags
         } = self;
 
@@ -145,8 +146,8 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.__bindgen_anon_2.addr = iovec as _;
-        sqe.len = len;
+        sqe.__bindgen_anon_2.addr = iovec.as_mut_ptr() as _;
+        sqe.len = iovec.len().try_into().unwrap();
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
