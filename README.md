@@ -28,7 +28,7 @@ fn main() -> io::Result<()> {
     let mut ring = IoUring::new(8)?;
 
     let fd = fs::File::open("README.md")?;
-    let mut buf = vec![0; 1024];
+    let mut buf = vec![0; 16];
 
     let read_e = opcode::Read::new(types::Fd(fd.as_raw_fd()), buf.as_mut_ptr(), buf.len() as _)
         .build()
@@ -48,6 +48,7 @@ fn main() -> io::Result<()> {
 
     assert_eq!(cqe.user_data(), 0x42);
     assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+    assert_eq!(&buf[..], b"# Linux IO Uring");
 
     Ok(())
 }
