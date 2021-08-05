@@ -3,7 +3,7 @@
 #![allow(clippy::new_without_default)]
 
 use std::convert::TryInto;
-use std::io::IoSliceMut;
+use std::io::{IoSlice, IoSliceMut};
 use std::mem;
 use std::os::unix::io::RawFd;
 
@@ -157,10 +157,9 @@ opcode!(
 opcode!(
     /// Vectored write, equivalent to `pwritev2(2)`.
     #[derive(Debug)]
-    pub struct Writev {
+    pub struct Writev<'a> {
         fd: { impl sealed::UseFixed },
-        iovec: { *const libc::iovec },
-        len: { u32 },
+        iovec: { &'a [IoSlice<'a>] },
         ;;
         ioprio: u16 = 0,
         offset: libc::off_t = 0,
@@ -174,7 +173,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Writev {
             fd,
-            iovec, len, offset,
+            iovec, offset,
             ioprio, rw_flags
         } = self;
 
@@ -182,8 +181,8 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.__bindgen_anon_2.addr = iovec as _;
-        sqe.len = len;
+        sqe.__bindgen_anon_2.addr = iovec.as_ptr() as _;
+        sqe.len = iovec.len().try_into().unwrap();
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
