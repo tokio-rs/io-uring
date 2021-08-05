@@ -862,10 +862,9 @@ opcode!(
 
 opcode!(
     /// Send a message on a socket, equivalent to `send(2)`.
-    pub struct Send {
+    pub struct Send<'a> {
         fd: { impl sealed::UseFixed },
-        buf: { *const u8 },
-        len: { u32 },
+        buf: { &'a [u8] },
         ;;
         flags: i32 = 0
     }
@@ -873,13 +872,13 @@ opcode!(
     pub const CODE = sys::IORING_OP_SEND;
 
     pub fn build(self) -> Entry {
-        let Send { fd, buf, len, flags } = self;
+        let Send { fd, buf, flags } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_2.addr = buf as _;
-        sqe.len = len;
+        sqe.__bindgen_anon_2.addr = buf.as_ptr() as _;
+        sqe.len = buf.len().try_into().unwrap();
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         Entry(sqe)
     }
