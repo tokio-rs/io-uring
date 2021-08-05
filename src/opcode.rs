@@ -887,10 +887,9 @@ opcode!(
 
 opcode!(
     /// Receive a message from a socket, equivalent to `recv(2)`.
-    pub struct Recv {
+    pub struct Recv<'a> {
         fd: { impl sealed::UseFixed },
-        buf: { *mut u8 },
-        len: { u32 },
+        buf: { &'a mut [u8] },
         ;;
         flags: i32 = 0,
         buf_group: u16 = 0
@@ -899,13 +898,13 @@ opcode!(
     pub const CODE = sys::IORING_OP_RECV;
 
     pub fn build(self) -> Entry {
-        let Recv { fd, buf, len, flags, buf_group } = self;
+        let Recv { fd, buf, flags, buf_group } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_2.addr = buf as _;
-        sqe.len = len;
+        sqe.__bindgen_anon_2.addr = buf.as_mut_ptr() as _;
+        sqe.len = buf.len().try_into().unwrap();
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
