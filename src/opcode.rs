@@ -781,10 +781,9 @@ opcode!(
 
 opcode!(
     /// Write to a file descriptor, equivalent to `write(2)`.
-    pub struct Write {
+    pub struct Write<'a> {
         fd: { impl sealed::UseFixed },
-        buf: { *const u8 },
-        len: { u32 },
+        buf: { &'a [u8] },
         ;;
         offset: libc::off_t = 0,
         ioprio: u16 = 0,
@@ -796,7 +795,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Write {
             fd,
-            buf, len, offset,
+            buf, offset,
             ioprio, rw_flags
         } = self;
 
@@ -804,8 +803,8 @@ opcode!(
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
-        sqe.__bindgen_anon_2.addr = buf as _;
-        sqe.len = len;
+        sqe.__bindgen_anon_2.addr = buf.as_ptr() as _;
+        sqe.len = buf.len().try_into().unwrap();
         sqe.__bindgen_anon_1.off = offset as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
