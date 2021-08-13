@@ -2,9 +2,6 @@
 mod utils;
 mod tests;
 
-#[cfg(feature = "unstable")]
-mod ownedsplit;
-
 use io_uring::{IoUring, Probe};
 
 pub struct Test {
@@ -74,9 +71,6 @@ fn main() -> anyhow::Result<()> {
     tests::poll::test_eventfd_poll(&mut ring, &test)?;
     tests::poll::test_eventfd_poll_remove(&mut ring, &test)?;
     tests::poll::test_eventfd_poll_remove_failed(&mut ring, &test)?;
-
-    #[cfg(feature = "unstable")]
-    ownedsplit::main(ring, &test)?;
 
     Ok(())
 }
