@@ -40,14 +40,10 @@ pub(crate) mod sealed {
     }
 }
 
-use crate::sys;
 use bitflags::bitflags;
-use std::os::unix::io::RawFd;
-
-#[cfg(feature = "unstable")]
 use std::marker::PhantomData;
-
-#[cfg(feature = "unstable")]
+use std::os::unix::io::RawFd;
+use crate::sys;
 use crate::util::cast_ptr;
 
 pub use sys::__kernel_rwf_t as RwFlags;
@@ -169,7 +165,6 @@ impl Timespec {
 ///
 /// drop(args);
 /// ```
-#[cfg(feature = "unstable")]
 #[derive(Default, Debug, Clone, Copy)]
 pub struct SubmitArgs<'prev: 'now, 'now> {
     pub(crate) args: sys::io_uring_getevents_arg,
@@ -177,7 +172,6 @@ pub struct SubmitArgs<'prev: 'now, 'now> {
     now: PhantomData<&'now ()>,
 }
 
-#[cfg(feature = "unstable")]
 impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     #[inline]
     pub const fn new() -> SubmitArgs<'static, 'static> {

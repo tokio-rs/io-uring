@@ -3,15 +3,12 @@ use std::sync::atomic;
 use std::{io, ptr};
 
 use crate::register::{execute, Probe};
-use crate::sys;
+use crate::{ sys, types };
 use crate::util::{cast_ptr, Fd};
 use crate::Parameters;
 
 #[cfg(feature = "unstable")]
 use crate::register::Restriction;
-
-#[cfg(feature = "unstable")]
-use crate::types;
 
 /// Interface for submitting submission queue events in an io_uring instance to the kernel for
 /// executing and registering files or buffers with the instance.
@@ -99,6 +96,8 @@ impl<'a> Submitter<'a> {
         } else if result == -1 {
             Err(io::Error::last_os_error())
         } else {
+            // when using ext arg,
+            // it will return error via `-code` instead of `errno`.
             Err(io::Error::from_raw_os_error(-result))
         }
     }
@@ -132,7 +131,21 @@ impl<'a> Submitter<'a> {
         unsafe { self.enter::<libc::sigset_t>(len as _, want as _, flags, None) }
     }
 
-    #[cfg(feature = "unstable")]
+    /// Submit all queued submission queue events to the kernel but with submit arguments.
+    ///
+    /// You can use submit args to simply implement the `wait_or_timeout` operation.
+    ///
+    /// ```rust
+    /// # use io_uring::IoUring;
+    /// # let mut ring = IoUring::new(8).unwrap();
+    /// use io_uring::types::{ SubmitArgs, Timespec };
+    ///
+    /// let timespec = Timespec::new().sec(1);
+    /// let args = SubmitArgs::new().timespec(&timespec);
+    ///
+    /// let err = ring.submitter().submit_with_args(1, &args).unwrap_err();
+    /// assert_eq!(err.raw_os_error(), Some(libc::ETIME));
+    /// ```
     pub fn submit_with_args(
         &self,
         want: usize,
