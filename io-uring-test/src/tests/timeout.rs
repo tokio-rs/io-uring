@@ -262,7 +262,6 @@ pub fn test_timeout_abs(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
 pub fn test_timeout_submit_args(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     require! {
         test;
