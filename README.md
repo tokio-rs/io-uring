@@ -53,6 +53,9 @@ fn main() -> io::Result<()> {
 }
 ```
 
+Note that opcode `Read` is only available after kernel 5.6.
+If you use a kernel lower than 5.6, this example will fail.
+
 ## Test and Benchmarks
 
 You can run the test and benchmark of the library with the following commands.
