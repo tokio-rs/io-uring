@@ -184,6 +184,13 @@ impl ExactSizeIterator for CompletionQueue<'_> {
 impl Entry {
     /// The operation-specific result code. For example, for a [`Read`](crate::opcode::Read)
     /// operation this is equivalent to the return value of the `read(2)` system call.
+    ///
+    /// Many system calls that have io-uring equivalents use `errno` to return error values.
+    /// `errno` is not used with io-uring as it's an async interface. Instead the result is set to
+    /// `-errno` in these cases. This can be converted to an [`std::io::Error`] by
+    /// ```rust
+    /// std::io::Error::from_raw_os_error(-entry.result())
+    /// ```
     #[inline]
     pub fn result(&self) -> i32 {
         self.0.res

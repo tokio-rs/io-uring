@@ -745,9 +745,21 @@ opcode!(
 );
 
 opcode!(
-    /// Read from a file descriptor, mostly equivalent to `pread(2)`.
-    /// However, if an offset of `-1` is used, the files ,
-    /// then the current file offset is used and updated, like `read(2)`.
+    /// Read from a file descriptor, issues the equivalent of the `read(2)`.
+    ///
+    /// system call. In practice, it mixes the semantics of `pread(2)` and
+    /// `preadv2(2)` in that it takes an explicit offset, and supports using -1
+    /// for the offset to indicate that the current file position should be used 
+    /// instead of passing in an explicit offset.
+    ///
+    /// Given that io_uring is an async interface, `errno`
+    /// is never used for passing back error information. Instead, `res` will 
+    /// contain what the equivalent system call would have returned in case
+    /// of success, and in case of error `res` will contain `-errno`.
+    /// For example, if the normal read system call would have returned -1 and 
+    /// set `errno` to `EINVAL` then `res` would contain `-EINVAL`.
+    /// If the normal system call would have returned a read size of 1024, then
+    /// `res` would contain 1024.
     pub struct Read {
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
@@ -783,9 +795,21 @@ opcode!(
 );
 
 opcode!(
-    /// Write to a file descriptor, mostly equivalent to `pwrite(2)`.
-    /// However, if an offset of `-1` is used, the files ,
-    /// then the current file offset is used and updated, like `write(2)`.
+    /// Write to a file descriptor, issues the equivalent of the `write(2)`.
+    ///
+    /// system call. In practice, it mixes the semantics of `pwrite(2)` and
+    /// `pwritev2(2)` in that it takes an explicit offset, and supports using -1
+    /// for the offset to indicate that the current file position should be used 
+    /// instead of passing in an explicit offset.
+    ///
+    /// Given that io_uring is an async interface, `errno`
+    /// is never used for passing back error information. Instead, `res` will 
+    /// contain what the equivalent system call would have returned in case
+    /// of success, and in case of error `res` will contain `-errno`.
+    /// For example, if the normal read system call would have returned -1 and 
+    /// set `errno` to `EINVAL` then `res` would contain `-EINVAL`.
+    /// If the normal system call would have returned a read size of 1024, then
+    /// `res` would contain 1024.
     pub struct Write {
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
