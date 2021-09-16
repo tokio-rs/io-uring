@@ -745,7 +745,9 @@ opcode!(
 );
 
 opcode!(
-    /// Read from a file descriptor, equivalent to `read(2)`.
+    /// Read from a file descriptor, mostly equivalent to `pread(2)`.
+    /// However, if an offset of `-1` is used, the files ,
+    /// then the current file offset is used and updated, like `read(2)`.
     pub struct Read {
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
@@ -781,7 +783,9 @@ opcode!(
 );
 
 opcode!(
-    /// Write to a file descriptor, equivalent to `write(2)`.
+    /// Write to a file descriptor, mostly equivalent to `pwrite(2)`.
+    /// However, if an offset of `-1` is used, the files ,
+    /// then the current file offset is used and updated, like `write(2)`.
     pub struct Write {
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
