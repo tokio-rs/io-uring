@@ -306,6 +306,7 @@ pub union io_uring_sqe__bindgen_ty_3 {
     pub splice_flags: __u32,
     pub rename_flags: __u32,
     pub unlink_flags: __u32,
+    pub hardlink_flags: __u32,
 }
 #[test]
 fn bindgen_test_layout_io_uring_sqe__bindgen_ty_3() {
@@ -726,7 +727,10 @@ pub const IORING_OP_TEE: libc::c_uint = 33;
 pub const IORING_OP_SHUTDOWN: libc::c_uint = 34;
 pub const IORING_OP_RENAMEAT: libc::c_uint = 35;
 pub const IORING_OP_UNLINKAT: libc::c_uint = 36;
-pub const IORING_OP_LAST: libc::c_uint = 37;
+pub const IORING_OP_MKDIRAT: libc::c_uint = 37;
+pub const IORING_OP_SYMLINKAT: libc::c_uint = 38;
+pub const IORING_OP_LINKAT: libc::c_uint = 39;
+pub const IORING_OP_LAST: libc::c_uint = 40;
 pub type _bindgen_ty_5 = libc::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
