@@ -745,12 +745,26 @@ opcode!(
 );
 
 opcode!(
-    /// Read from a file descriptor, equivalent to `read(2)`.
+    /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
+    ///
+    /// * `fd` is the file descriptor to be operated on,
+    /// * `addr` contains the buffer in question,
+    /// * `len` contains the length of the IO operation,
+    ///
+    /// These are non-vectored versions of the `IORING_OP_READV` and `IORING_OP_WRITEV` opcodes.
+    /// See also `read(2)` and `write(2)` for the general description of the related system call.
+    ///
+    /// Available since 5.6.
     pub struct Read {
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
         len: { u32 },
         ;;
+        /// `offset` contains the read or write offset.
+        ///
+        /// If `fd` does not refer to a seekable file, `offset` must be set to zero.
+        /// If `offsett` is set to `-1`, the offset will use (and advance) the file position,
+        /// like the `read(2)` and `write(2)` system calls.
         offset: libc::off_t = 0,
         ioprio: u16 = 0,
         rw_flags: types::RwFlags = 0,
@@ -781,12 +795,26 @@ opcode!(
 );
 
 opcode!(
-    /// Write to a file descriptor, equivalent to `write(2)`.
+    /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
+    ///
+    /// * `fd` is the file descriptor to be operated on,
+    /// * `addr` contains the buffer in question,
+    /// * `len` contains the length of the IO operation,
+    ///
+    /// These are non-vectored versions of the `IORING_OP_READV` and `IORING_OP_WRITEV` opcodes.
+    /// See also `read(2)` and `write(2)` for the general description of the related system call.
+    ///
+    /// Available since 5.6.
     pub struct Write {
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
         len: { u32 },
         ;;
+        /// `offset` contains the read or write offset.
+        ///
+        /// If `fd` does not refer to a seekable file, `offset` must be set to zero.
+        /// If `offsett` is set to `-1`, the offset will use (and advance) the file position,
+        /// like the `read(2)` and `write(2)` system calls.
         offset: libc::off_t = 0,
         ioprio: u16 = 0,
         rw_flags: types::RwFlags = 0
