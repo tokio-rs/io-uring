@@ -1179,3 +1179,87 @@ opcode!(
         Entry(sqe)
     }
 );
+
+// === 5.15 ===
+
+#[cfg(feature = "unstable")]
+opcode!(
+    /// Make a directory, equivalent to `mkdirat2(2)`.
+    ///
+    /// Requires the `unstable` feature.
+    pub struct MkDirAt {
+        dirfd: { impl sealed::UseFd },
+        pathname: { *const libc::c_char },
+        ;;
+        mode: libc::mode_t = 0
+    }
+
+    pub const CODE = sys::IORING_OP_MKDIRAT;
+
+    pub fn build(self) -> Entry {
+        let MkDirAt { dirfd, pathname, mode } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = dirfd;
+        sqe.__bindgen_anon_2.addr = pathname as _;
+        sqe.len = mode;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    /// Create a symlink, equivalent to `symlinkat2(2)`.
+    ///
+    /// Requires the `unstable` feature.
+    pub struct SymlinkAt {
+        newdirfd: { impl sealed::UseFd },
+        target: { *const libc::c_char },
+        linkpath: { *const libc::c_char },
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_SYMLINKAT;
+
+    pub fn build(self) -> Entry {
+        let SymlinkAt { newdirfd, target, linkpath } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = newdirfd;
+        sqe.__bindgen_anon_2.addr = target as _;
+        sqe.__bindgen_anon_1.addr2 = linkpath as _;
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    /// Create a hard link, equivalent to `linkat2(2)`.
+    ///
+    /// Requires the `unstable` feature.
+    pub struct LinkAt {
+        olddirfd: { impl sealed::UseFd },
+        oldpath: { *const libc::c_char },
+        newdirfd: { impl sealed::UseFd },
+        newpath: { *const libc::c_char },
+        ;;
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_LINKAT;
+
+    pub fn build(self) -> Entry {
+        let LinkAt { olddirfd, oldpath, newdirfd, newpath, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = olddirfd as _;
+        sqe.__bindgen_anon_2.addr = oldpath as _;
+        sqe.len = newdirfd as _;
+        sqe.__bindgen_anon_1.addr2 = newpath as _;
+        sqe.__bindgen_anon_3.hardlink_flags = flags as _;
+        Entry(sqe)
+    }
+);
