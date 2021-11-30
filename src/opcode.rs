@@ -992,7 +992,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = off_out as _;
 
-        sqe.splice_fd_in = match fd_in {
+        sqe.__bindgen_anon_5.splice_fd_in = match fd_in {
             sealed::Target::Fd(fd) => fd,
             sealed::Target::Fixed(i) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;
@@ -1089,7 +1089,7 @@ opcode!(
         assign_fd!(sqe.fd = fd_out);
         sqe.len = len;
 
-        sqe.splice_fd_in = match fd_in {
+        sqe.__bindgen_anon_5.splice_fd_in = match fd_in {
             sealed::Target::Fd(fd) => fd,
             sealed::Target::Fixed(i) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;
