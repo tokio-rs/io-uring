@@ -43,6 +43,12 @@ pub const IORING_SETUP_R_DISABLED: u32 = 64;
 pub const IORING_FSYNC_DATASYNC: u32 = 1;
 pub const IORING_TIMEOUT_ABS: u32 = 1;
 pub const IORING_TIMEOUT_UPDATE: u32 = 2;
+pub const IORING_TIMEOUT_BOOTTIME: u32 = 4;
+pub const IORING_TIMEOUT_REALTIME: u32 = 8;
+pub const IORING_LINK_TIMEOUT_UPDATE: u32 = 16;
+pub const IORING_TIMEOUT_ETIME_SUCCESS: u32 = 32;
+pub const IORING_TIMEOUT_CLOCK_MASK: u32 = 12;
+pub const IORING_TIMEOUT_UPDATE_MASK: u32 = 18;
 pub const SPLICE_F_FD_IN_FIXED: u32 = 2147483648;
 pub const IORING_POLL_ADD_MULTI: u32 = 1;
 pub const IORING_POLL_UPDATE_EVENTS: u32 = 2;
@@ -182,7 +188,7 @@ pub struct io_uring_sqe {
     pub user_data: __u64,
     pub __bindgen_anon_4: io_uring_sqe__bindgen_ty_4,
     pub personality: __u16,
-    pub splice_fd_in: __s32,
+    pub __bindgen_anon_5: io_uring_sqe__bindgen_ty_5,
     pub __pad2: [__u64; 2usize],
 }
 #[repr(C)]
@@ -509,6 +515,19 @@ fn bindgen_test_layout_io_uring_sqe__bindgen_ty_3() {
             stringify!(unlink_flags)
         )
     );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_3>())).hardlink_flags as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_3),
+            "::",
+            stringify!(hardlink_flags)
+        )
+    );
 }
 impl Default for io_uring_sqe__bindgen_ty_3 {
     fn default() -> Self {
@@ -563,6 +582,59 @@ fn bindgen_test_layout_io_uring_sqe__bindgen_ty_4() {
     );
 }
 impl Default for io_uring_sqe__bindgen_ty_4 {
+    fn default() -> Self {
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union io_uring_sqe__bindgen_ty_5 {
+    pub splice_fd_in: __s32,
+    pub file_index: __u32,
+}
+#[test]
+fn bindgen_test_layout_io_uring_sqe__bindgen_ty_5() {
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_sqe__bindgen_ty_5>(),
+        4usize,
+        concat!("Size of: ", stringify!(io_uring_sqe__bindgen_ty_5))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_sqe__bindgen_ty_5>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_sqe__bindgen_ty_5))
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_5>())).splice_fd_in as *const _
+                as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_5),
+            "::",
+            stringify!(splice_fd_in)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::core::ptr::null::<io_uring_sqe__bindgen_ty_5>())).file_index as *const _ as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_5),
+            "::",
+            stringify!(file_index)
+        )
+    );
+}
+impl Default for io_uring_sqe__bindgen_ty_5 {
     fn default() -> Self {
         let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
@@ -651,16 +723,6 @@ fn bindgen_test_layout_io_uring_sqe() {
             stringify!(io_uring_sqe),
             "::",
             stringify!(personality)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::core::ptr::null::<io_uring_sqe>())).splice_fd_in as *const _ as usize },
-        44usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(io_uring_sqe),
-            "::",
-            stringify!(splice_fd_in)
         )
     );
     assert_eq!(
@@ -1162,7 +1224,8 @@ pub const IORING_REGISTER_BUFFERS2: libc::c_uint = 15;
 pub const IORING_REGISTER_BUFFERS_UPDATE: libc::c_uint = 16;
 pub const IORING_REGISTER_IOWQ_AFF: libc::c_uint = 17;
 pub const IORING_UNREGISTER_IOWQ_AFF: libc::c_uint = 18;
-pub const IORING_REGISTER_LAST: libc::c_uint = 19;
+pub const IORING_REGISTER_IOWQ_MAX_WORKERS: libc::c_uint = 19;
+pub const IORING_REGISTER_LAST: libc::c_uint = 20;
 pub type _bindgen_ty_7 = libc::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -1688,7 +1751,7 @@ pub const IORING_RESTRICTION_SQE_OP: libc::c_uint = 1;
 pub const IORING_RESTRICTION_SQE_FLAGS_ALLOWED: libc::c_uint = 2;
 pub const IORING_RESTRICTION_SQE_FLAGS_REQUIRED: libc::c_uint = 3;
 pub const IORING_RESTRICTION_LAST: libc::c_uint = 4;
-pub type _bindgen_ty_8 = libc::c_uint;
+pub type _bindgen_ty_9 = libc::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct io_uring_getevents_arg {
