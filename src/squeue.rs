@@ -4,6 +4,8 @@ use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::atomic;
 
+#[cfg(feature = "unstable")]
+use crate::opcode::PrepareSQE;
 use crate::sys;
 use crate::util::{unsync_load, Mmap};
 
@@ -33,6 +35,15 @@ pub struct SubmissionQueue<'a> {
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct Entry(pub(crate) sys::io_uring_sqe);
+
+/// Common options for Submission Queue Entry.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct SqeCommonOptions {
+    pub user_data: u64,
+    pub personality: u16,
+    pub flags_set: u8,
+    pub flags_clear: u8,
+}
 
 bitflags! {
     /// Submission flags
@@ -244,6 +255,59 @@ impl SubmissionQueue<'_> {
         Ok(())
     }
 
+    /// Attempts to push an opcode into the submission queue.
+    /// If the queue is full, an error is returned.
+    ///
+    /// # Safety
+    ///
+    /// Developers must ensure that parameters of the opcode (such as buffer) are valid and will
+    /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
+    #[cfg(feature = "unstable")]
+    #[inline]
+    pub unsafe fn push_command<'a, T: PrepareSQE>(
+        &'a mut self,
+        opcode: &T,
+        options: Option<&SqeCommonOptions>,
+    ) -> Result<(), PushError> {
+        if !self.is_full() {
+            let sqe = self.next_sqe();
+            options.map(|v| v.set(sqe));
+            opcode.prepare(sqe);
+            self.move_forward();
+            Ok(())
+        } else {
+            Err(PushError)
+        }
+    }
+
+    /// Attempts to push several opcodes into the queue.
+    /// If the queue does not have space for all of the entries, an error is returned.
+    ///
+    /// # Safety
+    ///
+    /// Developers must ensure that parameters of all the entries (such as buffer) are valid and
+    /// will be valid for the entire duration of the operation, otherwise it may cause memory
+    /// problems.
+    #[cfg(feature = "unstable")]
+    #[inline]
+    pub unsafe fn push_commands<'a, T: PrepareSQE>(
+        &'a mut self,
+        ops: &[(T, Option<&SqeCommonOptions>)],
+    ) -> Result<(), PushError> {
+        if self.capacity() - self.len() < ops.len() {
+            return Err(PushError);
+        }
+
+        for (opcode, options) in ops {
+            let sqe = self.next_sqe();
+            options.map(|v| v.set(sqe));
+            opcode.prepare(sqe);
+            self.move_forward();
+        }
+
+        Ok(())
+    }
+
     // Unsafe because it may return entry being used by kernel and make kernel use the
     // uninitialized entry.
     #[inline]
@@ -292,6 +356,60 @@ impl Entry {
     pub fn personality(mut self, personality: u16) -> Entry {
         self.0.personality = personality;
         self
+    }
+}
+
+impl SqeCommonOptions {
+    /// Create a new instance of `OptionValues`.
+    pub fn new(user_data: u64, personality: u16, flags_set: Flags, flags_clear: Flags) -> Self {
+        SqeCommonOptions {
+            user_data,
+            personality,
+            flags_set: flags_set.bits(),
+            flags_clear: flags_clear.bits(),
+        }
+    }
+
+    /// Set the user data.
+    ///
+    /// This is an application-supplied value that will be passed straight through into the
+    /// [completion queue entry](crate::cqueue::Entry::user_data).
+    #[inline]
+    pub fn user_data(mut self, user_data: u64) -> Self {
+        self.user_data = user_data;
+        self
+    }
+
+    /// Set the personality of this event.
+    ///
+    /// You can obtain a personality using
+    /// [`Submitter::register_personality`](crate::Submitter::register_personality).
+    #[inline]
+    pub fn personality(mut self, personality: u16) -> Self {
+        self.personality = personality;
+        self
+    }
+
+    /// Mark the flags to set on the submission event's [flags](Flags).
+    #[inline]
+    pub fn set_flags(mut self, flags: Flags) -> Self {
+        self.flags_set |= flags.bits();
+        self
+    }
+
+    /// Mark the flags to cleared on the submission event's [flags](Flags).
+    #[inline]
+    pub fn clear_flags(mut self, flags: Flags) -> Self {
+        self.flags_clear |= flags.bits();
+        self
+    }
+
+    /// Set common options for a submission queue entry.
+    pub fn set(&self, sqe: &mut sys::io_uring_sqe) {
+        sqe.personality = self.personality;
+        sqe.user_data = self.user_data;
+        sqe.flags |= self.flags_set;
+        sqe.flags &= !self.flags_clear;
     }
 }
 
