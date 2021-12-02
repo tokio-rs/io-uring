@@ -213,11 +213,8 @@ impl SubmissionQueue<'_> {
     #[inline]
     pub unsafe fn push(&mut self, Entry(entry): &Entry) -> Result<(), PushError> {
         if !self.is_full() {
-            *self
-                .queue
-                .sqes
-                .add((self.tail & self.queue.ring_mask) as usize) = *entry;
-            self.tail = self.tail.wrapping_add(1);
+            *self.next_sqe() = *entry;
+            self.move_forward();
             Ok(())
         } else {
             Err(PushError)
@@ -240,14 +237,27 @@ impl SubmissionQueue<'_> {
         }
 
         for Entry(entry) in entries {
-            *self
-                .queue
-                .sqes
-                .add((self.tail & self.queue.ring_mask) as usize) = *entry;
-            self.tail = self.tail.wrapping_add(1);
+            *self.next_sqe() = *entry;
+            self.move_forward();
         }
 
         Ok(())
+    }
+
+    // Unsafe because it may return entry being used by kernel and make kernel use the
+    // uninitialized entry.
+    #[inline]
+    unsafe fn next_sqe(&mut self) -> &mut sys::io_uring_sqe {
+        &mut *self
+            .queue
+            .sqes
+            .add((self.tail & self.queue.ring_mask) as usize)
+    }
+
+    // Unsafe because it may cause kernel to access uninitialized entry.
+    #[inline]
+    unsafe fn move_forward(&mut self) {
+        self.tail = self.tail.wrapping_add(1);
     }
 }
 
