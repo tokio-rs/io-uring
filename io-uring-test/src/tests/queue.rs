@@ -1,4 +1,5 @@
 use crate::Test;
+use io_uring::squeue::SqeCommonOptions;
 use io_uring::{opcode, IoUring};
 
 pub fn test_nop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
@@ -13,6 +14,33 @@ pub fn test_nop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     unsafe {
         let mut queue = ring.submission();
         queue.push(&nop_e).expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes = ring.completion().collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x42);
+    assert_eq!(cqes[0].result(), 0);
+
+    Ok(())
+}
+
+#[cfg(feature = "unstable")]
+pub fn test_nop_prepare(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+    require! {
+        test;
+    }
+
+    println!("test nop_prepare");
+
+    let nop = opcode::Nop::new();
+    let opt = SqeCommonOptions::default().user_data(0x42);
+
+    unsafe {
+        let mut queue = ring.submission();
+        queue.push_command(&nop, Some(&opt)).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
