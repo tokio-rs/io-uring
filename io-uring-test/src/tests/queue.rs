@@ -106,3 +106,35 @@ pub fn test_queue_split(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     Ok(())
 }
+
+pub fn test_debug_print(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+    require! {
+        test;
+    }
+
+    println!("test debug_print");
+
+    let mut sq = ring.submission();
+    let num_to_sub = sq.capacity();
+    for _ in 0..num_to_sub {
+        unsafe {
+            sq.push(&opcode::Nop::new().build().user_data(0x42))
+                .expect("queue is full");
+        }
+    }
+    println!("Full: {:?}", sq);
+    drop(sq);
+
+    ring.submit_and_wait(num_to_sub)?;
+
+    let cqes = ring.completion().collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), num_to_sub);
+    for cqe in cqes {
+        assert_eq!(cqe.user_data(), 0x42);
+        assert_eq!(cqe.result(), 0);
+    }
+    println!("Empty: {:?}", ring.submission());
+
+    Ok(())
+}
