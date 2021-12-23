@@ -1,7 +1,7 @@
 //! Submission Queue
 
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::atomic;
 
 use crate::sys;
@@ -297,3 +297,28 @@ impl Display for PushError {
 }
 
 impl Error for PushError {}
+
+impl Debug for Entry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Entry")
+            .field("op_code", &self.0.opcode)
+            .field("flags", &self.0.flags)
+            .field("user_data", &self.0.user_data)
+            .finish()
+    }
+}
+
+impl Debug for SubmissionQueue<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut d = f.debug_list();
+        let mut pos = self.head;
+        while pos != self.tail {
+            let entry: &Entry = unsafe {
+                &*(self.queue.sqes.add((pos & self.queue.ring_mask) as usize) as *const Entry)
+            };
+            d.entry(&entry);
+            pos = pos.wrapping_add(1);
+        }
+        d.finish()
+    }
+}
