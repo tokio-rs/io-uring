@@ -31,6 +31,8 @@ fn main() -> anyhow::Result<()> {
     tests::queue::test_debug_print(&mut ring, &test)?;
     #[cfg(feature = "unstable")]
     tests::queue::test_nop_prepare(&mut ring, &test)?;
+    #[cfg(feature = "unstable")]
+    tests::queue::test_nop_prepare_sqe(&mut ring, &test)?;
 
     #[cfg(feature = "unstable")]
     tests::queue::test_batch(&mut ring, &test)?;

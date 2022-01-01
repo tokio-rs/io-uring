@@ -55,6 +55,36 @@ pub fn test_nop_prepare(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 }
 
 #[cfg(feature = "unstable")]
+pub fn test_nop_prepare_sqe(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+    require! {
+        test;
+    }
+
+    println!("test nop_prepare_sqe");
+
+    let opt = SqeCommonOptions::default().user_data(0x42);
+
+    unsafe {
+        let mut queue = ring.submission();
+        let sqe = queue.get_available_sqe(0).unwrap();
+        let nop_sqe: &mut opcode::NopSqe = sqe.into();
+        nop_sqe.prepare();
+        opt.set(nop_sqe.get_mut_sqe());
+        queue.move_forward(1);
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes = ring.completion().collect::<Vec<_>>();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x42);
+    assert_eq!(cqes[0].result(), 0);
+
+    Ok(())
+}
+
+#[cfg(feature = "unstable")]
 pub fn test_batch(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     use std::mem::MaybeUninit;
 
