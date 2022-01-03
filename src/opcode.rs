@@ -223,6 +223,11 @@ macro_rules! opcode {
                 $( $set_op_sqe_special_fields )?
             }
 
+            #[inline]
+            pub fn get_mut_sqe(&mut self) -> &mut sys::io_uring_sqe {
+                &mut self.sqe
+            }
+
             $(
                 $( #[$opt_meta] )*
                 #[inline]
