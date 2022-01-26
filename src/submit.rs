@@ -373,4 +373,24 @@ impl<'a> Submitter<'a> {
         )
         .map(drop)
     }
+
+    /// Get and/or set the limit for number of io_uring worker threads per NUMA
+    /// node. `max[0]` holds the limit for bounded workers, which process I/O
+    /// operations expected to be bound in time, that is I/O on regular files or
+    /// block devices. While `max[1]` holds the limit for unbounded workers,
+    /// which carry out I/O operations that can never complete, for instance I/O
+    /// on sockets. Passing `0` does not change the current limit. Returns
+    /// previous limits on success.
+    ///
+    /// Requires the `unstable` feature.
+    #[cfg(feature = "unstable")]
+    pub fn register_iowq_max_workers(&self, max: &mut [u32; 2]) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_IOWQ_MAX_WORKERS,
+            max.as_mut_ptr().cast(),
+            max.len() as _,
+        )
+        .map(drop)
+    }
 }
