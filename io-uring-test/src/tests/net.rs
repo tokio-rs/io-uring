@@ -399,7 +399,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
     assert_eq!(cqe.result(), 1);
 
     // remove bufs fail
-    let remove_bufs_e = opcode::RemoveBuffers::new(1, 0xdead);
+    let remove_bufs_e = opcode::RemoveBuffers::new(1, 0xdeaf);
 
     unsafe {
         ring.submission()
