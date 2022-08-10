@@ -2,6 +2,7 @@
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::mem;
 use std::sync::atomic;
 
 use crate::sys;
@@ -31,7 +32,6 @@ pub struct SubmissionQueue<'a> {
 ///
 /// These can be created via the opcodes in [`opcode`](crate::opcode).
 #[repr(transparent)]
-#[derive(Clone)]
 pub struct Entry(pub(crate) sys::io_uring_sqe);
 
 bitflags! {
@@ -216,7 +216,7 @@ impl SubmissionQueue<'_> {
             *self
                 .queue
                 .sqes
-                .add((self.tail & self.queue.ring_mask) as usize) = *entry;
+                .add((self.tail & self.queue.ring_mask) as usize) = mem::transmute_copy(entry);
             self.tail = self.tail.wrapping_add(1);
             Ok(())
         } else {
@@ -243,7 +243,7 @@ impl SubmissionQueue<'_> {
             *self
                 .queue
                 .sqes
-                .add((self.tail & self.queue.ring_mask) as usize) = *entry;
+                .add((self.tail & self.queue.ring_mask) as usize) = mem::transmute_copy(entry);
             self.tail = self.tail.wrapping_add(1);
         }
 
@@ -282,6 +282,13 @@ impl Entry {
     pub fn personality(mut self, personality: u16) -> Entry {
         self.0.personality = personality;
         self
+    }
+}
+
+impl Clone for Entry {
+    fn clone(&self) -> Entry {
+        // io_uring_sqe doesn't implement Clone due to the 'cmd' incomplete array field.
+        Entry(unsafe { mem::transmute_copy(&self.0) })
     }
 }
 

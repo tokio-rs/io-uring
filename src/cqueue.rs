@@ -1,9 +1,9 @@
 //! Completion Queue
 
-use std::fmt;
 #[cfg(feature = "unstable")]
 use std::mem::MaybeUninit;
 use std::sync::atomic;
+use std::{fmt, mem};
 
 use crate::sys;
 use crate::util::{unsync_load, Mmap};
@@ -31,7 +31,6 @@ pub struct CompletionQueue<'a> {
 
 /// An entry in the completion queue, representing a complete I/O operation.
 #[repr(transparent)]
-#[derive(Clone)]
 pub struct Entry(pub(crate) sys::io_uring_cqe);
 
 impl Inner {
@@ -130,10 +129,12 @@ impl CompletionQueue<'_> {
 
         for entry in &mut entries[..len] {
             *entry = MaybeUninit::new(Entry(unsafe {
-                *self
-                    .queue
-                    .cqes
-                    .add((self.head & self.queue.ring_mask) as usize)
+                mem::transmute_copy(
+                    &*self
+                        .queue
+                        .cqes
+                        .add((self.head & self.queue.ring_mask) as usize),
+                )
             }));
             self.head = self.head.wrapping_add(1);
         }
@@ -156,10 +157,12 @@ impl Iterator for CompletionQueue<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.head != self.tail {
             let entry = unsafe {
-                *self
-                    .queue
-                    .cqes
-                    .add((self.head & self.queue.ring_mask) as usize)
+                mem::transmute_copy(
+                    &*self
+                        .queue
+                        .cqes
+                        .add((self.head & self.queue.ring_mask) as usize),
+                )
             };
             self.head = self.head.wrapping_add(1);
             Some(Entry(entry))
@@ -204,6 +207,13 @@ impl Entry {
     #[inline]
     pub fn flags(&self) -> u32 {
         self.0.flags
+    }
+}
+
+impl Clone for Entry {
+    fn clone(&self) -> Entry {
+        // io_uring_cqe doesn't implement Clone due to the 'big_cqe' incomplete array field.
+        Entry(unsafe { mem::transmute_copy(&self.0) })
     }
 }
 

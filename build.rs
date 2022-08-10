@@ -24,6 +24,7 @@ fn main() {
     bindgen::Builder::default()
         .header_contents("include-file.h", INCLUDE)
         .ctypes_prefix("libc")
+        .prepend_enum_name(false)
         .derive_default(true)
         .generate_comments(true)
         .use_core()
