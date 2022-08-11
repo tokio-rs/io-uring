@@ -2,10 +2,14 @@
 
 #![allow(clippy::new_without_default)]
 
+#[cfg(feature = "unstable")]
+use std::convert::TryInto;
 use std::mem;
 use std::os::unix::io::RawFd;
 
 use crate::squeue::Entry;
+#[cfg(feature = "unstable")]
+use crate::squeue::Entry128;
 use crate::sys;
 use crate::types::{self, sealed};
 
@@ -1289,5 +1293,60 @@ opcode!(
         sqe.__bindgen_anon_1.addr2 = newpath as _;
         sqe.__bindgen_anon_3.hardlink_flags = flags as _;
         Entry(sqe)
+    }
+);
+
+// === 5.19 ===
+
+#[cfg(feature = "unstable")]
+opcode!(
+    /// A file/device-specific 16-byte command, akin (but not equivalent) to `ioctl(2)`.
+    pub struct UringCmd16 {
+        fd: { impl sealed::UseFixed },
+        cmd_op: { u32 },
+        ;;
+        /// Arbitrary command data.
+        cmd: [u8; 16] = [0u8; 16]
+    }
+
+    pub const CODE = sys::IORING_OP_URING_CMD;
+
+    pub fn build(self) -> Entry {
+        let UringCmd16 { fd, cmd_op, cmd } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.__bindgen_anon_1.cmd_op = cmd_op;
+        unsafe { *sqe.__bindgen_anon_6.cmd.as_mut().as_mut_ptr().cast::<[u8; 16]>() = cmd };
+        Entry(sqe)
+    }
+);
+
+#[cfg(feature = "unstable")]
+opcode!(
+    /// A file/device-specific 80-byte command, akin (but not equivalent) to `ioctl(2)`.
+    pub struct UringCmd80 {
+        fd: { impl sealed::UseFixed },
+        cmd_op: { u32 },
+        ;;
+        /// Arbitrary command data.
+        cmd: [u8; 80] = [0u8; 80]
+    }
+
+    pub const CODE = sys::IORING_OP_URING_CMD;
+
+    pub fn build(self) -> Entry128 {
+        let UringCmd80 { fd, cmd_op, cmd } = self;
+
+        let cmd1 = cmd[..16].try_into().unwrap();
+        let cmd2 = cmd[16..].try_into().unwrap();
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.__bindgen_anon_1.cmd_op = cmd_op;
+        unsafe { *sqe.__bindgen_anon_6.cmd.as_mut().as_mut_ptr().cast::<[u8; 16]>() = cmd1 };
+        Entry128(Entry(sqe), cmd2)
     }
 );
