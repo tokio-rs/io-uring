@@ -53,7 +53,7 @@ macro_rules! opcode {
         pub const CODE = $opcode:expr;
 
         $( #[$build_meta:meta] )*
-        pub fn build($self:ident) -> Entry $build_block:block
+        pub fn build($self:ident) -> $entry:ty $build_block:block
     ) => {
         $( #[$outer] )*
         pub struct $name {
@@ -87,7 +87,7 @@ macro_rules! opcode {
 
             $( #[$build_meta] )*
             #[inline]
-            pub fn build($self) -> Entry $build_block
+            pub fn build($self) -> $entry $build_block
         }
     }
 }
