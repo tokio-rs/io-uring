@@ -1,7 +1,6 @@
-use std::convert::TryFrom;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::AsRawFd;
 use std::sync::atomic;
-use std::{io, mem, ptr};
+use std::{io, ptr};
 
 /// A region of memory mapped using `mmap(2)`.
 pub struct Mmap {
@@ -60,49 +59,119 @@ impl Drop for Mmap {
     }
 }
 
-/// An owned file descriptor.
-pub struct Fd(pub RawFd);
+pub use fd::Fd;
 
-impl TryFrom<RawFd> for Fd {
-    type Error = ();
+#[cfg(feature = "io_safety")]
+mod fd {
+    use std::os::unix::io::{AsRawFd, RawFd, IntoRawFd, FromRawFd, OwnedFd, AsFd, BorrowedFd};
 
-    #[inline]
-    fn try_from(value: RawFd) -> Result<Fd, Self::Error> {
-        if value >= 0 {
-            Ok(Fd(value))
-        } else {
-            Err(())
+    /// An owned file descriptor.
+    pub struct Fd(pub OwnedFd);
+
+    impl Fd {
+        /// Try to convert from a `RawFd` to an `Fd`.
+        /// 
+        /// # Safety
+        /// 
+        /// Must be a valid file descriptor.
+        pub unsafe fn from_raw(value: RawFd) -> Option<Fd> {
+            if value >= 0 {
+                // SAFETY: not -1, and this is a valid FD
+                Some(Fd(OwnedFd::from_raw_fd(value)))
+            } else {
+                None
+            }
+        }       
+    }
+
+    impl AsRawFd for Fd {
+        fn as_raw_fd(&self) -> RawFd {
+            self.0.as_raw_fd()
+        }
+    }
+
+    impl IntoRawFd for Fd {
+        fn into_raw_fd(self) -> RawFd {
+            self.0.into_raw_fd()
+        }
+    }
+
+    impl FromRawFd for Fd {
+        unsafe fn from_raw_fd(fd: RawFd) -> Self {
+            Fd(OwnedFd::from_raw_fd(fd))
+        }
+    }
+
+    impl AsFd for Fd {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            self.0.as_fd()
+        }
+    }
+
+    impl From<OwnedFd> for Fd {
+        fn from(fd: OwnedFd) -> Self {
+            Fd(fd)
+        }
+    }
+
+    impl From<Fd> for OwnedFd {
+        fn from(fd: Fd) -> Self {
+            fd.0
         }
     }
 }
 
-impl AsRawFd for Fd {
-    #[inline]
-    fn as_raw_fd(&self) -> RawFd {
-        self.0
-    }
-}
+#[cfg(not(feature = "io_safety"))]
+mod fd {
+    use std::mem;
+    use std::os::unix::io::{AsRawFd, RawFd, IntoRawFd, FromRawFd};
 
-impl IntoRawFd for Fd {
-    #[inline]
-    fn into_raw_fd(self) -> RawFd {
-        let fd = self.0;
-        mem::forget(self);
-        fd
-    }
-}
+    /// An owned file descriptor.
+    pub struct Fd(pub RawFd);
 
-impl FromRawFd for Fd {
-    #[inline]
-    unsafe fn from_raw_fd(fd: RawFd) -> Fd {
-        Fd(fd)
+    impl Fd {
+        /// Try to convert from a `RawFd` to an `Fd`.
+        /// 
+        /// # Safety
+        /// 
+        /// Must be a valid file descriptor.
+        pub unsafe fn from_raw(value: RawFd) -> Option<Fd> {
+            if value >= 0 {
+                Some(Fd(value))
+            } else {
+                None
+            }
+        }
     }
-}
 
-impl Drop for Fd {
-    fn drop(&mut self) {
-        unsafe {
-            libc::close(self.0);
+    impl AsRawFd for Fd {
+        #[inline]
+        fn as_raw_fd(&self) -> RawFd {
+            self.0
+        }
+    }
+
+    impl IntoRawFd for Fd {
+        #[inline]
+        fn into_raw_fd(self) -> RawFd {
+            let fd = self.0;
+            mem::forget(self);
+            fd
+        }
+    }
+
+    impl FromRawFd for Fd {
+        #[inline]
+        unsafe fn from_raw_fd(fd: RawFd) -> Fd {
+            Fd(fd)
+        }
+    }
+
+    impl Drop for Fd {
+        fn drop(&mut self) {
+            unsafe {
+                libc::close(self.0);
+            }
         }
     }
 }

@@ -14,10 +14,12 @@ mod submit;
 mod sys;
 pub mod types;
 
-use std::convert::TryInto;
 use std::mem::ManuallyDrop;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{cmp, io, mem};
+
+#[cfg(feature = "io_safety")]
+use std::os::unix::io::{AsFd, BorrowedFd};
 
 pub use cqueue::CompletionQueue;
 pub use register::Probe;
@@ -122,9 +124,8 @@ impl IoUring {
         }
 
         let fd: Fd = unsafe {
-            sys::io_uring_setup(entries, &mut p)
-                .try_into()
-                .map_err(|_| io::Error::last_os_error())?
+            let fd = sys::io_uring_setup(entries, &mut p);
+            Fd::from_raw(fd).ok_or_else(io::Error::last_os_error)?
         };
 
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
@@ -449,5 +450,12 @@ impl std::fmt::Debug for Parameters {
 impl AsRawFd for IoUring {
     fn as_raw_fd(&self) -> RawFd {
         self.fd.as_raw_fd()
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl AsFd for IoUring {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.fd.as_fd()
     }
 }
