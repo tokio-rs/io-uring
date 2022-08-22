@@ -15,7 +15,7 @@ mod sys;
 pub mod types;
 
 use std::mem::ManuallyDrop;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::{cmp, io, mem};
 
 #[cfg(feature = "io_safety")]
@@ -25,13 +25,13 @@ pub use cqueue::CompletionQueue;
 pub use register::Probe;
 pub use squeue::SubmissionQueue;
 pub use submit::Submitter;
-use util::{Fd, Mmap};
+use util::{OwnedFd, Mmap};
 
 /// IoUring instance
 pub struct IoUring {
     sq: squeue::Inner,
     cq: cqueue::Inner,
-    fd: Fd,
+    fd: OwnedFd,
     params: Parameters,
     memory: ManuallyDrop<MemoryMap>,
 }
@@ -85,7 +85,7 @@ impl IoUring {
         // I really hope that Rust can safely use self-reference types.
         #[inline]
         unsafe fn setup_queue(
-            fd: &Fd,
+            fd: &OwnedFd,
             p: &sys::io_uring_params,
         ) -> io::Result<(MemoryMap, squeue::Inner, cqueue::Inner)> {
             let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
@@ -123,9 +123,13 @@ impl IoUring {
             }
         }
 
-        let fd: Fd = unsafe {
+        let fd: OwnedFd = unsafe {
             let fd = sys::io_uring_setup(entries, &mut p);
-            Fd::from_raw(fd).ok_or_else(io::Error::last_os_error)?
+            if fd >= 0 {
+                OwnedFd::from_raw_fd(fd)
+            } else {
+                return Err(io::Error::last_os_error());
+            }
         };
 
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
