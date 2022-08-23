@@ -69,7 +69,7 @@ mod fd {
 #[cfg(not(feature = "io_safety"))]
 mod fd {
     use std::mem;
-    use std::os::unix::io::{AsRawFd, RawFd, IntoRawFd, FromRawFd};
+    use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 
     /// API-compatible with the `OwnedFd` type in the Rust stdlib.
     pub struct OwnedFd(RawFd);

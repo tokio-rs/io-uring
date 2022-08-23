@@ -25,7 +25,7 @@ pub use cqueue::CompletionQueue;
 pub use register::Probe;
 pub use squeue::SubmissionQueue;
 pub use submit::Submitter;
-use util::{OwnedFd, Mmap};
+use util::{Mmap, OwnedFd};
 
 /// IoUring instance
 pub struct IoUring {
