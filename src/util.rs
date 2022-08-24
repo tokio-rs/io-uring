@@ -1,7 +1,6 @@
-use std::convert::TryFrom;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::AsRawFd;
 use std::sync::atomic;
-use std::{io, mem, ptr};
+use std::{io, ptr};
 
 /// A region of memory mapped using `mmap(2)`.
 pub struct Mmap {
@@ -11,7 +10,7 @@ pub struct Mmap {
 
 impl Mmap {
     /// Map `len` bytes starting from the offset `offset` in the file descriptor `fd` into memory.
-    pub fn new(fd: &Fd, offset: libc::off_t, len: usize) -> io::Result<Mmap> {
+    pub fn new(fd: &OwnedFd, offset: libc::off_t, len: usize) -> io::Result<Mmap> {
         unsafe {
             match libc::mmap(
                 ptr::null_mut(),
@@ -60,49 +59,49 @@ impl Drop for Mmap {
     }
 }
 
-/// An owned file descriptor.
-pub struct Fd(pub RawFd);
+pub use fd::OwnedFd;
 
-impl TryFrom<RawFd> for Fd {
-    type Error = ();
+#[cfg(feature = "io_safety")]
+mod fd {
+    pub use std::os::unix::io::OwnedFd;
+}
 
-    #[inline]
-    fn try_from(value: RawFd) -> Result<Fd, Self::Error> {
-        if value >= 0 {
-            Ok(Fd(value))
-        } else {
-            Err(())
+#[cfg(not(feature = "io_safety"))]
+mod fd {
+    use std::mem;
+    use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+
+    /// API-compatible with the `OwnedFd` type in the Rust stdlib.
+    pub struct OwnedFd(RawFd);
+
+    impl AsRawFd for OwnedFd {
+        #[inline]
+        fn as_raw_fd(&self) -> RawFd {
+            self.0
         }
     }
-}
 
-impl AsRawFd for Fd {
-    #[inline]
-    fn as_raw_fd(&self) -> RawFd {
-        self.0
+    impl IntoRawFd for OwnedFd {
+        #[inline]
+        fn into_raw_fd(self) -> RawFd {
+            let fd = self.0;
+            mem::forget(self);
+            fd
+        }
     }
-}
 
-impl IntoRawFd for Fd {
-    #[inline]
-    fn into_raw_fd(self) -> RawFd {
-        let fd = self.0;
-        mem::forget(self);
-        fd
+    impl FromRawFd for OwnedFd {
+        #[inline]
+        unsafe fn from_raw_fd(fd: RawFd) -> OwnedFd {
+            OwnedFd(fd)
+        }
     }
-}
 
-impl FromRawFd for Fd {
-    #[inline]
-    unsafe fn from_raw_fd(fd: RawFd) -> Fd {
-        Fd(fd)
-    }
-}
-
-impl Drop for Fd {
-    fn drop(&mut self) {
-        unsafe {
-            libc::close(self.0);
+    impl Drop for OwnedFd {
+        fn drop(&mut self) {
+            unsafe {
+                libc::close(self.0);
+            }
         }
     }
 }

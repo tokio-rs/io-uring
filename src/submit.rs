@@ -4,7 +4,7 @@ use std::{io, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
-use crate::util::{cast_ptr, Fd};
+use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 
 #[cfg(feature = "unstable")]
@@ -19,7 +19,7 @@ use crate::types;
 /// io_uring supports both directly performing I/O on buffers and file descriptors and registering
 /// them beforehand. Registering is slow, but it makes performing the actual I/O much faster.
 pub struct Submitter<'a> {
-    fd: &'a Fd,
+    fd: &'a OwnedFd,
     params: &'a Parameters,
 
     sq_head: *const atomic::AtomicU32,
@@ -30,7 +30,7 @@ pub struct Submitter<'a> {
 impl<'a> Submitter<'a> {
     #[inline]
     pub(crate) const fn new(
-        fd: &'a Fd,
+        fd: &'a OwnedFd,
         params: &'a Parameters,
         sq_head: *const atomic::AtomicU32,
         sq_tail: *const atomic::AtomicU32,
