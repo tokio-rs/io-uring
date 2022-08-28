@@ -2,7 +2,7 @@
 mod utils;
 mod tests;
 
-use io_uring::{IoUring, Probe};
+use io_uring::{cqueue, squeue, IoUring, Probe};
 
 pub struct Test {
     probe: Probe,
@@ -10,13 +10,39 @@ pub struct Test {
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut ring = IoUring::new(8)?;
+    let entries = 8;
+
+    test::<squeue::Entry, cqueue::Entry>(IoUring::new(entries)?)?;
+
+    #[cfg(all(feature = "unstable", not(feature = "ci")))]
+    {
+        test::<squeue::Entry128, cqueue::Entry>(IoUring::generic_new(entries)?)?;
+        test::<squeue::Entry, cqueue::Entry32>(IoUring::generic_new(entries)?)?;
+        test::<squeue::Entry128, cqueue::Entry32>(IoUring::generic_new(entries)?)?;
+    }
+
+    Ok(())
+}
+
+fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    mut ring: IoUring<S, C>,
+) -> anyhow::Result<()> {
     let mut probe = Probe::new();
 
     if ring.submitter().register_probe(&mut probe).is_err() {
         eprintln!("No probe supported");
     }
 
+    println!();
+    println!(
+        "ring type: IoUring<{}, {}>",
+        std::any::type_name::<S>()
+            .strip_prefix("io_uring::")
+            .unwrap(),
+        std::any::type_name::<C>()
+            .strip_prefix("io_uring::")
+            .unwrap(),
+    );
     println!("params: {:#?}", ring.params());
     println!("probe: {:?}", probe);
     println!();

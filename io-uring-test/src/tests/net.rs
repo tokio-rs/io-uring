@@ -1,6 +1,6 @@
 use crate::utils;
 use crate::Test;
-use io_uring::{opcode, squeue, types, IoUring};
+use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
 use std::net::{TcpListener, TcpStream};
 use std::os::unix::io::AsRawFd;
@@ -18,7 +18,10 @@ fn tcp_pair() -> io::Result<(TcpStream, TcpStream)> {
     Ok((send_stream, recv_stream))
 }
 
-pub fn test_tcp_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_tcp_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Write::CODE);
@@ -37,7 +40,10 @@ pub fn test_tcp_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
     Ok(())
 }
 
-pub fn test_tcp_writev_readv(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_tcp_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Writev::CODE);
@@ -56,7 +62,10 @@ pub fn test_tcp_writev_readv(ring: &mut IoUring, test: &Test) -> anyhow::Result<
     Ok(())
 }
 
-pub fn test_tcp_send_recv(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_tcp_send_recv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Send::CODE);
@@ -78,16 +87,20 @@ pub fn test_tcp_send_recv(ring: &mut IoUring, test: &Test) -> anyhow::Result<()>
 
     unsafe {
         let mut queue = ring.submission();
-        let send_e = send_e.build().user_data(0x01).flags(squeue::Flags::IO_LINK);
+        let send_e = send_e
+            .build()
+            .user_data(0x01)
+            .flags(squeue::Flags::IO_LINK)
+            .into();
         queue.push(&send_e).expect("queue is full");
         queue
-            .push(&recv_e.build().user_data(0x02))
+            .push(&recv_e.build().user_data(0x02).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(2)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
@@ -100,7 +113,10 @@ pub fn test_tcp_send_recv(ring: &mut IoUring, test: &Test) -> anyhow::Result<()>
     Ok(())
 }
 
-pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_tcp_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     use std::mem::MaybeUninit;
 
     require!(
@@ -157,18 +173,19 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, test: &Test) -> anyhow::Resu
                 &sendmsg_e
                     .build()
                     .user_data(0x01)
-                    .flags(squeue::Flags::IO_LINK),
+                    .flags(squeue::Flags::IO_LINK)
+                    .into(),
             )
             .expect("queue is full");
         queue
-            .push(&recvmsg_e.build().user_data(0x02))
+            .push(&recvmsg_e.build().user_data(0x02).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(2)?;
 
     // complete
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
@@ -181,7 +198,10 @@ pub fn test_tcp_sendmsg_recvmsg(ring: &mut IoUring, test: &Test) -> anyhow::Resu
     Ok(())
 }
 
-pub fn test_tcp_accept(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_tcp_accept<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Accept::CODE);
@@ -202,13 +222,13 @@ pub fn test_tcp_accept(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     unsafe {
         ring.submission()
-            .push(&accept_e.build().user_data(0x0e))
+            .push(&accept_e.build().user_data(0x0e).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0e);
@@ -223,7 +243,10 @@ pub fn test_tcp_accept(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_tcp_connect(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_tcp_connect<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
     require!(
@@ -247,13 +270,13 @@ pub fn test_tcp_connect(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     unsafe {
         ring.submission()
-            .push(&connect_e.build().user_data(0x0f))
+            .push(&connect_e.build().user_data(0x0f).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0f);
@@ -265,8 +288,10 @@ pub fn test_tcp_connect(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 }
 
 #[cfg(feature = "unstable")]
-pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
-    use io_uring::cqueue;
+pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     use std::io::Write;
 
     require!(
@@ -292,13 +317,13 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
 
     unsafe {
         ring.submission()
-            .push(&provide_bufs_e.build().user_data(0x21))
+            .push(&provide_bufs_e.build().user_data(0x21).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqe = ring.completion().next().expect("cqueue is empty");
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
     assert_eq!(cqe.user_data(), 0x21);
     // assert_eq!(cqe.result(), 0xdead);
 
@@ -310,7 +335,8 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
         .buf_group(0xdead)
         .build()
         .flags(squeue::Flags::BUFFER_SELECT)
-        .user_data(0x22);
+        .user_data(0x22)
+        .into();
 
     unsafe {
         ring.submission().push(&recv_e).expect("queue is full");
@@ -318,7 +344,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
 
     ring.submit_and_wait(1)?;
 
-    let cqe = ring.completion().next().expect("cqueue is empty");
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
     assert_eq!(cqe.user_data(), 0x22);
     assert_eq!(cqe.result(), 1024);
     assert_eq!(cqueue::buffer_select(cqe.flags()), Some(0));
@@ -329,7 +355,8 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
         .buf_group(0xdead)
         .build()
         .flags(squeue::Flags::BUFFER_SELECT)
-        .user_data(0x23);
+        .user_data(0x23)
+        .into();
 
     unsafe {
         ring.submission().push(&recv_e).expect("queue is full");
@@ -337,7 +364,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
 
     ring.submit_and_wait(1)?;
 
-    let cqe = ring.completion().next().expect("cqueue is empty");
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
     assert_eq!(cqe.user_data(), 0x23);
     assert_eq!(cqe.result(), -libc::ENOBUFS);
 
@@ -348,13 +375,13 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
 
     unsafe {
         ring.submission()
-            .push(&provide_bufs_e.build().user_data(0x24))
+            .push(&provide_bufs_e.build().user_data(0x24).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqe = ring.completion().next().expect("cqueue is empty");
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
     assert_eq!(cqe.user_data(), 0x24);
     // assert_eq!(cqe.result(), 0xdeae);
 
@@ -363,7 +390,8 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
         .buf_group(0xdeae)
         .build()
         .flags(squeue::Flags::BUFFER_SELECT)
-        .user_data(0x25);
+        .user_data(0x25)
+        .into();
 
     unsafe {
         ring.submission().push(&recv_e).expect("queue is full");
@@ -371,7 +399,7 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
 
     ring.submit_and_wait(1)?;
 
-    let cqe = ring.completion().next().expect("cqueue is empty");
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
     assert_eq!(cqe.user_data(), 0x25);
     assert_eq!(cqe.result(), 256);
 
@@ -388,13 +416,13 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
 
     unsafe {
         ring.submission()
-            .push(&remove_bufs_e.build().user_data(0x26))
+            .push(&remove_bufs_e.build().user_data(0x26).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqe = ring.completion().next().expect("cqueue is empty");
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
     assert_eq!(cqe.user_data(), 0x26);
     assert_eq!(cqe.result(), 1);
 
@@ -403,13 +431,13 @@ pub fn test_tcp_buffer_select(ring: &mut IoUring, test: &Test) -> anyhow::Result
 
     unsafe {
         ring.submission()
-            .push(&remove_bufs_e.build().user_data(0x27))
+            .push(&remove_bufs_e.build().user_data(0x27).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqe = ring.completion().next().expect("cqueue is empty");
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
     assert_eq!(cqe.user_data(), 0x27);
     assert_eq!(cqe.result(), -libc::ENOENT);
 

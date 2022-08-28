@@ -1,14 +1,17 @@
 use crate::Test;
-use io_uring::{opcode, IoUring};
+use io_uring::{cqueue, opcode, squeue, IoUring};
 
-pub fn test_nop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_nop<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require! {
         test;
     }
 
     println!("test nop");
 
-    let nop_e = opcode::Nop::new().build().user_data(0x42);
+    let nop_e = opcode::Nop::new().build().user_data(0x42).into();
 
     unsafe {
         let mut queue = ring.submission();
@@ -17,7 +20,7 @@ pub fn test_nop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x42);
@@ -27,7 +30,10 @@ pub fn test_nop(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 }
 
 #[cfg(feature = "unstable")]
-pub fn test_batch(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_batch<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     use std::mem::MaybeUninit;
 
     require! {
@@ -39,7 +45,7 @@ pub fn test_batch(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     assert!(ring.completion().is_empty());
 
     unsafe {
-        let sqes = vec![opcode::Nop::new().build().user_data(0x09); 5];
+        let sqes = vec![opcode::Nop::new().build().user_data(0x09).into(); 5];
         let mut sq = ring.submission();
 
         assert_eq!(sq.capacity(), 8);
@@ -65,13 +71,17 @@ pub fn test_batch(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     assert_eq!(cqes.len(), 8);
 
     for entry in cqes {
+        let entry: cqueue::Entry = entry.clone().into();
         assert_eq!(entry.user_data(), 0x09);
     }
 
     Ok(())
 }
 
-pub fn test_queue_split(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_queue_split<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require! {
         test;
     }
@@ -84,7 +94,8 @@ pub fn test_queue_split(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     for _ in 0..sq.capacity() {
         unsafe {
-            sq.push(&opcode::Nop::new().build()).expect("queue is full");
+            sq.push(&opcode::Nop::new().build().into())
+                .expect("queue is full");
         }
     }
 
@@ -107,7 +118,10 @@ pub fn test_queue_split(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_debug_print(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_debug_print<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require! {
         test;
     }
@@ -118,7 +132,7 @@ pub fn test_debug_print(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     let num_to_sub = sq.capacity();
     for _ in 0..num_to_sub {
         unsafe {
-            sq.push(&opcode::Nop::new().build().user_data(0x42))
+            sq.push(&opcode::Nop::new().build().user_data(0x42).into())
                 .expect("queue is full");
         }
     }
@@ -127,7 +141,7 @@ pub fn test_debug_print(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     ring.submit_and_wait(num_to_sub)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), num_to_sub);
     for cqe in cqes {
