@@ -156,7 +156,7 @@ impl<E: EntryMarker> CompletionQueue<'_, E> {
         let len = std::cmp::min(self.len(), entries.len());
 
         for entry in &mut entries[..len] {
-            entry.write(unsafe { self.pop() });
+            *entry = MaybeUninit::new(unsafe { self.pop() });
         }
 
         unsafe { std::slice::from_raw_parts_mut(entries as *mut _ as *mut E, len) }
