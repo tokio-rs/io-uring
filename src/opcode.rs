@@ -130,7 +130,7 @@ opcode!(
         len: { u32 },
         ;;
         ioprio: u16 = 0,
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
@@ -141,7 +141,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Readv {
             fd,
-            iovec, len, offset,
+            iovec, len, offset64,
             ioprio, rw_flags
         } = self;
 
@@ -151,11 +151,18 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
+
+impl Readv {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Vectored write, equivalent to `pwritev2(2)`.
@@ -166,7 +173,7 @@ opcode!(
         len: { u32 },
         ;;
         ioprio: u16 = 0,
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
@@ -177,7 +184,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Writev {
             fd,
-            iovec, len, offset,
+            iovec, len, offset64,
             ioprio, rw_flags
         } = self;
 
@@ -187,11 +194,18 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
+
+impl Writev {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// File sync, equivalent to `fsync(2)`.
@@ -239,7 +253,7 @@ opcode!(
         len: { u32 },
         buf_index: { u16 },
         ;;
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         ioprio: u16 = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
@@ -251,7 +265,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let ReadFixed {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             buf_index,
             ioprio, rw_flags
         } = self;
@@ -262,12 +276,19 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
 );
+
+impl ReadFixed {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Write to pre-mapped buffers that have been previously registered with
@@ -284,7 +305,7 @@ opcode!(
         buf_index: { u16 },
         ;;
         ioprio: u16 = 0,
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
@@ -295,7 +316,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let WriteFixed {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             buf_index,
             ioprio, rw_flags
         } = self;
@@ -306,12 +327,19 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
 );
+
+impl WriteFixed {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Poll the specified fd.
@@ -629,24 +657,31 @@ opcode!(
         fd: { impl sealed::UseFixed },
         len: { libc::off_t },
         ;;
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         mode: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_FALLOCATE;
 
     pub fn build(self) -> Entry {
-        let Fallocate { fd, len, offset, mode } = self;
+        let Fallocate { fd, len, offset64, mode } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_2.addr = len as _;
         sqe.len = mode as _;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         Entry(sqe)
     }
 );
+
+impl Fallocate {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Open a file, equivalent to `openat(2)`.
@@ -769,7 +804,7 @@ opcode!(
         /// If `fd` does not refer to a seekable file, `offset` must be set to zero.
         /// If `offsett` is set to `-1`, the offset will use (and advance) the file position,
         /// like the `read(2)` and `write(2)` system calls.
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         ioprio: u16 = 0,
         rw_flags: types::RwFlags = 0,
         buf_group: u16 = 0
@@ -780,7 +815,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Read {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             ioprio, rw_flags,
             buf_group
         } = self;
@@ -791,12 +826,19 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 );
+
+impl Read {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
@@ -819,7 +861,7 @@ opcode!(
         /// If `fd` does not refer to a seekable file, `offset` must be set to zero.
         /// If `offsett` is set to `-1`, the offset will use (and advance) the file position,
         /// like the `read(2)` and `write(2)` system calls.
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         ioprio: u16 = 0,
         rw_flags: types::RwFlags = 0
     }
@@ -829,7 +871,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Write {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             ioprio, rw_flags
         } = self;
 
@@ -839,11 +881,18 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
+
+impl Write {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Predeclare an access pattern for file data, equivalent to `posix_fadvise(2)`.
@@ -852,23 +901,30 @@ opcode!(
         len: { libc::off_t },
         advice: { i32 },
         ;;
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
     }
 
     pub const CODE = sys::IORING_OP_FADVISE;
 
     pub fn build(self) -> Entry {
-        let Fadvise { fd, len, advice, offset } = self;
+        let Fadvise { fd, len, advice, offset64 } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.len = len as _;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.fadvise_advice = advice as _;
         Entry(sqe)
     }
 );
+
+impl Fadvise {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Give advice about use of memory, equivalent to `madvise(2)`.
