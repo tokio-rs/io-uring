@@ -143,13 +143,23 @@ pub fn test_file_fallocate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
             .expect("queue is full");
     }
 
-    ring.submit_and_wait(1)?;
+    let falloc_e = opcode::Fallocate64::new(fd, 1024);
+
+    unsafe {
+        ring.submission()
+            .push(&falloc_e.build().user_data(0x20).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(2)?;
 
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
-    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x10);
     assert_eq!(cqes[0].result(), 0);
+    assert_eq!(cqes[1].user_data(), 0x20);
+    assert_eq!(cqes[1].result(), 0);
 
     Ok(())
 }

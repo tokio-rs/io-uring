@@ -684,6 +684,38 @@ impl Fallocate {
 }
 
 opcode!(
+    /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
+    pub struct Fallocate64 {
+        fd: { impl sealed::UseFixed },
+        len: { libc::off64_t },
+        ;;
+        offset64: libc::off64_t = 0,
+        mode: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_FALLOCATE;
+
+    pub fn build(self) -> Entry {
+        let Fallocate64 { fd, len, offset64, mode } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = len as _;
+        sqe.len = mode as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
+        Entry(sqe)
+    }
+);
+
+impl Fallocate64 {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
+
+opcode!(
     /// Open a file, equivalent to `openat(2)`.
     pub struct OpenAt {
         dirfd: { impl sealed::UseFd },
