@@ -65,6 +65,7 @@ macro_rules! opcode {
             $( $opt_field : $opt_tname, )*
         }
 
+        #[allow(deprecated)]
         impl $name {
             $( #[$new_meta] )*
             #[inline]
@@ -653,6 +654,7 @@ opcode!(
 
 opcode!(
     /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
+    #[deprecated(note = "use Fallocate64 instead, which always takes a 64-bit length")]
     pub struct Fallocate {
         fd: { impl sealed::UseFixed },
         len: { libc::off_t },
@@ -676,6 +678,7 @@ opcode!(
     }
 );
 
+#[allow(deprecated)]
 impl Fallocate {
     #[inline]
     pub const fn offset(self, offset: libc::off_t) -> Self {
