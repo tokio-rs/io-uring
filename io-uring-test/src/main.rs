@@ -19,13 +19,20 @@ fn main() -> anyhow::Result<()> {
         match IoUring::<squeue::Entry128, cqueue::Entry>::generic_new(entries) {
             Ok(r) => test(r)?,
             Err(e) => {
-                println!("IoUring::<squeue::Entry128, cqueue::Entry>::generic_new(entries) failed: {}", e);
+                println!(
+                    "IoUring::<squeue::Entry128, cqueue::Entry>::generic_new(entries) failed: {}",
+                    e
+                );
                 println!("Assume kernel doesn't support the new entry sizes so remaining tests being skipped.");
                 return Ok(());
-            },
+            }
         };
-        test(IoUring::<squeue::Entry, cqueue::Entry32>::generic_new(entries)?)?;
-        test(IoUring::<squeue::Entry128, cqueue::Entry32>::generic_new(entries)?)?;
+        test(IoUring::<squeue::Entry, cqueue::Entry32>::generic_new(
+            entries,
+        )?)?;
+        test(IoUring::<squeue::Entry128, cqueue::Entry32>::generic_new(
+            entries,
+        )?)?;
     }
 
     Ok(())
