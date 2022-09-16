@@ -179,6 +179,30 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
+    /// Registers an empty file table of nr_files number of file descriptors. The sparse variant is
+    /// available in kernels 5.19 and later.
+    ///
+    /// Registering a file table is a prerequisite for using any request that
+    /// uses direct descriptors.
+    pub fn register_files_sparse(&self, nr: u32) -> io::Result<()> {
+        use std::mem;
+        let rr = sys::io_uring_rsrc_register {
+            nr,
+            flags: sys::IORING_RSRC_REGISTER_SPARSE,
+            resv2: 0,
+            data: 0,
+            tags: 0,
+        };
+        let rr = cast_ptr::<sys::io_uring_rsrc_register>(&rr);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_FILES2,
+            rr as *const _,
+            mem::size_of::<sys::io_uring_rsrc_register>() as _,
+        )
+        .map(drop)
+    }
+
     /// Register files for I/O. You can use the registered files with
     /// [`Fixed`](crate::types::Fixed).
     ///
