@@ -184,6 +184,9 @@ impl<'a> Submitter<'a> {
     ///
     /// Registering a file table is a prerequisite for using any request that
     /// uses direct descriptors.
+    ///
+    /// Requires the `unstable` feature.
+    #[cfg(feature = "unstable")]
     pub fn register_files_sparse(&self, nr: u32) -> io::Result<()> {
         use std::mem;
         let rr = sys::io_uring_rsrc_register {
