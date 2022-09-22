@@ -74,6 +74,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::queue::test_batch(&mut ring, &test)?;
 
     // register
+    #[cfg(feature = "unstable")]
     tests::register::test_register_files_sparse(&mut ring, &test)?;
 
     // fs
