@@ -329,6 +329,6 @@ pub fn buffer_select(flags: u32) -> Option<u16> {
 }
 
 #[cfg(feature = "unstable")]
-pub fn more(flags: u32) -> bool{
+pub fn more(flags: u32) -> bool {
     flags & sys::IORING_CQE_F_MORE != 0
 }

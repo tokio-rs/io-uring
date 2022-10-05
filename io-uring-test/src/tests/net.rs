@@ -161,18 +161,18 @@ pub fn test_tcp_zero_copy_send_recv<S: squeue::EntryMarker, C: cqueue::EntryMark
     assert_eq!(cqes[0].result(), text.len() as i32);
 
     // Notification is not ordered w.r.t recv
-    match(cqes[1].user_data(), cqes[2].user_data()){
+    match (cqes[1].user_data(), cqes[2].user_data()) {
         (0x01, 0x02) => {
             assert!(!io_uring::cqueue::more(cqes[1].flags()));
             assert_eq!(cqes[2].result(), text.len() as i32);
             assert_eq!(&output[..cqes[2].result() as usize], text);
-        },
+        }
         (0x02, 0x01) => {
             assert!(!io_uring::cqueue::more(cqes[2].flags()));
             assert_eq!(cqes[1].result(), text.len() as i32);
             assert_eq!(&output[..cqes[1].result() as usize], text);
         }
-        _ => assert!(false)
+        _ => assert!(false),
     }
     Ok(())
 }
