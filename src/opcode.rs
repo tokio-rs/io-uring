@@ -1441,3 +1441,33 @@ opcode!(
         Entry128(Entry(sqe), cmd2)
     }
 );
+
+// === 6.0 ===
+
+#[cfg(feature = "unstable")]
+opcode!(
+    /// Send a zerocopy message on a socket, equivalent to `send(2)`.
+    pub struct SendZc {
+        fd: { impl sealed::UseFixed },
+        buf: { *const u8 },
+        len: { u32 },
+        ;;
+        flags: i32 = 0,
+        zc_flags: u16 =0,
+    }
+
+    pub const CODE = sys::IORING_OP_SEND_ZC;
+
+    pub fn build(self) -> Entry {
+        let SendZc { fd, buf, len, flags, zc_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = buf as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.ioprio = zc_flags;
+        Entry(sqe)
+    }
+);

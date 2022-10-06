@@ -110,6 +110,7 @@ pub const IORING_ACCEPT_MULTISHOT: u32 = 1;
 pub const IORING_CQE_F_BUFFER: u32 = 1;
 pub const IORING_CQE_F_MORE: u32 = 2;
 pub const IORING_CQE_F_SOCK_NONEMPTY: u32 = 4;
+pub const IORING_CQE_F_NOTIF: u32 = 8;
 pub const IORING_OFF_SQ_RING: u32 = 0;
 pub const IORING_OFF_CQ_RING: u32 = 134217728;
 pub const IORING_OFF_SQES: u32 = 268435456;
@@ -1229,7 +1230,8 @@ pub const IORING_OP_FGETXATTR: io_uring_op = 43;
 pub const IORING_OP_GETXATTR: io_uring_op = 44;
 pub const IORING_OP_SOCKET: io_uring_op = 45;
 pub const IORING_OP_URING_CMD: io_uring_op = 46;
-pub const IORING_OP_LAST: io_uring_op = 47;
+pub const IORING_OP_SEND_ZC: io_uring_op = 47;
+pub const IORING_OP_LAST: io_uring_op = 48;
 pub type io_uring_op = libc::c_uint;
 #[repr(C)]
 #[derive(Debug, Default)]
