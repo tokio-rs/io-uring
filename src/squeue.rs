@@ -185,6 +185,26 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
         }
     }
 
+    /// This will flush any entries added by [`push`](Self::push) or
+    /// [`push_multiple`](Self::push_multiple)
+    #[cfg(feature = "unstable")]
+    #[inline]
+    pub fn flush(&self) {
+        unsafe {
+            (*self.queue.tail).store(self.tail, atomic::Ordering::Release);
+        }
+    }
+
+    /// Update the queue's length if the kernel has consumed some
+    /// entries in the meantime.
+    #[cfg(feature = "unstable")]
+    #[inline]
+    pub fn load(&mut self) {
+        unsafe {
+            self.head = (*self.queue.head).load(atomic::Ordering::Acquire);
+        }
+    }
+
     /// When [`is_setup_sqpoll`](crate::Parameters::is_setup_sqpoll) is set, whether the kernel
     /// threads has gone to sleep and requires a system call to wake it up.
     #[inline]
