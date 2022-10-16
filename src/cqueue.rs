@@ -115,14 +115,18 @@ impl<E: EntryMarker> CompletionQueue<'_, E> {
     #[cfg(feature = "unstable")]
     #[inline]
     pub fn flush(&self) {
-        unsafe { (*self.queue.head).store(self.head, atomic::Ordering::Release) };
+        unsafe {
+            (*self.queue.head).store(self.head, atomic::Ordering::Release);
+        }
     }
 
     /// Load new entries in the queue if the kernel has produced some entries in the meantime.
     #[cfg(feature = "unstable")]
     #[inline]
     pub fn load(&mut self) {
-        unsafe { self.tail = (*self.queue.tail).load(atomic::Ordering::Acquire); }
+        unsafe {
+            self.tail = (*self.queue.tail).load(atomic::Ordering::Acquire);
+        }
     }
 
     /// If queue is full and [`is_feature_nodrop`](crate::Parameters::is_feature_nodrop) is not set,
