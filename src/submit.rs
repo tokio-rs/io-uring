@@ -420,4 +420,66 @@ impl<'a> Submitter<'a> {
         )
         .map(drop)
     }
+
+    /// Register buffer ring for provided buffers.
+    ///
+    /// Details can be found in the io_uring_register_buf_ring.3 man page.
+    ///
+    /// If the register command is not supported, or the ring_entries value exceeds
+    /// 32768, the InvalidInput error is returned.
+    ///
+    /// Available since 5.19.
+    ///
+    /// Requires the `unstable` feature.
+    #[cfg(feature = "unstable")]
+    pub fn register_buf_ring(
+        &self,
+        ring_addr: u64,
+        ring_entries: u16,
+        bgid: u16,
+    ) -> io::Result<()> {
+        // The interface type for ring_entries is u32 but the same interface only allows a u16 for
+        // the tail to be specified, so to try and avoid further confusion, we limit the
+        // ring_entries to u16 here too. The value is actually limited to 2^15 (32768) but we can
+        // let the kernel enforce that.
+        let arg = sys::io_uring_buf_reg {
+            ring_addr,
+            ring_entries: ring_entries as _,
+            bgid,
+            pad: 0,
+            resv: Default::default(),
+        };
+        let arg = cast_ptr::<sys::io_uring_buf_reg>(&arg);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_PBUF_RING,
+            arg as *const _,
+            1,
+        )
+        .map(drop)
+    }
+
+    /// Unregister a previously registered buffer ring.
+    ///
+    /// Available since 5.19.
+    ///
+    /// Requires the `unstable` feature.
+    #[cfg(feature = "unstable")]
+    pub fn unregister_buf_ring(&self, bgid: u16) -> io::Result<()> {
+        let arg = sys::io_uring_buf_reg {
+            ring_addr: 0,
+            ring_entries: 0,
+            bgid,
+            pad: 0,
+            resv: Default::default(),
+        };
+        let arg = cast_ptr::<sys::io_uring_buf_reg>(&arg);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_UNREGISTER_PBUF_RING,
+            arg as *const _,
+            1,
+        )
+        .map(drop)
+    }
 }
