@@ -332,7 +332,3 @@ pub fn buffer_select(flags: u32) -> Option<u16> {
 pub fn more(flags: u32) -> bool {
     flags & sys::IORING_CQE_F_MORE != 0
 }
-
-#[cfg(feature = "unstable")]
-#[allow(non_camel_case_types)]
-pub type io_uring_buf = sys::io_uring_buf;

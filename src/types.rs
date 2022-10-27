@@ -218,3 +218,33 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
         }
     }
 }
+
+#[cfg(feature = "unstable")]
+#[allow(non_camel_case_types)]
+/// io_uring_buf is a stable copy of the sys::io_uring_buf struct.
+/// When using it to write to the ring buffer shared memory,
+/// only the first three fields should be written per entry.
+/// The resv field should not be written, not even as a zero
+/// as the 16 bits on that location are reserved from the first
+/// element to represent the tail index of the ring.
+pub struct io_uring_buf {
+    /// The 64 bit address of the buffer that the uring interface will write to
+    /// and the application can later read from.
+    pub addr: libc::__u64,
+
+    /// The 32 bit length field of the buffer pointed to by addr.
+    pub len: libc::__u32,
+
+    /// The buffer id that will be placed into the CQE when this buffer is taken from
+    /// the ring by the uring interface.
+    pub bid: libc::__u16,
+
+    /// The reserved 16 bits of each buffer ring entry that should not be written to, not even
+    /// zeroed once the buffer ring has been registered. This is the address of the first entry
+    /// where the 16 bit tail index is stored. As entry[0].tail, it is written to by the
+    /// application as the application fills entries in the ring.
+    pub resv: libc::__u16,
+}
+
+/// The offset to the resv field of the io_uring_buf struct.
+pub const RING_BUFFER_TAIL_OFFSET: usize = 14;

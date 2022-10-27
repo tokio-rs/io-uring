@@ -120,6 +120,12 @@ bitflags! {
         /// Requires the `unstable` feature.
         #[cfg(feature = "unstable")]
         const BUFFER_SELECT = 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+
+        /// Don't post CQE if request succeeded.
+        ///
+        /// Requires the `unstable` feature.
+        #[cfg(feature = "unstable")]
+        const SKIP_SUCCESS = 1 << sys::IOSQE_CQE_SKIP_SUCCESS_BIT;
     }
 }
 
