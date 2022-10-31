@@ -172,7 +172,7 @@ pub fn test_tcp_zero_copy_send_recv<S: squeue::EntryMarker, C: cqueue::EntryMark
             assert_eq!(cqes[1].result(), text.len() as i32);
             assert_eq!(&output[..cqes[1].result() as usize], text);
         }
-        _ => assert!(false),
+        _ => unreachable!(),
     }
     Ok(())
 }
