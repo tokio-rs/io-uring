@@ -64,6 +64,13 @@ impl<'a> Submitter<'a> {
         }
     }
 
+    /// CQ ring is overflown
+    fn sq_cq_overflow(&self) -> bool {
+        unsafe {
+            (*self.sq_flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0
+        }
+    }
+
     /// Initiate and/or complete asynchronous I/O. This is a low-level wrapper around
     /// `io_uring_enter` - see `man io_uring_enter` (or [its online
     /// version](https://manpages.debian.org/unstable/liburing-dev/io_uring_enter.2.en.html) for
@@ -115,7 +122,12 @@ impl<'a> Submitter<'a> {
         let len = self.sq_len();
         let mut flags = 0;
 
-        if want > 0 || self.params.is_setup_iopoll() {
+        // This logic suffers from the fact the sq_cq_overflow and sq_need_wakeup
+        // each cause an atomic load of the same variable, self.sq_flags.
+        // In the hottest paths, when a server is running with sqpoll,
+        // this is going to be hit twice, when once would be sufficient.
+
+        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow() {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
