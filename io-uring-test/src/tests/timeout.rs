@@ -302,9 +302,7 @@ pub fn test_timeout_submit_args<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     }
     assert_eq!(start.elapsed().as_secs(), 1);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
-
-    assert!(cqes.is_empty());
+    assert!(ring.completion().next().is_none());
 
     // no timeout
 
