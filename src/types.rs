@@ -220,6 +220,7 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
 }
 
 #[cfg(feature = "unstable")]
+#[repr(transparent)]
 pub struct BufRingEntry(sys::io_uring_buf);
 
 /// An entry in a buf_ring that allows setting the address, length and buffer id.
