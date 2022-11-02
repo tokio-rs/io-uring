@@ -231,7 +231,7 @@ impl BufRingEntry {
         self.0.addr = addr;
     }
     /// Returns the entry addr.
-    pub fn _addr(&mut self) -> u64 {
+    pub fn addr(&self) -> u64 {
         self.0.addr
     }
     /// Sets the entry len.
@@ -240,7 +240,7 @@ impl BufRingEntry {
     }
     /// Returns the entry len.
     #[allow(clippy::len_without_is_empty)]
-    pub fn len(&mut self) -> u32 {
+    pub fn len(&self) -> u32 {
         self.0.len
     }
     /// Sets the entry bid.
@@ -248,10 +248,22 @@ impl BufRingEntry {
         self.0.bid = bid;
     }
     /// Returns the entry bid.
-    pub fn bid(&mut self) -> u16 {
+    pub fn bid(&self) -> u16 {
         self.0.bid
     }
-}
 
-/// The offset to the resv field of the io_uring_buf struct.
-pub const RING_BUFFER_TAIL_OFFSET: usize = 14;
+    /// The offset to the ring's tail field given the ring's base address.
+    ///
+    /// The caller should ensure the ring's base address is aligned with the system's page size,
+    /// per the uring interface requirements.
+    ///
+    /// # Safety
+    ///
+    /// The ptr will be dereferenced in order to determine the address of the resv field,
+    /// so the caller is responsible for passing in a valid pointer. And not just
+    /// a valid pointer type, but also the argument must be the address to the first entry
+    /// of the buf_ring for the resv field to even be considered the tail field of the ring.
+    pub unsafe fn tail(ring_base: *const BufRingEntry) -> *const u16 {
+        std::ptr::addr_of!((*ring_base).0.resv)
+    }
+}

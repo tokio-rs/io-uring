@@ -7,15 +7,88 @@ use io_uring::types::BufRingEntry;
 use io_uring::{cqueue, opcode, squeue, IoUring};
 
 use std::cell::Cell;
+use std::fmt;
 use std::io;
 use std::os::unix::io::AsRawFd;
+use std::ptr;
 use std::rc::Rc;
 use std::sync::atomic::{self, AtomicU16};
 
 type Bgid = u16; // Buffer group id
 type Bid = u16; // Buffer id
 
-#[derive(Debug)]
+/// An anonymous region of memory mapped using `mmap(2)`, not backed by a file
+/// but that is guaranteed to be page-aligned and zero-filled.
+pub struct AnonymousMmap {
+    addr: ptr::NonNull<libc::c_void>,
+    len: usize,
+}
+
+impl AnonymousMmap {
+    /// Allocate `len` bytes that are page aligned and zero-filled.
+    pub fn new(len: usize) -> io::Result<AnonymousMmap> {
+        unsafe {
+            match libc::mmap(
+                ptr::null_mut(),
+                len,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_ANONYMOUS | libc::MAP_SHARED | libc::MAP_POPULATE,
+                -1,
+                0,
+            ) {
+                libc::MAP_FAILED => Err(io::Error::last_os_error()),
+                addr => {
+                    // here, `mmap` will never return null
+                    let addr = ptr::NonNull::new_unchecked(addr);
+                    Ok(AnonymousMmap { addr, len })
+                }
+            }
+        }
+    }
+
+    /// Do not make the stored memory accessible by child processes after a `fork`.
+    pub fn dontfork(&self) -> io::Result<()> {
+        match unsafe { libc::madvise(self.addr.as_ptr(), self.len, libc::MADV_DONTFORK) } {
+            0 => Ok(()),
+            _ => Err(io::Error::last_os_error()),
+        }
+    }
+
+    /// Get a pointer to the memory.
+    #[inline]
+    pub fn as_ptr(&self) -> *const libc::c_void {
+        self.addr.as_ptr()
+    }
+
+    /// Get a mut pointer to the memory.
+    #[inline]
+    pub fn as_ptr_mut(&self) -> *mut libc::c_void {
+        self.addr.as_ptr()
+    }
+
+    /// Get a pointer to the data at the given offset.
+    #[inline]
+    #[allow(dead_code)]
+    pub unsafe fn offset(&self, offset: u32) -> *const libc::c_void {
+        self.as_ptr().add(offset as usize)
+    }
+
+    /// Get a mut pointer to the data at the given offset.
+    #[inline]
+    #[allow(dead_code)]
+    pub unsafe fn offset_mut(&self, offset: u32) -> *mut libc::c_void {
+        self.as_ptr_mut().add(offset as usize)
+    }
+}
+
+impl Drop for AnonymousMmap {
+    fn drop(&mut self) {
+        unsafe {
+            libc::munmap(self.addr.as_ptr(), self.len);
+        }
+    }
+}
+
 struct InnerBufRing {
     // All these fields are constant once the struct is instantiated except the one of type Cell<u16>.
     bgid: Bgid,
@@ -25,15 +98,9 @@ struct InnerBufRing {
     buf_cnt: u16,   // Invariants: > 0, <= ring_entries.
     buf_len: usize, // Invariant: > 0.
 
-    // This test version of a BufRing uses one memory layout for the ring entries.
-    //
-    // The one alignment restriction the uring interface has is the buf_ring itself, the contiguous
-    // array of buf_ring entries, must start on a page boundary. The liburing library was satisfied
-    // to use the hardcoded value 4096 for this.
-    layout: std::alloc::Layout,
-
-    // `ring_start` holds the memory allocated from std::alloc::alloc_zeroed(layout).
-    ring_start: *mut u8, // Invariant: non zero.
+    // `ring_start` holds the memory allocated for the buf_ring, the ring of entries describing
+    // the buffers being made available to the uring interface for this buf group id.
+    ring_start: AnonymousMmap,
 
     buf_list: Vec<Vec<u8>>,
 
@@ -71,12 +138,11 @@ impl InnerBufRing {
         assert_eq!(entry_size, 16);
         let ring_size = entry_size * (ring_entries as usize);
 
-        let align: usize = 4096; // alignment should be the page size
-        let align = align.next_power_of_two();
-        let layout = std::alloc::Layout::from_size_align(ring_size, align).unwrap();
-
-        // Allocate zeroed memory.
-        let ring_start: *mut u8 = unsafe { std::alloc::alloc_zeroed(layout) };
+        // The memory is required to be page aligned and zero-filled by the uring buf_ring
+        // interface. Anonymous mmap promises both of those things.
+        // https://man7.org/linux/man-pages/man2/mmap.2.html
+        let ring_start = AnonymousMmap::new(ring_size).unwrap();
+        ring_start.dontfork()?;
 
         // Probably some functional way to do this.
         let buf_list: Vec<Vec<u8>> = {
@@ -88,7 +154,8 @@ impl InnerBufRing {
         };
 
         let shared_tail =
-            unsafe { ring_start.add(types::RING_BUFFER_TAIL_OFFSET) } as *const AtomicU16;
+            unsafe { types::BufRingEntry::tail(ring_start.as_ptr() as *const BufRingEntry) }
+                as *const AtomicU16;
 
         let ring_entries_mask = ring_entries - 1;
         assert!((ring_entries & ring_entries_mask) == 0);
@@ -98,7 +165,6 @@ impl InnerBufRing {
             ring_entries_mask,
             buf_cnt,
             buf_len,
-            layout,
             ring_start,
             buf_list,
             local_tail: Cell::new(0),
@@ -119,9 +185,11 @@ impl InnerBufRing {
     {
         let bgid = self.bgid;
 
-        let res =
-            ring.submitter()
-                .register_buf_ring(self.ring_start as _, self.ring_entries(), bgid);
+        let res = ring.submitter().register_buf_ring(
+            self.ring_start.as_ptr() as _,
+            self.ring_entries(),
+            bgid,
+        );
 
         if let Err(e) = res {
             match e.raw_os_error() {
@@ -235,7 +303,7 @@ impl InnerBufRing {
         self.local_tail.set(old_tail + 1);
         let ring_idx = old_tail & self.mask();
 
-        let entries = self.ring_start as *mut BufRingEntry;
+        let entries = self.ring_start.as_ptr_mut() as *mut BufRingEntry;
         let re = unsafe { &mut *entries.add(ring_idx as usize) };
 
         re.set_addr(self.stable_ptr(bid) as _);
@@ -255,13 +323,7 @@ impl InnerBufRing {
     }
 }
 
-impl Drop for InnerBufRing {
-    fn drop(&mut self) {
-        unsafe { std::alloc::dealloc(self.ring_start, self.layout) };
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct FixedSizeBufRing {
     // The BufRing is reference counted because each buffer handed out has a reference back to its
     // buffer group, or in this case, to its buffer ring.
@@ -356,11 +418,21 @@ impl Builder {
 
 // This tracks a buffer that has been filled in by the kernel, having gotten the memory
 // from a buffer ring, and returned to userland via a cqe entry.
-#[derive(Debug)]
 struct GBuf {
     bufgroup: FixedSizeBufRing,
     len: usize,
     bid: Bid,
+}
+
+impl fmt::Debug for GBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GBuf")
+            .field("bgid", &self.bufgroup.rc.bgid())
+            .field("bid", &self.bid)
+            .field("len", &self.len)
+            .field("cap", &self.bufgroup.rc.buf_capacity())
+            .finish()
+    }
 }
 
 impl GBuf {
