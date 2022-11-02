@@ -3,7 +3,7 @@
 
 use crate::Test;
 use io_uring::types;
-use io_uring::types::io_uring_buf;
+use io_uring::types::BufRingEntry;
 use io_uring::{cqueue, opcode, squeue, IoUring};
 
 use std::cell::Cell;
@@ -67,7 +67,8 @@ impl InnerBufRing {
         }
 
         // entry_size is 16 bytes.
-        let entry_size = std::mem::size_of::<io_uring_buf>() as usize;
+        let entry_size = std::mem::size_of::<BufRingEntry>() as usize;
+        assert_eq!(entry_size, 16);
         let ring_size = entry_size * (ring_entries as usize);
 
         let align: usize = 4096; // alignment should be the page size
@@ -234,18 +235,18 @@ impl InnerBufRing {
         self.local_tail.set(old_tail + 1);
         let ring_idx = old_tail & self.mask();
 
-        let entries = self.ring_start as *mut io_uring_buf;
+        let entries = self.ring_start as *mut BufRingEntry;
         let re = unsafe { &mut *entries.add(ring_idx as usize) };
 
-        re.addr = self.stable_ptr(bid) as _;
-        re.len = self.buf_len as _;
-        re.bid = bid;
+        re.set_addr(self.stable_ptr(bid) as _);
+        re.set_len(self.buf_len as _);
+        re.set_bid(bid);
 
         // Also note, we have not updated the tail as far as the kernel is concerned.
         // That is done with buf_ring_sync.
     }
 
-    // Make 'local_tail' visible to the kernel. Called after io_uring_buf_ring_add() has been
+    // Make 'local_tail' visible to the kernel. Called after buf_ring_push() has been
     // called to fill in new buffers.
     fn buf_ring_sync(&self) {
         unsafe {

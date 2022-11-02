@@ -220,30 +220,36 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
 }
 
 #[cfg(feature = "unstable")]
-#[allow(non_camel_case_types)]
-/// io_uring_buf is a stable copy of the sys::io_uring_buf struct.
-/// When using it to write to the ring buffer shared memory,
-/// only the first three fields should be written per entry.
-/// The resv field should not be written, not even as a zero
-/// as the 16 bits on that location are reserved from the first
-/// element to represent the tail index of the ring.
-pub struct io_uring_buf {
-    /// The 64 bit address of the buffer that the uring interface will write to
-    /// and the application can later read from.
-    pub addr: libc::__u64,
+pub struct BufRingEntry(sys::io_uring_buf);
 
-    /// The 32 bit length field of the buffer pointed to by addr.
-    pub len: libc::__u32,
-
-    /// The buffer id that will be placed into the CQE when this buffer is taken from
-    /// the ring by the uring interface.
-    pub bid: libc::__u16,
-
-    /// The reserved 16 bits of each buffer ring entry that should not be written to, not even
-    /// zeroed once the buffer ring has been registered. This is the address of the first entry
-    /// where the 16 bit tail index is stored. As entry[0].tail, it is written to by the
-    /// application as the application fills entries in the ring.
-    pub resv: libc::__u16,
+/// An entry in a buf_ring that allows setting the address, length and buffer id.
+#[cfg(feature = "unstable")]
+impl BufRingEntry {
+    /// Sets the entry addr.
+    pub fn set_addr(&mut self, addr: u64) {
+        self.0.addr = addr;
+    }
+    /// Returns the entry addr.
+    pub fn _addr(&mut self) -> u64 {
+        self.0.addr
+    }
+    /// Sets the entry len.
+    pub fn set_len(&mut self, len: u32) {
+        self.0.len = len;
+    }
+    /// Returns the entry len.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&mut self) -> u32 {
+        self.0.len
+    }
+    /// Sets the entry bid.
+    pub fn set_bid(&mut self, bid: u16) {
+        self.0.bid = bid;
+    }
+    /// Returns the entry bid.
+    pub fn bid(&mut self) -> u16 {
+        self.0.bid
+    }
 }
 
 /// The offset to the resv field of the io_uring_buf struct.
