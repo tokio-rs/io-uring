@@ -93,21 +93,14 @@ impl<'a> Submitter<'a> {
             .map(|arg| cast_ptr(arg) as *const _)
             .unwrap_or_else(ptr::null);
         let size = std::mem::size_of::<T>();
-        let result = sys::io_uring_enter(
+        sys::io_uring_enter(
             self.fd.as_raw_fd(),
             to_submit,
             min_complete,
             flag,
             arg,
             size,
-        );
-        if result >= 0 {
-            Ok(result as _)
-        } else if result == -1 {
-            Err(io::Error::last_os_error())
-        } else {
-            Err(io::Error::from_raw_os_error(-result))
-        }
+        ).map(|res| res as _)
     }
 
     /// Submit all queued submission queue events to the kernel.
