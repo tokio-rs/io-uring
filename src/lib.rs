@@ -370,6 +370,12 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
+    #[cfg(feature = "unstable")]
+    pub fn setup_coop_taskrun(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_COOP_TASKRUN;
+        self
+    }
+
     /// Build an [IoUring], with the specified number of entries in the submission queue and
     /// completion queue unless [`setup_cqsize`](Self::setup_cqsize) has been called.
     pub fn build(&self, entries: u32) -> io::Result<IoUring<S, C>> {
