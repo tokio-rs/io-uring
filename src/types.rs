@@ -44,10 +44,8 @@ use crate::sys;
 use bitflags::bitflags;
 use std::os::unix::io::RawFd;
 
-#[cfg(feature = "unstable")]
 use std::marker::PhantomData;
 
-#[cfg(feature = "unstable")]
 use crate::util::cast_ptr;
 
 pub use sys::__kernel_rwf_t as RwFlags;
@@ -81,7 +79,6 @@ bitflags! {
     pub struct TimeoutFlags: u32 {
         const ABS = sys::IORING_TIMEOUT_ABS;
 
-        #[cfg(feature = "unstable")]
         const UPDATE = sys::IORING_TIMEOUT_UPDATE;
     }
 }
@@ -169,7 +166,6 @@ impl Timespec {
 ///
 /// drop(args);
 /// ```
-#[cfg(feature = "unstable")]
 #[derive(Default, Debug, Clone, Copy)]
 pub struct SubmitArgs<'prev: 'now, 'now> {
     pub(crate) args: sys::io_uring_getevents_arg,
@@ -177,7 +173,6 @@ pub struct SubmitArgs<'prev: 'now, 'now> {
     now: PhantomData<&'now ()>,
 }
 
-#[cfg(feature = "unstable")]
 impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     #[inline]
     pub const fn new() -> SubmitArgs<'static, 'static> {
@@ -219,12 +214,10 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     }
 }
 
-#[cfg(feature = "unstable")]
 #[repr(transparent)]
 pub struct BufRingEntry(sys::io_uring_buf);
 
 /// An entry in a buf_ring that allows setting the address, length and buffer id.
-#[cfg(feature = "unstable")]
 impl BufRingEntry {
     /// Sets the entry addr.
     pub fn set_addr(&mut self, addr: u64) {

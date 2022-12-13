@@ -34,6 +34,3 @@ bindgen = { version = "0.60", optional = true }
 anyhow = "1"
 socket2 = "0.4"
 slab = "0.4"
-
-[package.metadata.docs.rs]
-features = [ "unstable" ]

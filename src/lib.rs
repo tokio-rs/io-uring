@@ -101,7 +101,6 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
     ///
     /// Unlike [`IoUring::new`], this function is available for any combination of submission queue
     /// entry (SQE) and completion queue entry (CQE) types.
-    #[cfg(feature = "unstable")]
     pub fn generic_new(entries: u32) -> io::Result<Self> {
         Self::generic_builder().build(entries)
     }
@@ -113,7 +112,6 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
     /// Unlike [`IoUring::builder`], this function is available for any combination of submission
     /// queue entry (SQE) and completion queue entry (CQE) types.
     #[must_use]
-    #[cfg(feature = "unstable")]
     pub fn generic_builder() -> Builder<S, C> {
         Builder {
             dontfork: false,
@@ -362,15 +360,11 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// events. You are only able to [register restrictions](Submitter::register_restrictions) when
     /// the rings are disabled due to concurrency issues. You can enable the rings with
     /// [`Submitter::register_enable_rings`].
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn setup_r_disabled(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_R_DISABLED;
         self
     }
 
-    #[cfg(feature = "unstable")]
     pub fn setup_coop_taskrun(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_COOP_TASKRUN;
         self
@@ -453,9 +447,6 @@ impl Parameters {
     /// See [the commit message that introduced
     /// it](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=d7718a9d25a61442da8ee8aeeff6a0097f0ccfd6)
     /// for more details.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn is_feature_fast_poll(&self) -> bool {
         self.0.features & sys::IORING_FEAT_FAST_POLL != 0
     }
@@ -466,17 +457,14 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
     }
 
-    #[cfg(feature = "unstable")]
     pub fn is_feature_sqpoll_nonfixed(&self) -> bool {
         self.0.features & sys::IORING_FEAT_SQPOLL_NONFIXED != 0
     }
 
-    #[cfg(feature = "unstable")]
     pub fn is_feature_ext_arg(&self) -> bool {
         self.0.features & sys::IORING_FEAT_EXT_ARG != 0
     }
 
-    #[cfg(feature = "unstable")]
     pub fn is_feature_native_workers(&self) -> bool {
         self.0.features & sys::IORING_FEAT_NATIVE_WORKERS != 0
     }

@@ -29,7 +29,6 @@ pub fn test_nop<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
 pub fn test_batch<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,

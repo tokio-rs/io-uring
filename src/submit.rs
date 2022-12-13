@@ -7,10 +7,8 @@ use crate::sys;
 use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 
-#[cfg(feature = "unstable")]
 use crate::register::Restriction;
 
-#[cfg(feature = "unstable")]
 use crate::types;
 
 /// Interface for submitting submission queue events in an io_uring instance to the kernel for
@@ -144,7 +142,6 @@ impl<'a> Submitter<'a> {
         unsafe { self.enter::<libc::sigset_t>(len as _, want as _, flags, None) }
     }
 
-    #[cfg(feature = "unstable")]
     pub fn submit_with_args(
         &self,
         want: usize,
@@ -171,9 +168,6 @@ impl<'a> Submitter<'a> {
     }
 
     /// Wait for the submission queue to have free entries.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn squeue_wait(&self) -> io::Result<usize> {
         unsafe { self.enter::<libc::sigset_t>(0, 0, sys::IORING_ENTER_SQ_WAIT, None) }
     }
@@ -196,9 +190,6 @@ impl<'a> Submitter<'a> {
     ///
     /// Registering a file table is a prerequisite for using any request that
     /// uses direct descriptors.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn register_files_sparse(&self, nr: u32) -> io::Result<()> {
         use std::mem;
         let rr = sys::io_uring_rsrc_register {
@@ -385,9 +376,6 @@ impl<'a> Submitter<'a> {
     /// an operation not on the allowlist will fail with `-EACCES`.
     ///
     /// This can only be called once, to prevent untrusted code from removing restrictions.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn register_restrictions(&self, res: &mut [Restriction]) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -400,9 +388,6 @@ impl<'a> Submitter<'a> {
 
     /// Enable the rings of the io_uring instance if they have been disabled with
     /// [`setup_r_disabled`](crate::Builder::setup_r_disabled).
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn register_enable_rings(&self) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -420,9 +405,6 @@ impl<'a> Submitter<'a> {
     /// which carry out I/O operations that can never complete, for instance I/O
     /// on sockets. Passing `0` does not change the current limit. Returns
     /// previous limits on success.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn register_iowq_max_workers(&self, max: &mut [u32; 2]) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -441,9 +423,6 @@ impl<'a> Submitter<'a> {
     /// 32768, the InvalidInput error is returned.
     ///
     /// Available since 5.19.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn register_buf_ring(
         &self,
         ring_addr: u64,
@@ -474,9 +453,6 @@ impl<'a> Submitter<'a> {
     /// Unregister a previously registered buffer ring.
     ///
     /// Available since 5.19.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn unregister_buf_ring(&self, bgid: u16) -> io::Result<()> {
         let arg = sys::io_uring_buf_reg {
             ring_addr: 0,

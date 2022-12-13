@@ -2,7 +2,6 @@
 
 use std::fmt::{self, Debug};
 use std::mem;
-#[cfg(feature = "unstable")]
 use std::mem::MaybeUninit;
 use std::sync::atomic;
 
@@ -49,7 +48,6 @@ pub trait EntryMarker: Clone + Debug + Into<Entry> + Sealed {}
 pub struct Entry(pub(crate) sys::io_uring_cqe);
 
 /// A 32-byte completion queue entry (CQE), representing a complete I/O operation.
-#[cfg(feature = "unstable")]
 #[repr(C)]
 #[derive(Clone)]
 pub struct Entry32(pub(crate) Entry, pub(crate) [u64; 2]);
@@ -57,7 +55,6 @@ pub struct Entry32(pub(crate) Entry, pub(crate) [u64; 2]);
 #[test]
 fn test_entry_sizes() {
     assert_eq!(mem::size_of::<Entry>(), 16);
-    #[cfg(feature = "unstable")]
     assert_eq!(mem::size_of::<Entry32>(), 32);
 }
 
@@ -120,9 +117,6 @@ impl<E: EntryMarker> CompletionQueue<'_, E> {
     /// Whether eventfd notifications are disabled when a request is completed and queued to the CQ
     /// ring. This library currently does not provide a way to set it, so this will always be
     /// `false`.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn eventfd_disabled(&self) -> bool {
         unsafe {
             (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_CQ_EVENTFD_DISABLED
@@ -150,7 +144,6 @@ impl<E: EntryMarker> CompletionQueue<'_, E> {
         self.len() == self.capacity()
     }
 
-    #[cfg(feature = "unstable")]
     #[inline]
     pub fn fill<'a>(&mut self, entries: &'a mut [MaybeUninit<E>]) -> &'a mut [E] {
         let len = std::cmp::min(self.len(), entries.len());
@@ -254,7 +247,6 @@ impl Debug for Entry {
     }
 }
 
-#[cfg(feature = "unstable")]
 impl Entry32 {
     /// The operation-specific result code. For example, for a [`Read`](crate::opcode::Read)
     /// operation this is equivalent to the return value of the `read(2)` system call.
@@ -287,22 +279,18 @@ impl Entry32 {
     }
 }
 
-#[cfg(feature = "unstable")]
 impl Sealed for Entry32 {
     const ADDITIONAL_FLAGS: u32 = sys::IORING_SETUP_CQE32;
 }
 
-#[cfg(feature = "unstable")]
 impl EntryMarker for Entry32 {}
 
-#[cfg(feature = "unstable")]
 impl From<Entry32> for Entry {
     fn from(entry32: Entry32) -> Self {
         entry32.0
     }
 }
 
-#[cfg(feature = "unstable")]
 impl Debug for Entry32 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Entry32")
@@ -314,7 +302,6 @@ impl Debug for Entry32 {
     }
 }
 
-#[cfg(feature = "unstable")]
 pub fn buffer_select(flags: u32) -> Option<u16> {
     if flags & sys::IORING_CQE_F_BUFFER != 0 {
         let id = flags >> sys::IORING_CQE_BUFFER_SHIFT;
@@ -328,7 +315,6 @@ pub fn buffer_select(flags: u32) -> Option<u16> {
     }
 }
 
-#[cfg(feature = "unstable")]
 pub fn more(flags: u32) -> bool {
     flags & sys::IORING_CQE_F_MORE != 0
 }

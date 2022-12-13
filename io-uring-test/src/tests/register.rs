@@ -1,9 +1,6 @@
-#[cfg(feature = "unstable")]
 use crate::Test;
-#[cfg(feature = "unstable")]
 use io_uring::{cqueue, opcode, squeue, IoUring};
 
-#[cfg(feature = "unstable")]
 pub fn test_register_files_sparse<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,

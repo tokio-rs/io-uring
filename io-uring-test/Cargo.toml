@@ -15,7 +15,5 @@ once_cell = "1"
 socket2 = "0.4"
 
 [features]
-default = [ "unstable" ]
-unstable = [ "io-uring/unstable" ]
 direct-syscall = [ "io-uring/direct-syscall" ]
 ci = []

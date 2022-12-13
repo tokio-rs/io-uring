@@ -2,13 +2,11 @@
 
 #![allow(clippy::new_without_default)]
 
-#[cfg(feature = "unstable")]
 use std::convert::TryInto;
 use std::mem;
 use std::os::unix::io::RawFd;
 
 use crate::squeue::Entry;
-#[cfg(feature = "unstable")]
 use crate::squeue::Entry128;
 use crate::sys;
 use crate::types::{self, sealed};
@@ -1129,13 +1127,10 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Register `nbufs` buffers that each have the length `len` with ids starting from `big` in the
     /// group `bgid` that can be used for any request. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
-    ///
-    /// Requires the `unstable` feature.
     pub struct ProvideBuffers {
         addr: { *mut u8 },
         len: { i32 },
@@ -1161,12 +1156,9 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Remove some number of buffers from a buffer group. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
-    ///
-    /// Requires the `unstable` feature.
     pub struct RemoveBuffers {
         nbufs: { u16 },
         bgid: { u16 }
@@ -1188,11 +1180,8 @@ opcode!(
 
 // === 5.8 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Duplicate pipe content, equivalent to `tee(2)`.
-    ///
-    /// Requires the `unstable` feature.
     pub struct Tee {
         fd_in: { impl sealed::UseFixed },
         fd_out: { impl sealed::UseFixed },
@@ -1228,7 +1217,6 @@ opcode!(
 
 // === 5.11 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Shutdown {
         fd: { impl sealed::UseFixed },
@@ -1249,7 +1237,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct RenameAt {
         olddirfd: { impl sealed::UseFd },
@@ -1280,7 +1267,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct UnlinkAt {
         dirfd: { impl sealed::UseFd },
@@ -1305,11 +1291,8 @@ opcode!(
 
 // === 5.15 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Make a directory, equivalent to `mkdirat2(2)`.
-    ///
-    /// Requires the `unstable` feature.
     pub struct MkDirAt {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -1331,11 +1314,8 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Create a symlink, equivalent to `symlinkat2(2)`.
-    ///
-    /// Requires the `unstable` feature.
     pub struct SymlinkAt {
         newdirfd: { impl sealed::UseFd },
         target: { *const libc::c_char },
@@ -1357,11 +1337,8 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Create a hard link, equivalent to `linkat2(2)`.
-    ///
-    /// Requires the `unstable` feature.
     pub struct LinkAt {
         olddirfd: { impl sealed::UseFd },
         oldpath: { *const libc::c_char },
@@ -1389,7 +1366,6 @@ opcode!(
 
 // === 5.19 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// A file/device-specific 16-byte command, akin (but not equivalent) to `ioctl(2)`.
     pub struct UringCmd16 {
@@ -1414,7 +1390,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// A file/device-specific 80-byte command, akin (but not equivalent) to `ioctl(2)`.
     pub struct UringCmd80 {
@@ -1444,7 +1419,6 @@ opcode!(
 
 // === 6.0 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Send a zerocopy message on a socket, equivalent to `send(2)`.
     pub struct SendZc {

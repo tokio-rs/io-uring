@@ -51,7 +51,6 @@ pub struct Entry(pub(crate) sys::io_uring_sqe);
 /// A 128-byte submission queue entry (SQE), representing a request for an I/O operation.
 ///
 /// These can be created via opcodes in [`opcode`](crate::opcode).
-#[cfg(feature = "unstable")]
 #[repr(C)]
 #[derive(Clone)]
 pub struct Entry128(pub(crate) Entry, pub(crate) [u8; 64]);
@@ -59,7 +58,6 @@ pub struct Entry128(pub(crate) Entry, pub(crate) [u8; 64]);
 #[test]
 fn test_entry_sizes() {
     assert_eq!(mem::size_of::<Entry>(), 64);
-    #[cfg(feature = "unstable")]
     assert_eq!(mem::size_of::<Entry128>(), 128);
 }
 
@@ -116,15 +114,9 @@ bitflags! {
         ///
         /// See also [the LWN thread on automatic buffer
         /// selection](https://lwn.net/Articles/815491/).
-        ///
-        /// Requires the `unstable` feature.
-        #[cfg(feature = "unstable")]
         const BUFFER_SELECT = 1 << sys::IOSQE_BUFFER_SELECT_BIT;
 
         /// Don't post CQE if request succeeded.
-        ///
-        /// Requires the `unstable` feature.
-        #[cfg(feature = "unstable")]
         const SKIP_SUCCESS = 1 << sys::IOSQE_CQE_SKIP_SUCCESS_BIT;
     }
 }
@@ -263,7 +255,6 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     /// Developers must ensure that parameters of all the entries (such as buffer) are valid and
     /// will be valid for the entire duration of the operation, otherwise it may cause memory
     /// problems.
-    #[cfg(feature = "unstable")]
     #[inline]
     pub unsafe fn push_multiple(&mut self, entries: &[E]) -> Result<(), PushError> {
         if self.capacity() - self.len() < entries.len() {
@@ -312,9 +303,6 @@ impl Entry {
 
     /// Set the personality of this event. You can obtain a personality using
     /// [`Submitter::register_personality`](crate::Submitter::register_personality).
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn personality(mut self, personality: u16) -> Entry {
         self.0.personality = personality;
         self
@@ -344,7 +332,6 @@ impl Debug for Entry {
     }
 }
 
-#[cfg(feature = "unstable")]
 impl Entry128 {
     /// Set the submission event's [flags](Flags).
     #[inline]
@@ -363,31 +350,24 @@ impl Entry128 {
 
     /// Set the personality of this event. You can obtain a personality using
     /// [`Submitter::register_personality`](crate::Submitter::register_personality).
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn personality(mut self, personality: u16) -> Entry128 {
         self.0 .0.personality = personality;
         self
     }
 }
 
-#[cfg(feature = "unstable")]
 impl Sealed for Entry128 {
     const ADDITIONAL_FLAGS: u32 = sys::IORING_SETUP_SQE128;
 }
 
-#[cfg(feature = "unstable")]
 impl EntryMarker for Entry128 {}
 
-#[cfg(feature = "unstable")]
 impl From<Entry> for Entry128 {
     fn from(entry: Entry) -> Entry128 {
         Entry128(entry, [0u8; 64])
     }
 }
 
-#[cfg(feature = "unstable")]
 impl Debug for Entry128 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Entry128")
