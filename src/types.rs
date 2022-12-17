@@ -263,7 +263,8 @@ impl BufRingEntry {
     /// so the caller is responsible for passing in a valid pointer. And not just
     /// a valid pointer type, but also the argument must be the address to the first entry
     /// of the buf_ring for the resv field to even be considered the tail field of the ring.
+    /// The entry must also be properly initialized.
     pub unsafe fn tail(ring_base: *const BufRingEntry) -> *const u16 {
-        std::ptr::addr_of!((*ring_base).0.resv)
+        &(*ring_base).0.resv
     }
 }
