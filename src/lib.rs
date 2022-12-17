@@ -172,10 +172,8 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
             }
         }
 
-        let fd: OwnedFd = unsafe {
-            sys::io_uring_setup(entries, &mut p)
-                .map(|fd| OwnedFd::from_raw_fd(fd))?
-        };
+        let fd: OwnedFd =
+            unsafe { sys::io_uring_setup(entries, &mut p).map(|fd| OwnedFd::from_raw_fd(fd))? };
 
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 

@@ -100,7 +100,8 @@ impl<'a> Submitter<'a> {
             flag,
             arg,
             size,
-        ).map(|res| res as _)
+        )
+        .map(|res| res as _)
     }
 
     /// Submit all queued submission queue events to the kernel.
