@@ -508,7 +508,6 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
 pub fn test_file_splice<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,

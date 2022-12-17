@@ -14,7 +14,7 @@ fn main() -> anyhow::Result<()> {
 
     test::<squeue::Entry, cqueue::Entry>(IoUring::new(entries)?)?;
 
-    #[cfg(all(feature = "unstable", not(feature = "ci")))]
+    #[cfg(not(feature = "ci"))]
     {
         match IoUring::<squeue::Entry128, cqueue::Entry>::generic_new(entries) {
             Ok(r) => test(r)?,
@@ -70,13 +70,10 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::queue::test_queue_split(&mut ring, &test)?;
     tests::queue::test_debug_print(&mut ring, &test)?;
 
-    #[cfg(feature = "unstable")]
     tests::queue::test_batch(&mut ring, &test)?;
 
     // register
-    #[cfg(feature = "unstable")]
     tests::register::test_register_files_sparse(&mut ring, &test)?;
-    #[cfg(feature = "unstable")]
     tests::register_buf_ring::test_register_buf_ring(&mut ring, &test)?;
 
     // fs
@@ -93,7 +90,6 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::fs::test_file_direct_write_read(&mut ring, &test)?;
     #[cfg(not(feature = "ci"))]
     tests::fs::test_statx(&mut ring, &test)?;
-    #[cfg(feature = "unstable")]
     tests::fs::test_file_splice(&mut ring, &test)?;
 
     // timeout
@@ -102,19 +98,16 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::timeout::test_timeout_remove(&mut ring, &test)?;
     tests::timeout::test_timeout_cancel(&mut ring, &test)?;
     tests::timeout::test_timeout_abs(&mut ring, &test)?;
-    #[cfg(feature = "unstable")]
     tests::timeout::test_timeout_submit_args(&mut ring, &test)?;
 
     // net
     tests::net::test_tcp_write_read(&mut ring, &test)?;
     tests::net::test_tcp_writev_readv(&mut ring, &test)?;
     tests::net::test_tcp_send_recv(&mut ring, &test)?;
-    #[cfg(feature = "unstable")]
     tests::net::test_tcp_zero_copy_send_recv(&mut ring, &test)?;
     tests::net::test_tcp_sendmsg_recvmsg(&mut ring, &test)?;
     tests::net::test_tcp_accept(&mut ring, &test)?;
     tests::net::test_tcp_connect(&mut ring, &test)?;
-    #[cfg(feature = "unstable")]
     tests::net::test_tcp_buffer_select(&mut ring, &test)?;
 
     // queue

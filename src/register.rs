@@ -104,20 +104,15 @@ impl Drop for Probe {
 
 /// An allowed feature of io_uring. You can set the allowed features with
 /// [`register_restrictions`](crate::Submitter::register_restrictions).
-///
-/// Requires the `unstable` feature.
-#[cfg(feature = "unstable")]
 #[repr(transparent)]
 pub struct Restriction(sys::io_uring_restriction);
 
 /// inline zeroed to improve codegen
-#[cfg(feature = "unstable")]
 #[inline(always)]
 fn res_zeroed() -> sys::io_uring_restriction {
     unsafe { std::mem::zeroed() }
 }
 
-#[cfg(feature = "unstable")]
 impl Restriction {
     /// Allow an `io_uring_register` opcode.
     pub fn register_op(op: u8) -> Restriction {
@@ -158,5 +153,4 @@ impl Restriction {
 ///
 /// File descriptors can be skipped if they are set to `SKIP_FILE`.
 /// Skipping an fd will not touch the file associated with the previous fd at that index.
-#[cfg(feature = "unstable")]
 pub const SKIP_FILE: RawFd = sys::IORING_REGISTER_FILES_SKIP;

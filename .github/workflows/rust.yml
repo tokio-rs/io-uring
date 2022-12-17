@@ -25,7 +25,7 @@ jobs:
         with:
           command: test
           use-cross: true
-          args: --features unstable --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }}
       - uses: actions-rs/cargo@v1
         with:
           command: run
@@ -80,7 +80,7 @@ jobs:
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --target ${{ matrix.target }} --features unstable
+          args: --target ${{ matrix.target }}
 
 
   fmt:
