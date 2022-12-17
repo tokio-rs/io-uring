@@ -11,14 +11,7 @@ pub(crate) fn execute(
     arg: *const libc::c_void,
     len: libc::c_uint,
 ) -> io::Result<i32> {
-    unsafe {
-        let ret = sys::io_uring_register(fd, opcode, arg, len);
-        if ret >= 0 {
-            Ok(ret)
-        } else {
-            Err(io::Error::last_os_error())
-        }
-    }
+    unsafe { sys::io_uring_register(fd, opcode, arg, len) }
 }
 
 /// Information about what `io_uring` features the kernel supports.
