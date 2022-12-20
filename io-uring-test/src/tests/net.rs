@@ -590,7 +590,12 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqe.user_data(), 0x2a);
     assert_eq!(cqe.result(), 1);
 
-    // remove bufs fail
+    /* Disabled because results vary between kernels 5.15 and 6.1. See last two lines.
+     * In summary, removing this buffer group should also be a valid operation and doing so
+     * on a 6.1 kernel does succeed. But on a 5.15 kernel, it fails. I don't really know why
+     * but I'm willing to chalk it up to lots of uring fixes went in in preparation for 6.1.
+
+    // remove a different buf group
     let remove_bufs_e = opcode::RemoveBuffers::new(1, 0xdeaf);
 
     unsafe {
@@ -603,6 +608,23 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
     assert_eq!(cqe.user_data(), 0x2b);
+    assert_eq!(cqe.result(), -libc::ENOENT); // Valid assertion for kernel 5.15
+    assert_eq!(cqe.result(), 1);             // Valid assertion for kernel 6.1
+     */
+
+    // remove bufs fail
+    let remove_bufs_e = opcode::RemoveBuffers::new(1, 0xbad);
+
+    unsafe {
+        ring.submission()
+            .push(&remove_bufs_e.build().user_data(0x2c).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x2c);
     assert_eq!(cqe.result(), -libc::ENOENT);
 
     Ok(())
