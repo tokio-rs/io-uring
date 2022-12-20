@@ -11,14 +11,7 @@ pub(crate) fn execute(
     arg: *const libc::c_void,
     len: libc::c_uint,
 ) -> io::Result<i32> {
-    unsafe {
-        let ret = sys::io_uring_register(fd, opcode, arg, len);
-        if ret >= 0 {
-            Ok(ret)
-        } else {
-            Err(io::Error::last_os_error())
-        }
-    }
+    unsafe { sys::io_uring_register(fd, opcode, arg, len) }
 }
 
 /// Information about what `io_uring` features the kernel supports.
@@ -111,20 +104,15 @@ impl Drop for Probe {
 
 /// An allowed feature of io_uring. You can set the allowed features with
 /// [`register_restrictions`](crate::Submitter::register_restrictions).
-///
-/// Requires the `unstable` feature.
-#[cfg(feature = "unstable")]
 #[repr(transparent)]
 pub struct Restriction(sys::io_uring_restriction);
 
 /// inline zeroed to improve codegen
-#[cfg(feature = "unstable")]
 #[inline(always)]
 fn res_zeroed() -> sys::io_uring_restriction {
     unsafe { std::mem::zeroed() }
 }
 
-#[cfg(feature = "unstable")]
 impl Restriction {
     /// Allow an `io_uring_register` opcode.
     pub fn register_op(op: u8) -> Restriction {
@@ -165,5 +153,4 @@ impl Restriction {
 ///
 /// File descriptors can be skipped if they are set to `SKIP_FILE`.
 /// Skipping an fd will not touch the file associated with the previous fd at that index.
-#[cfg(feature = "unstable")]
 pub const SKIP_FILE: RawFd = sys::IORING_REGISTER_FILES_SKIP;

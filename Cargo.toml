@@ -1,6 +1,6 @@
 [package]
 name = "io-uring"
-version = "0.5.2"
+version = "0.5.10"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -20,6 +20,7 @@ members = [ "io-uring-test", "io-uring-bench" ]
 unstable = []
 overwrite = [ "bindgen" ]
 direct-syscall = [ "sc" ]
+io_safety = []
 
 [dependencies]
 bitflags = "1"
@@ -27,12 +28,9 @@ libc = { version = "0.2.98", default-features = false }
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]
-bindgen = { version = "0.59", optional = true }
+bindgen = { version = "0.61", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
 socket2 = "0.4"
 slab = "0.4"
-
-[package.metadata.docs.rs]
-features = [ "unstable" ]

@@ -1,12 +1,15 @@
 use crate::Test;
-use io_uring::{opcode, types, IoUring};
+use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use std::fs::File;
 use std::io::{self, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::thread;
 use std::time::Duration;
 
-pub fn test_eventfd_poll(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_eventfd_poll<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::PollAdd::CODE);
@@ -29,7 +32,7 @@ pub fn test_eventfd_poll(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x04))
+            .push(&poll_e.build().user_data(0x04).into())
             .expect("queue is full");
     }
 
@@ -40,7 +43,7 @@ pub fn test_eventfd_poll(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
     fd.write_all(&0x1u64.to_ne_bytes())?;
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x04);
@@ -49,7 +52,10 @@ pub fn test_eventfd_poll(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
     Ok(())
 }
 
-pub fn test_eventfd_poll_remove(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_eventfd_poll_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::PollAdd::CODE);
@@ -75,7 +81,7 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring, test: &Test) -> anyhow::Resu
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x05))
+            .push(&poll_e.build().user_data(0x05).into())
             .expect("queue is full");
     }
 
@@ -88,7 +94,7 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring, test: &Test) -> anyhow::Resu
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x06))
+            .push(&poll_e.build().user_data(0x06).into())
             .expect("queue is full");
     }
 
@@ -99,7 +105,7 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring, test: &Test) -> anyhow::Resu
     fd.write_all(&0x1u64.to_ne_bytes())?;
     ring.submit_and_wait(2)?;
 
-    let mut cqes = ring.completion().collect::<Vec<_>>();
+    let mut cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
     cqes.sort_by_key(|cqe| cqe.user_data());
 
     assert_eq!(cqes.len(), 2);
@@ -111,7 +117,10 @@ pub fn test_eventfd_poll_remove(ring: &mut IoUring, test: &Test) -> anyhow::Resu
     Ok(())
 }
 
-pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_eventfd_poll_remove_failed<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::PollAdd::CODE);
@@ -137,7 +146,7 @@ pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring, test: &Test) -> anyho
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x07))
+            .push(&poll_e.build().user_data(0x07).into())
             .expect("queue is full");
     }
 
@@ -152,13 +161,13 @@ pub fn test_eventfd_poll_remove_failed(ring: &mut IoUring, test: &Test) -> anyho
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x08))
+            .push(&poll_e.build().user_data(0x08).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(2)?;
 
-    let mut cqes = ring.completion().collect::<Vec<_>>();
+    let mut cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
     cqes.sort_by_key(|cqe| cqe.user_data());
 
     assert_eq!(cqes.len(), 2);

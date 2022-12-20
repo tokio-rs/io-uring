@@ -7,7 +7,27 @@
 )]
 #![allow(clippy::unreadable_literal, clippy::missing_safety_doc)]
 
+use std::io;
+
 use libc::*;
+
+#[cfg(feature = "direct-syscall")]
+fn to_result(ret: c_int) -> io::Result<c_int> {
+    if ret >= 0 {
+        Ok(ret)
+    } else {
+        Err(io::Error::from_raw_os_error(-ret))
+    }
+}
+
+#[cfg(not(feature = "direct-syscall"))]
+fn to_result(ret: c_int) -> io::Result<c_int> {
+    if ret >= 0 {
+        Ok(ret)
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
 
 #[cfg(all(feature = "bindgen", not(feature = "overwrite")))]
 include!(concat!(env!("OUT_DIR"), "/sys.rs"));
@@ -42,14 +62,14 @@ pub unsafe fn io_uring_register(
     opcode: c_uint,
     arg: *const c_void,
     nr_args: c_uint,
-) -> c_int {
-    syscall(
+) -> io::Result<c_int> {
+    to_result(syscall(
         SYSCALL_REGISTER,
         fd as c_long,
         opcode as c_long,
         arg as c_long,
         nr_args as c_long,
-    ) as _
+    ) as _)
 }
 
 #[cfg(feature = "direct-syscall")]
@@ -58,24 +78,24 @@ pub unsafe fn io_uring_register(
     opcode: c_uint,
     arg: *const c_void,
     nr_args: c_uint,
-) -> c_int {
-    sc::syscall4(
+) -> io::Result<c_int> {
+    to_result(sc::syscall4(
         SYSCALL_REGISTER as usize,
         fd as usize,
         opcode as usize,
         arg as usize,
         nr_args as usize,
-    ) as _
+    ) as _)
 }
 
 #[cfg(not(feature = "direct-syscall"))]
-pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int {
-    syscall(SYSCALL_SETUP, entries as c_long, p as c_long) as _
+pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> io::Result<c_int> {
+    to_result(syscall(SYSCALL_SETUP, entries as c_long, p as c_long) as _)
 }
 
 #[cfg(feature = "direct-syscall")]
-pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> c_int {
-    sc::syscall2(SYSCALL_SETUP as usize, entries as usize, p as usize) as _
+pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> io::Result<c_int> {
+    to_result(sc::syscall2(SYSCALL_SETUP as usize, entries as usize, p as usize) as _)
 }
 
 #[cfg(not(feature = "direct-syscall"))]
@@ -86,8 +106,8 @@ pub unsafe fn io_uring_enter(
     flags: c_uint,
     arg: *const libc::c_void,
     size: usize,
-) -> c_int {
-    syscall(
+) -> io::Result<c_int> {
+    to_result(syscall(
         SYSCALL_ENTER,
         fd as c_long,
         to_submit as c_long,
@@ -95,7 +115,7 @@ pub unsafe fn io_uring_enter(
         flags as c_long,
         arg as c_long,
         size as c_long,
-    ) as _
+    ) as _)
 }
 
 #[cfg(feature = "direct-syscall")]
@@ -106,8 +126,8 @@ pub unsafe fn io_uring_enter(
     flags: c_uint,
     arg: *const libc::c_void,
     size: usize,
-) -> c_int {
-    sc::syscall6(
+) -> io::Result<c_int> {
+    to_result(sc::syscall6(
         SYSCALL_ENTER as usize,
         fd as usize,
         to_submit as usize,
@@ -115,5 +135,5 @@ pub unsafe fn io_uring_enter(
         flags as usize,
         arg as usize,
         size,
-    ) as _
+    ) as _)
 }

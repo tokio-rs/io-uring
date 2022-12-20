@@ -1,13 +1,16 @@
 use crate::utils;
 use crate::Test;
-use io_uring::{opcode, types, IoUring};
+use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use std::ffi::CString;
 use std::fs;
 use std::io::Write;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 
-pub fn test_file_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_file_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Write::CODE);
@@ -24,7 +27,10 @@ pub fn test_file_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<(
     Ok(())
 }
 
-pub fn test_file_writev_readv(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_file_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Writev::CODE);
@@ -41,7 +47,10 @@ pub fn test_file_writev_readv(ring: &mut IoUring, test: &Test) -> anyhow::Result
     Ok(())
 }
 
-pub fn test_file_fsync(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_file_fsync<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Fsync::CODE);
@@ -59,13 +68,13 @@ pub fn test_file_fsync(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     unsafe {
         ring.submission()
-            .push(&fsync_e.build().user_data(0x03))
+            .push(&fsync_e.build().user_data(0x03).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x03);
@@ -74,7 +83,10 @@ pub fn test_file_fsync(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_file_fsync_file_range(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_file_fsync_file_range<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::SyncFileRange::CODE);
@@ -94,13 +106,13 @@ pub fn test_file_fsync_file_range(ring: &mut IoUring, test: &Test) -> anyhow::Re
 
     unsafe {
         ring.submission()
-            .push(&fsync_e.build().user_data(0x04))
+            .push(&fsync_e.build().user_data(0x04).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x04);
@@ -109,7 +121,11 @@ pub fn test_file_fsync_file_range(ring: &mut IoUring, test: &Test) -> anyhow::Re
     Ok(())
 }
 
-pub fn test_file_fallocate(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+#[allow(deprecated)]
+pub fn test_file_fallocate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Fallocate::CODE);
@@ -124,13 +140,13 @@ pub fn test_file_fallocate(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
 
     unsafe {
         ring.submission()
-            .push(&falloc_e.build().user_data(0x10))
+            .push(&falloc_e.build().user_data(0x10).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x10);
@@ -139,7 +155,43 @@ pub fn test_file_fallocate(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
     Ok(())
 }
 
-pub fn test_file_openat2(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_file_fallocate64<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Fallocate64::CODE);
+    );
+
+    println!("test file_fallocate64");
+
+    let fd = tempfile::tempfile()?;
+    let fd = types::Fd(fd.as_raw_fd());
+
+    let falloc_e = opcode::Fallocate64::new(fd, 1024);
+
+    unsafe {
+        ring.submission()
+            .push(&falloc_e.build().user_data(0x20).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x20);
+    assert_eq!(cqes[0].result(), 0);
+
+    Ok(())
+}
+
+pub fn test_file_openat2<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::OpenAt2::CODE);
@@ -160,13 +212,13 @@ pub fn test_file_openat2(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
 
     unsafe {
         ring.submission()
-            .push(&open_e.build().user_data(0x11))
+            .push(&open_e.build().user_data(0x11).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x11);
@@ -179,7 +231,10 @@ pub fn test_file_openat2(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
     Ok(())
 }
 
-pub fn test_file_close(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_file_close<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Close::CODE);
@@ -194,13 +249,13 @@ pub fn test_file_close(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     unsafe {
         ring.submission()
-            .push(&close_e.build().user_data(0x12))
+            .push(&close_e.build().user_data(0x12).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x12);
@@ -209,7 +264,10 @@ pub fn test_file_close(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_file_cur_pos(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Write::CODE);
@@ -228,7 +286,8 @@ pub fn test_file_cur_pos(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
     let write_e = opcode::Write::new(fd, text.as_ptr(), 22)
         .offset(-1)
         .build()
-        .user_data(0x01);
+        .user_data(0x01)
+        .into();
 
     unsafe {
         ring.submission().push(&write_e).expect("queue is full");
@@ -239,7 +298,8 @@ pub fn test_file_cur_pos(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
     let write_e = opcode::Write::new(fd, unsafe { text.as_ptr().add(22) }, 22)
         .offset(-1)
         .build()
-        .user_data(0x02);
+        .user_data(0x02)
+        .into();
 
     unsafe {
         ring.submission().push(&write_e).expect("queue is full");
@@ -251,13 +311,13 @@ pub fn test_file_cur_pos(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
 
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x03))
+            .push(&read_e.build().user_data(0x03).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(3)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 3);
     assert_eq!(cqes[0].user_data(), 0x01);
@@ -274,7 +334,10 @@ pub fn test_file_cur_pos(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> 
 
 /// Skip ci, because statx does not exist in old release.
 #[cfg(not(feature = "ci"))]
-pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Statx::CODE);
@@ -296,7 +359,8 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     )
     .mask(libc::STATX_ALL)
     .build()
-    .user_data(0x99);
+    .user_data(0x99)
+    .into();
 
     unsafe {
         ring.submission().push(&statx_e).expect("queue is full");
@@ -304,7 +368,7 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x99);
@@ -337,7 +401,8 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     .flags(libc::AT_EMPTY_PATH)
     .mask(libc::STATX_ALL)
     .build()
-    .user_data(0x9a);
+    .user_data(0x9a)
+    .into();
 
     unsafe {
         ring.submission().push(&statx_e).expect("queue is full");
@@ -345,7 +410,7 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x9a);
@@ -358,7 +423,10 @@ pub fn test_statx(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
 /// Skip ci, because direct IO does not work on qemu.
 #[cfg(not(feature = "ci"))]
-pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     use std::os::unix::fs::OpenOptionsExt;
     use tempfile::TempDir;
 
@@ -392,7 +460,7 @@ pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::R
 
     unsafe {
         ring.submission()
-            .push(&write_e.build().user_data(0x01))
+            .push(&write_e.build().user_data(0x01).into())
             .expect("queue is full");
     }
 
@@ -400,13 +468,13 @@ pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::R
 
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x02))
+            .push(&read_e.build().user_data(0x02).into())
             .expect("queue is full");
     }
 
     assert_eq!(ring.submit_and_wait(2)?, 1);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
@@ -425,13 +493,13 @@ pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::R
 
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x03))
+            .push(&read_e.build().user_data(0x03).into())
             .expect("queue is full");
     }
 
     assert_eq!(ring.submit_and_wait(1)?, 1);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x03);
@@ -440,7 +508,10 @@ pub fn test_file_direct_write_read(ring: &mut IoUring, test: &Test) -> anyhow::R
     Ok(())
 }
 
-pub fn test_file_splice(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_file_splice<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     use std::io::Read;
 
     require!(
@@ -477,13 +548,13 @@ pub fn test_file_splice(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     unsafe {
         ring.submission()
-            .push(&splice_e.build().user_data(0x33))
+            .push(&splice_e.build().user_data(0x33).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x33);

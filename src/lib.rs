@@ -14,22 +14,32 @@ mod submit;
 mod sys;
 pub mod types;
 
-use std::convert::TryInto;
+use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::{cmp, io, mem};
 
+#[cfg(feature = "io_safety")]
+use std::os::unix::io::{AsFd, BorrowedFd};
+
 pub use cqueue::CompletionQueue;
+use cqueue::Sealed as _;
 pub use register::Probe;
+use squeue::Sealed as _;
 pub use squeue::SubmissionQueue;
 pub use submit::Submitter;
-use util::{Fd, Mmap};
+use util::{Mmap, OwnedFd};
 
 /// IoUring instance
-pub struct IoUring {
-    sq: squeue::Inner,
-    cq: cqueue::Inner,
-    fd: Fd,
+///
+/// - `S`: The ring's submission queue entry (SQE) type, either [`squeue::Entry`] or
+///   [`squeue::Entry128`];
+/// - `C`: The ring's completion queue entry (CQE) type, either [`cqueue::Entry`] or
+///   [`cqueue::Entry32`].
+pub struct IoUring<S: squeue::EntryMarker = squeue::Entry, C: cqueue::EntryMarker = cqueue::Entry> {
+    sq: squeue::Inner<S>,
+    cq: cqueue::Inner<C>,
+    fd: OwnedFd,
     params: Parameters,
     memory: ManuallyDrop<MemoryMap>,
 }
@@ -43,37 +53,77 @@ struct MemoryMap {
 
 /// IoUring build params
 #[derive(Clone, Default)]
-pub struct Builder {
+pub struct Builder<S: squeue::EntryMarker = squeue::Entry, C: cqueue::EntryMarker = cqueue::Entry> {
     dontfork: bool,
     params: sys::io_uring_params,
+    phantom: PhantomData<(S, C)>,
 }
 
 /// The parameters that were used to construct an [`IoUring`].
 #[derive(Clone)]
 pub struct Parameters(sys::io_uring_params);
 
-unsafe impl Send for IoUring {}
-unsafe impl Sync for IoUring {}
+unsafe impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Send for IoUring<S, C> {}
+unsafe impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Sync for IoUring<S, C> {}
 
-impl IoUring {
+impl IoUring<squeue::Entry, cqueue::Entry> {
     /// Create a new `IoUring` instance with default configuration parameters. See [`Builder`] to
     /// customize it further.
     ///
     /// The `entries` sets the size of queue,
     /// and its value should be the power of two.
-    pub fn new(entries: u32) -> io::Result<IoUring> {
-        IoUring::with_params(entries, Default::default())
+    pub fn new(entries: u32) -> io::Result<Self> {
+        Self::builder().build(entries)
     }
 
     /// Create a [`Builder`] for an `IoUring` instance.
     ///
     /// This allows for further customization than [`new`](Self::new).
     #[must_use]
-    pub fn builder() -> Builder {
-        Builder::default()
+    pub fn builder() -> Builder<squeue::Entry, cqueue::Entry> {
+        Builder {
+            dontfork: false,
+            params: sys::io_uring_params {
+                flags: squeue::Entry::ADDITIONAL_FLAGS | cqueue::Entry::ADDITIONAL_FLAGS,
+                ..Default::default()
+            },
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
+    /// Create a new `IoUring` instance with default configuration parameters. See [`Builder`] to
+    /// customize it further.
+    ///
+    /// The `entries` sets the size of queue,
+    /// and its value should be the power of two.
+    ///
+    /// Unlike [`IoUring::new`], this function is available for any combination of submission queue
+    /// entry (SQE) and completion queue entry (CQE) types.
+    pub fn generic_new(entries: u32) -> io::Result<Self> {
+        Self::generic_builder().build(entries)
     }
 
-    fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<IoUring> {
+    /// Create a [`Builder`] for an `IoUring` instance.
+    ///
+    /// This allows for further customization than [`generic_new`](Self::generic_new).
+    ///
+    /// Unlike [`IoUring::builder`], this function is available for any combination of submission
+    /// queue entry (SQE) and completion queue entry (CQE) types.
+    #[must_use]
+    pub fn generic_builder() -> Builder<S, C> {
+        Builder {
+            dontfork: false,
+            params: sys::io_uring_params {
+                flags: S::ADDITIONAL_FLAGS | C::ADDITIONAL_FLAGS,
+                ..Default::default()
+            },
+            phantom: PhantomData,
+        }
+    }
+
+    fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<Self> {
         // NOTE: The `SubmissionQueue` and `CompletionQueue` are references,
         // and their lifetime can never exceed `MemoryMap`.
         //
@@ -82,14 +132,13 @@ impl IoUring {
         //
         // I really hope that Rust can safely use self-reference types.
         #[inline]
-        unsafe fn setup_queue(
-            fd: &Fd,
+        unsafe fn setup_queue<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+            fd: &OwnedFd,
             p: &sys::io_uring_params,
-        ) -> io::Result<(MemoryMap, squeue::Inner, cqueue::Inner)> {
+        ) -> io::Result<(MemoryMap, squeue::Inner<S>, cqueue::Inner<C>)> {
             let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
-            let cq_len = p.cq_off.cqes as usize
-                + p.cq_entries as usize * mem::size_of::<sys::io_uring_cqe>();
-            let sqe_len = p.sq_entries as usize * mem::size_of::<sys::io_uring_sqe>();
+            let cq_len = p.cq_off.cqes as usize + p.cq_entries as usize * mem::size_of::<C>();
+            let sqe_len = p.sq_entries as usize * mem::size_of::<S>();
             let sqe_mmap = Mmap::new(fd, sys::IORING_OFF_SQES as _, sqe_len)?;
 
             if p.features & sys::IORING_FEAT_SINGLE_MMAP != 0 {
@@ -121,11 +170,8 @@ impl IoUring {
             }
         }
 
-        let fd: Fd = unsafe {
-            sys::io_uring_setup(entries, &mut p)
-                .try_into()
-                .map_err(|_| io::Error::last_os_error())?
-        };
+        let fd: OwnedFd =
+            unsafe { sys::io_uring_setup(entries, &mut p).map(|fd| OwnedFd::from_raw_fd(fd))? };
 
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
@@ -177,7 +223,13 @@ impl IoUring {
     /// please note that you need to `drop` or `sync` the queue before and after submit,
     /// otherwise the queue will not be updated.
     #[inline]
-    pub fn split(&mut self) -> (Submitter<'_>, SubmissionQueue<'_>, CompletionQueue<'_>) {
+    pub fn split(
+        &mut self,
+    ) -> (
+        Submitter<'_>,
+        SubmissionQueue<'_, S>,
+        CompletionQueue<'_, C>,
+    ) {
         let submit = Submitter::new(
             &self.fd,
             &self.params,
@@ -191,7 +243,7 @@ impl IoUring {
     /// Get the submission queue of the io_uring instance. This is used to send I/O requests to the
     /// kernel.
     #[inline]
-    pub fn submission(&mut self) -> SubmissionQueue<'_> {
+    pub fn submission(&mut self) -> SubmissionQueue<'_, S> {
         self.sq.borrow()
     }
 
@@ -201,14 +253,14 @@ impl IoUring {
     ///
     /// No other [`SubmissionQueue`]s may exist when calling this function.
     #[inline]
-    pub unsafe fn submission_shared(&self) -> SubmissionQueue<'_> {
+    pub unsafe fn submission_shared(&self) -> SubmissionQueue<'_, S> {
         self.sq.borrow_shared()
     }
 
     /// Get completion queue of the io_uring instance. This is used to receive I/O completion
     /// events from the kernel.
     #[inline]
-    pub fn completion(&mut self) -> CompletionQueue<'_> {
+    pub fn completion(&mut self) -> CompletionQueue<'_, C> {
         self.cq.borrow()
     }
 
@@ -218,12 +270,12 @@ impl IoUring {
     ///
     /// No other [`CompletionQueue`]s may exist when calling this function.
     #[inline]
-    pub unsafe fn completion_shared(&self) -> CompletionQueue<'_> {
+    pub unsafe fn completion_shared(&self) -> CompletionQueue<'_, C> {
         self.cq.borrow_shared()
     }
 }
 
-impl Drop for IoUring {
+impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Drop for IoUring<S, C> {
     fn drop(&mut self) {
         // Ensure that `MemoryMap` is released before `fd`.
         unsafe {
@@ -232,7 +284,7 @@ impl Drop for IoUring {
     }
 }
 
-impl Builder {
+impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// Do not make this io_uring instance accessible by child processes after a fork.
     pub fn dontfork(&mut self) -> &mut Self {
         self.dontfork = true;
@@ -302,17 +354,19 @@ impl Builder {
     /// events. You are only able to [register restrictions](Submitter::register_restrictions) when
     /// the rings are disabled due to concurrency issues. You can enable the rings with
     /// [`Submitter::register_enable_rings`].
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn setup_r_disabled(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_R_DISABLED;
         self
     }
 
+    pub fn setup_coop_taskrun(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_COOP_TASKRUN;
+        self
+    }
+
     /// Build an [IoUring], with the specified number of entries in the submission queue and
     /// completion queue unless [`setup_cqsize`](Self::setup_cqsize) has been called.
-    pub fn build(&self, entries: u32) -> io::Result<IoUring> {
+    pub fn build(&self, entries: u32) -> io::Result<IoUring<S, C>> {
         let ring = IoUring::with_params(entries, self.params)?;
 
         if self.dontfork {
@@ -387,9 +441,6 @@ impl Parameters {
     /// See [the commit message that introduced
     /// it](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=d7718a9d25a61442da8ee8aeeff6a0097f0ccfd6)
     /// for more details.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn is_feature_fast_poll(&self) -> bool {
         self.0.features & sys::IORING_FEAT_FAST_POLL != 0
     }
@@ -400,17 +451,14 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
     }
 
-    #[cfg(feature = "unstable")]
     pub fn is_feature_sqpoll_nonfixed(&self) -> bool {
         self.0.features & sys::IORING_FEAT_SQPOLL_NONFIXED != 0
     }
 
-    #[cfg(feature = "unstable")]
     pub fn is_feature_ext_arg(&self) -> bool {
         self.0.features & sys::IORING_FEAT_EXT_ARG != 0
     }
 
-    #[cfg(feature = "unstable")]
     pub fn is_feature_native_workers(&self) -> bool {
         self.0.features & sys::IORING_FEAT_NATIVE_WORKERS != 0
     }
@@ -446,8 +494,15 @@ impl std::fmt::Debug for Parameters {
     }
 }
 
-impl AsRawFd for IoUring {
+impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> AsRawFd for IoUring<S, C> {
     fn as_raw_fd(&self) -> RawFd {
         self.fd.as_raw_fd()
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl AsFd for IoUring {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.fd.as_fd()
     }
 }

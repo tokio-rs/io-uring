@@ -2,6 +2,7 @@
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::mem;
 use std::sync::atomic;
 
 use crate::sys;
@@ -9,7 +10,7 @@ use crate::util::{unsync_load, Mmap};
 
 use bitflags::bitflags;
 
-pub(crate) struct Inner {
+pub(crate) struct Inner<E: EntryMarker> {
     pub(crate) head: *const atomic::AtomicU32,
     pub(crate) tail: *const atomic::AtomicU32,
     pub(crate) ring_mask: u32,
@@ -17,22 +18,48 @@ pub(crate) struct Inner {
     pub(crate) flags: *const atomic::AtomicU32,
     dropped: *const atomic::AtomicU32,
 
-    pub(crate) sqes: *mut sys::io_uring_sqe,
+    pub(crate) sqes: *mut E,
 }
 
 /// An io_uring instance's submission queue. This is used to send I/O requests to the kernel.
-pub struct SubmissionQueue<'a> {
+pub struct SubmissionQueue<'a, E: EntryMarker = Entry> {
     head: u32,
     tail: u32,
-    queue: &'a Inner,
+    queue: &'a Inner<E>,
 }
 
-/// An entry in the submission queue, representing a request for an I/O operation.
+pub(crate) use private::Sealed;
+mod private {
+    /// Private trait that we use as a supertrait of `EntryMarker` to prevent it from being
+    /// implemented from outside this crate: https://jack.wrenn.fyi/blog/private-trait-methods/
+    pub trait Sealed {
+        const ADDITIONAL_FLAGS: u32;
+    }
+}
+
+/// A submission queue entry (SQE), representing a request for an I/O operation.
 ///
-/// These can be created via the opcodes in [`opcode`](crate::opcode).
-#[repr(transparent)]
-#[derive(Clone)]
+/// This is implemented for [`Entry`] and [`Entry128`].
+pub trait EntryMarker: Clone + Debug + From<Entry> + Sealed {}
+
+/// A 64-byte submission queue entry (SQE), representing a request for an I/O operation.
+///
+/// These can be created via opcodes in [`opcode`](crate::opcode).
+#[repr(C)]
 pub struct Entry(pub(crate) sys::io_uring_sqe);
+
+/// A 128-byte submission queue entry (SQE), representing a request for an I/O operation.
+///
+/// These can be created via opcodes in [`opcode`](crate::opcode).
+#[repr(C)]
+#[derive(Clone)]
+pub struct Entry128(pub(crate) Entry, pub(crate) [u8; 64]);
+
+#[test]
+fn test_entry_sizes() {
+    assert_eq!(mem::size_of::<Entry>(), 64);
+    assert_eq!(mem::size_of::<Entry128>(), 128);
+}
 
 bitflags! {
     /// Submission flags
@@ -87,14 +114,14 @@ bitflags! {
         ///
         /// See also [the LWN thread on automatic buffer
         /// selection](https://lwn.net/Articles/815491/).
-        ///
-        /// Requires the `unstable` feature.
-        #[cfg(feature = "unstable")]
         const BUFFER_SELECT = 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+
+        /// Don't post CQE if request succeeded.
+        const SKIP_SUCCESS = 1 << sys::IOSQE_CQE_SKIP_SUCCESS_BIT;
     }
 }
 
-impl Inner {
+impl<E: EntryMarker> Inner<E> {
     #[rustfmt::skip]
     pub(crate) unsafe fn new(
         sq_mmap: &Mmap,
@@ -109,7 +136,7 @@ impl Inner {
         let dropped      = sq_mmap.offset(p.sq_off.dropped     ) as *const atomic::AtomicU32;
         let array        = sq_mmap.offset(p.sq_off.array       ) as *mut u32;
 
-        let sqes         = sqe_mmap.as_mut_ptr() as *mut sys::io_uring_sqe;
+        let sqes         = sqe_mmap.as_mut_ptr() as *mut E;
 
         // To keep it simple, map it directly to `sqes`.
         for i in 0..ring_entries {
@@ -128,7 +155,7 @@ impl Inner {
     }
 
     #[inline]
-    pub(crate) unsafe fn borrow_shared(&self) -> SubmissionQueue<'_> {
+    pub(crate) unsafe fn borrow_shared(&self) -> SubmissionQueue<'_, E> {
         SubmissionQueue {
             head: (*self.head).load(atomic::Ordering::Acquire),
             tail: unsync_load(self.tail),
@@ -137,12 +164,12 @@ impl Inner {
     }
 
     #[inline]
-    pub(crate) fn borrow(&mut self) -> SubmissionQueue<'_> {
+    pub(crate) fn borrow(&mut self) -> SubmissionQueue<'_, E> {
         unsafe { self.borrow_shared() }
     }
 }
 
-impl SubmissionQueue<'_> {
+impl<E: EntryMarker> SubmissionQueue<'_, E> {
     /// Synchronize this type with the real submission queue.
     ///
     /// This will flush any entries added by [`push`](Self::push) or
@@ -203,28 +230,24 @@ impl SubmissionQueue<'_> {
         self.len() == self.capacity()
     }
 
-    /// Attempts to push an [`Entry`] into the queue.
+    /// Attempts to push an entry into the queue.
     /// If the queue is full, an error is returned.
     ///
     /// # Safety
     ///
-    /// Developers must ensure that parameters of the [`Entry`] (such as buffer) are valid and will
+    /// Developers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     #[inline]
-    pub unsafe fn push(&mut self, Entry(entry): &Entry) -> Result<(), PushError> {
+    pub unsafe fn push(&mut self, entry: &E) -> Result<(), PushError> {
         if !self.is_full() {
-            *self
-                .queue
-                .sqes
-                .add((self.tail & self.queue.ring_mask) as usize) = *entry;
-            self.tail = self.tail.wrapping_add(1);
+            self.push_unchecked(entry);
             Ok(())
         } else {
             Err(PushError)
         }
     }
 
-    /// Attempts to push several [entries](Entry) into the queue.
+    /// Attempts to push several entries into the queue.
     /// If the queue does not have space for all of the entries, an error is returned.
     ///
     /// # Safety
@@ -232,26 +255,30 @@ impl SubmissionQueue<'_> {
     /// Developers must ensure that parameters of all the entries (such as buffer) are valid and
     /// will be valid for the entire duration of the operation, otherwise it may cause memory
     /// problems.
-    #[cfg(feature = "unstable")]
     #[inline]
-    pub unsafe fn push_multiple(&mut self, entries: &[Entry]) -> Result<(), PushError> {
+    pub unsafe fn push_multiple(&mut self, entries: &[E]) -> Result<(), PushError> {
         if self.capacity() - self.len() < entries.len() {
             return Err(PushError);
         }
 
-        for Entry(entry) in entries {
-            *self
-                .queue
-                .sqes
-                .add((self.tail & self.queue.ring_mask) as usize) = *entry;
-            self.tail = self.tail.wrapping_add(1);
+        for entry in entries {
+            self.push_unchecked(entry);
         }
 
         Ok(())
     }
+
+    #[inline]
+    unsafe fn push_unchecked(&mut self, entry: &E) {
+        *self
+            .queue
+            .sqes
+            .add((self.tail & self.queue.ring_mask) as usize) = entry.clone();
+        self.tail = self.tail.wrapping_add(1);
+    }
 }
 
-impl Drop for SubmissionQueue<'_> {
+impl<E: EntryMarker> Drop for SubmissionQueue<'_, E> {
     #[inline]
     fn drop(&mut self) {
         unsafe { &*self.queue.tail }.store(self.tail, atomic::Ordering::Release);
@@ -276,12 +303,78 @@ impl Entry {
 
     /// Set the personality of this event. You can obtain a personality using
     /// [`Submitter::register_personality`](crate::Submitter::register_personality).
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn personality(mut self, personality: u16) -> Entry {
         self.0.personality = personality;
         self
+    }
+}
+
+impl Sealed for Entry {
+    const ADDITIONAL_FLAGS: u32 = 0;
+}
+
+impl EntryMarker for Entry {}
+
+impl Clone for Entry {
+    fn clone(&self) -> Entry {
+        // io_uring_sqe doesn't implement Clone due to the 'cmd' incomplete array field.
+        Entry(unsafe { mem::transmute_copy(&self.0) })
+    }
+}
+
+impl Debug for Entry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Entry")
+            .field("op_code", &self.0.opcode)
+            .field("flags", &self.0.flags)
+            .field("user_data", &self.0.user_data)
+            .finish()
+    }
+}
+
+impl Entry128 {
+    /// Set the submission event's [flags](Flags).
+    #[inline]
+    pub fn flags(mut self, flags: Flags) -> Entry128 {
+        self.0 .0.flags |= flags.bits();
+        self
+    }
+
+    /// Set the user data. This is an application-supplied value that will be passed straight
+    /// through into the [completion queue entry](crate::cqueue::Entry::user_data).
+    #[inline]
+    pub fn user_data(mut self, user_data: u64) -> Entry128 {
+        self.0 .0.user_data = user_data;
+        self
+    }
+
+    /// Set the personality of this event. You can obtain a personality using
+    /// [`Submitter::register_personality`](crate::Submitter::register_personality).
+    pub fn personality(mut self, personality: u16) -> Entry128 {
+        self.0 .0.personality = personality;
+        self
+    }
+}
+
+impl Sealed for Entry128 {
+    const ADDITIONAL_FLAGS: u32 = sys::IORING_SETUP_SQE128;
+}
+
+impl EntryMarker for Entry128 {}
+
+impl From<Entry> for Entry128 {
+    fn from(entry: Entry) -> Entry128 {
+        Entry128(entry, [0u8; 64])
+    }
+}
+
+impl Debug for Entry128 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Entry128")
+            .field("op_code", &self.0 .0.opcode)
+            .field("flags", &self.0 .0.flags)
+            .field("user_data", &self.0 .0.user_data)
+            .finish()
     }
 }
 
@@ -298,24 +391,12 @@ impl Display for PushError {
 
 impl Error for PushError {}
 
-impl Debug for Entry {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Entry")
-            .field("op_code", &self.0.opcode)
-            .field("flags", &self.0.flags)
-            .field("user_data", &self.0.user_data)
-            .finish()
-    }
-}
-
-impl Debug for SubmissionQueue<'_> {
+impl<E: EntryMarker> Debug for SubmissionQueue<'_, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut d = f.debug_list();
         let mut pos = self.head;
         while pos != self.tail {
-            let entry: &Entry = unsafe {
-                &*(self.queue.sqes.add((pos & self.queue.ring_mask) as usize) as *const Entry)
-            };
+            let entry: &E = unsafe { &*self.queue.sqes.add((pos & self.queue.ring_mask) as usize) };
             d.entry(&entry);
             pos = pos.wrapping_add(1);
         }

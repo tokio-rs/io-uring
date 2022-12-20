@@ -2,10 +2,12 @@
 
 #![allow(clippy::new_without_default)]
 
+use std::convert::TryInto;
 use std::mem;
 use std::os::unix::io::RawFd;
 
 use crate::squeue::Entry;
+use crate::squeue::Entry128;
 use crate::sys;
 use crate::types::{self, sealed};
 
@@ -53,7 +55,7 @@ macro_rules! opcode {
         pub const CODE = $opcode:expr;
 
         $( #[$build_meta:meta] )*
-        pub fn build($self:ident) -> Entry $build_block:block
+        pub fn build($self:ident) -> $entry:ty $build_block:block
     ) => {
         $( #[$outer] )*
         pub struct $name {
@@ -61,6 +63,7 @@ macro_rules! opcode {
             $( $opt_field : $opt_tname, )*
         }
 
+        #[allow(deprecated)]
         impl $name {
             $( #[$new_meta] )*
             #[inline]
@@ -87,7 +90,7 @@ macro_rules! opcode {
 
             $( #[$build_meta] )*
             #[inline]
-            pub fn build($self) -> Entry $build_block
+            pub fn build($self) -> $entry $build_block
         }
     }
 }
@@ -126,7 +129,7 @@ opcode!(
         len: { u32 },
         ;;
         ioprio: u16 = 0,
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0,
@@ -138,7 +141,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Readv {
             fd,
-            iovec, len, offset,
+            iovec, len, offset64,
             ioprio, rw_flags,
             buf_group
         } = self;
@@ -149,12 +152,19 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 );
+
+impl Readv {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Vectored write, equivalent to `pwritev2(2)`.
@@ -165,7 +175,7 @@ opcode!(
         len: { u32 },
         ;;
         ioprio: u16 = 0,
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
@@ -176,7 +186,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Writev {
             fd,
-            iovec, len, offset,
+            iovec, len, offset64,
             ioprio, rw_flags
         } = self;
 
@@ -186,11 +196,18 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
+
+impl Writev {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// File sync, equivalent to `fsync(2)`.
@@ -238,7 +255,7 @@ opcode!(
         len: { u32 },
         buf_index: { u16 },
         ;;
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         ioprio: u16 = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
@@ -250,7 +267,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let ReadFixed {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             buf_index,
             ioprio, rw_flags
         } = self;
@@ -261,12 +278,19 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
 );
+
+impl ReadFixed {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Write to pre-mapped buffers that have been previously registered with
@@ -283,7 +307,7 @@ opcode!(
         buf_index: { u16 },
         ;;
         ioprio: u16 = 0,
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
@@ -294,7 +318,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let WriteFixed {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             buf_index,
             ioprio, rw_flags
         } = self;
@@ -305,12 +329,19 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
 );
+
+impl WriteFixed {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Poll the specified fd.
@@ -626,28 +657,69 @@ opcode!(
 
 opcode!(
     /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
+    #[deprecated(note = "use Fallocate64 instead, which always takes a 64-bit length")]
     pub struct Fallocate {
         fd: { impl sealed::UseFixed },
         len: { libc::off_t },
         ;;
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         mode: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_FALLOCATE;
 
     pub fn build(self) -> Entry {
-        let Fallocate { fd, len, offset, mode } = self;
+        let Fallocate { fd, len, offset64, mode } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_2.addr = len as _;
         sqe.len = mode as _;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         Entry(sqe)
     }
 );
+
+#[allow(deprecated)]
+impl Fallocate {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
+
+opcode!(
+    /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
+    pub struct Fallocate64 {
+        fd: { impl sealed::UseFixed },
+        len: { libc::off64_t },
+        ;;
+        offset64: libc::off64_t = 0,
+        mode: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_FALLOCATE;
+
+    pub fn build(self) -> Entry {
+        let Fallocate64 { fd, len, offset64, mode } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = len as _;
+        sqe.len = mode as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
+        Entry(sqe)
+    }
+);
+
+impl Fallocate64 {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Open a file, equivalent to `openat(2)`.
@@ -770,7 +842,7 @@ opcode!(
         /// If `fd` does not refer to a seekable file, `offset` must be set to zero.
         /// If `offsett` is set to `-1`, the offset will use (and advance) the file position,
         /// like the `read(2)` and `write(2)` system calls.
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         ioprio: u16 = 0,
         rw_flags: types::RwFlags = 0,
         buf_group: u16 = 0
@@ -781,7 +853,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Read {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             ioprio, rw_flags,
             buf_group
         } = self;
@@ -792,12 +864,19 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 );
+
+impl Read {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
@@ -820,7 +899,7 @@ opcode!(
         /// If `fd` does not refer to a seekable file, `offset` must be set to zero.
         /// If `offsett` is set to `-1`, the offset will use (and advance) the file position,
         /// like the `read(2)` and `write(2)` system calls.
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         ioprio: u16 = 0,
         rw_flags: types::RwFlags = 0
     }
@@ -830,7 +909,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Write {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             ioprio, rw_flags
         } = self;
 
@@ -840,11 +919,18 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
+
+impl Write {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Predeclare an access pattern for file data, equivalent to `posix_fadvise(2)`.
@@ -853,23 +939,30 @@ opcode!(
         len: { libc::off_t },
         advice: { i32 },
         ;;
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
     }
 
     pub const CODE = sys::IORING_OP_FADVISE;
 
     pub fn build(self) -> Entry {
-        let Fadvise { fd, len, advice, offset } = self;
+        let Fadvise { fd, len, advice, offset64 } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.len = len as _;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.fadvise_advice = advice as _;
         Entry(sqe)
     }
 );
+
+impl Fadvise {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Give advice about use of memory, equivalent to `madvise(2)`.
@@ -1039,13 +1132,10 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Register `nbufs` buffers that each have the length `len` with ids starting from `big` in the
     /// group `bgid` that can be used for any request. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
-    ///
-    /// Requires the `unstable` feature.
     pub struct ProvideBuffers {
         addr: { *mut u8 },
         len: { i32 },
@@ -1071,12 +1161,9 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Remove some number of buffers from a buffer group. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
-    ///
-    /// Requires the `unstable` feature.
     pub struct RemoveBuffers {
         nbufs: { u16 },
         bgid: { u16 }
@@ -1098,11 +1185,8 @@ opcode!(
 
 // === 5.8 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Duplicate pipe content, equivalent to `tee(2)`.
-    ///
-    /// Requires the `unstable` feature.
     pub struct Tee {
         fd_in: { impl sealed::UseFixed },
         fd_out: { impl sealed::UseFixed },
@@ -1138,7 +1222,6 @@ opcode!(
 
 // === 5.11 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct Shutdown {
         fd: { impl sealed::UseFixed },
@@ -1159,7 +1242,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct RenameAt {
         olddirfd: { impl sealed::UseFd },
@@ -1190,7 +1272,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct UnlinkAt {
         dirfd: { impl sealed::UseFd },
@@ -1215,11 +1296,8 @@ opcode!(
 
 // === 5.15 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Make a directory, equivalent to `mkdirat2(2)`.
-    ///
-    /// Requires the `unstable` feature.
     pub struct MkDirAt {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -1241,11 +1319,8 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Create a symlink, equivalent to `symlinkat2(2)`.
-    ///
-    /// Requires the `unstable` feature.
     pub struct SymlinkAt {
         newdirfd: { impl sealed::UseFd },
         target: { *const libc::c_char },
@@ -1267,11 +1342,8 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Create a hard link, equivalent to `linkat2(2)`.
-    ///
-    /// Requires the `unstable` feature.
     pub struct LinkAt {
         olddirfd: { impl sealed::UseFd },
         oldpath: { *const libc::c_char },
@@ -1293,6 +1365,88 @@ opcode!(
         sqe.len = newdirfd as _;
         sqe.__bindgen_anon_1.addr2 = newpath as _;
         sqe.__bindgen_anon_3.hardlink_flags = flags as _;
+        Entry(sqe)
+    }
+);
+
+// === 5.19 ===
+
+opcode!(
+    /// A file/device-specific 16-byte command, akin (but not equivalent) to `ioctl(2)`.
+    pub struct UringCmd16 {
+        fd: { impl sealed::UseFixed },
+        cmd_op: { u32 },
+        ;;
+        /// Arbitrary command data.
+        cmd: [u8; 16] = [0u8; 16]
+    }
+
+    pub const CODE = sys::IORING_OP_URING_CMD;
+
+    pub fn build(self) -> Entry {
+        let UringCmd16 { fd, cmd_op, cmd } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.__bindgen_anon_1.cmd_op = cmd_op;
+        unsafe { *sqe.__bindgen_anon_6.cmd.as_mut().as_mut_ptr().cast::<[u8; 16]>() = cmd };
+        Entry(sqe)
+    }
+);
+
+opcode!(
+    /// A file/device-specific 80-byte command, akin (but not equivalent) to `ioctl(2)`.
+    pub struct UringCmd80 {
+        fd: { impl sealed::UseFixed },
+        cmd_op: { u32 },
+        ;;
+        /// Arbitrary command data.
+        cmd: [u8; 80] = [0u8; 80]
+    }
+
+    pub const CODE = sys::IORING_OP_URING_CMD;
+
+    pub fn build(self) -> Entry128 {
+        let UringCmd80 { fd, cmd_op, cmd } = self;
+
+        let cmd1 = cmd[..16].try_into().unwrap();
+        let cmd2 = cmd[16..].try_into().unwrap();
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.__bindgen_anon_1.cmd_op = cmd_op;
+        unsafe { *sqe.__bindgen_anon_6.cmd.as_mut().as_mut_ptr().cast::<[u8; 16]>() = cmd1 };
+        Entry128(Entry(sqe), cmd2)
+    }
+);
+
+// === 6.0 ===
+
+opcode!(
+    /// Send a zerocopy message on a socket, equivalent to `send(2)`.
+    pub struct SendZc {
+        fd: { impl sealed::UseFixed },
+        buf: { *const u8 },
+        len: { u32 },
+        ;;
+        flags: i32 = 0,
+        zc_flags: u16 =0,
+    }
+
+    pub const CODE = sys::IORING_OP_SEND_ZC;
+
+    pub fn build(self) -> Entry {
+        let SendZc { fd, buf, len, flags, zc_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = buf as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.ioprio = zc_flags;
         Entry(sqe)
     }
 );
