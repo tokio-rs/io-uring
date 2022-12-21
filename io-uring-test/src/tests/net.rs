@@ -431,7 +431,7 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqe.result(), -libc::ENOBUFS);
 
     // provides two bufs, one of which we will use, one we will free
-    let mut bufs = vec![0; 2*1024];
+    let mut bufs = vec![0; 2 * 1024];
 
     let provide_bufs_e = opcode::ProvideBuffers::new(bufs.as_mut_ptr(), 1024, 2, 0xdeae, 0);
 
