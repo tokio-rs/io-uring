@@ -109,6 +109,10 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::net::test_tcp_accept(&mut ring, &test)?;
     tests::net::test_tcp_connect(&mut ring, &test)?;
     tests::net::test_tcp_buffer_select(&mut ring, &test)?;
+    #[cfg(not(feature = "ci"))]
+    tests::net::test_tcp_buffer_select_recvmsg(&mut ring, &test)?;
+    #[cfg(not(feature = "ci"))]
+    tests::net::test_tcp_buffer_select_readv(&mut ring, &test)?;
 
     // queue
     tests::poll::test_eventfd_poll(&mut ring, &test)?;

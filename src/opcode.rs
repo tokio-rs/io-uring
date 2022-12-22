@@ -132,7 +132,8 @@ opcode!(
         offset64: libc::off64_t = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
-        rw_flags: types::RwFlags = 0
+        rw_flags: types::RwFlags = 0,
+        buf_group: u16 = 0
     }
 
     pub const CODE = sys::IORING_OP_READV;
@@ -141,7 +142,8 @@ opcode!(
         let Readv {
             fd,
             iovec, len, offset64,
-            ioprio, rw_flags
+            ioprio, rw_flags,
+            buf_group
         } = self;
 
         let mut sqe = sqe_zeroed();
@@ -152,6 +154,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 );
@@ -474,13 +477,14 @@ opcode!(
         msg: { *mut libc::msghdr },
         ;;
         ioprio: u16 = 0,
-        flags: u32 = 0
+        flags: u32 = 0,
+        buf_group: u16 = 0
     }
 
     pub const CODE = sys::IORING_OP_RECVMSG;
 
     pub fn build(self) -> Entry {
-        let RecvMsg { fd, msg, ioprio, flags } = self;
+        let RecvMsg { fd, msg, ioprio, flags, buf_group } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -489,6 +493,7 @@ opcode!(
         sqe.__bindgen_anon_2.addr = msg as _;
         sqe.len = 1;
         sqe.__bindgen_anon_3.msg_flags = flags;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 );

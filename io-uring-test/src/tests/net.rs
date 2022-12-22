@@ -430,8 +430,8 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqe.user_data(), 0x23);
     assert_eq!(cqe.result(), -libc::ENOBUFS);
 
-    // provides bufs 2
-    bufs.extend_from_slice(&[0; 1024]);
+    // provides two bufs, one of which we will use, one we will free
+    let mut bufs = vec![0; 2 * 1024];
 
     let provide_bufs_e = opcode::ProvideBuffers::new(bufs.as_mut_ptr(), 1024, 2, 0xdeae, 0);
 
@@ -473,7 +473,7 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         _ => panic!("{}", cqe.flags()),
     }
 
-    // remove bufs
+    // remove one remaining buf
     let remove_bufs_e = opcode::RemoveBuffers::new(1, 0xdeae);
 
     unsafe {
@@ -502,6 +502,171 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
     assert_eq!(cqe.user_data(), 0x27);
     assert_eq!(cqe.result(), -libc::ENOENT);
+
+    Ok(())
+}
+
+pub fn test_tcp_buffer_select_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    use std::io::Write;
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::RecvMsg::CODE);
+        test.probe.is_supported(opcode::Readv::CODE);
+        test.probe.is_supported(opcode::ProvideBuffers::CODE);
+        test.probe.is_supported(opcode::RemoveBuffers::CODE);
+    );
+
+    println!("test tcp_buffer_select_recvmsg");
+
+    let (mut send_stream, recv_stream) = tcp_pair()?;
+
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+
+    const BGID: u16 = 0xdeaf;
+    const INPUT_BID: u16 = 100;
+
+    // provide two buffers for recvmsg
+    let mut buf = [0u8; 2 * 1024];
+    let provide_bufs_e = opcode::ProvideBuffers::new(buf.as_mut_ptr(), 1024, 2, BGID, INPUT_BID);
+
+    unsafe {
+        ring.submission()
+            .push(&provide_bufs_e.build().user_data(0x26).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x26);
+
+    // send for recvmsg
+    send_stream.write_all(&[0x56u8; 1024])?;
+    send_stream.write_all(&[0x57u8; 1024])?;
+
+    // recvmsg
+    let mut msg: libc::msghdr = unsafe { std::mem::zeroed() };
+    let mut iovecs: [libc::iovec; 1] = unsafe { std::mem::zeroed() };
+    iovecs[0].iov_len = 1024; // This can be used to reduce the length of the read.
+    msg.msg_iov = &mut iovecs as *mut _;
+    msg.msg_iovlen = 1; // 2 results in EINVAL, Invalid argument, being returned in result.
+
+    // N.B. This op will only support a BUFFER_SELECT when the msg.msg_iovlen is 1;
+    // the kernel will return EINVAL for anything else. There would be no way of knowing
+    // which other buffer IDs had been chosen.
+    let op = opcode::RecvMsg::new(recv_fd, &mut msg as *mut _)
+        .buf_group(BGID) // else result is -105, ENOBUFS, no buffer space available
+        .build()
+        .flags(squeue::Flags::BUFFER_SELECT) // else result is -14, EFAULT, bad address
+        .user_data(0x27);
+
+    // Safety: the msghdr and the iovecs remain valid for length of the operation.
+    unsafe {
+        ring.submission().push(&op.into()).expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x27);
+    assert_eq!(cqe.result(), 1024); // -14 would mean EFAULT, bad address.
+
+    let bid = cqueue::buffer_select(cqe.flags()).expect("no buffer id");
+    if bid == INPUT_BID {
+        // The 6.1 case.
+        // Test buffer slice associated with the given bid.
+        assert_eq!(&(buf[..1024]), &([0x56u8; 1024][..]));
+    } else if bid == (INPUT_BID + 1) {
+        // The 5.15 case.
+        // Test buffer slice associated with the given bid.
+        assert_eq!(&(buf[1024..]), &([0x56u8; 1024][..]));
+    } else {
+        panic!(
+            "cqe bid {}, was neither {} nor {}",
+            bid,
+            INPUT_BID,
+            INPUT_BID + 1
+        );
+    }
+
+    Ok(())
+}
+
+pub fn test_tcp_buffer_select_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    use std::io::Write;
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::RecvMsg::CODE);
+        test.probe.is_supported(opcode::Readv::CODE);
+        test.probe.is_supported(opcode::ProvideBuffers::CODE);
+        test.probe.is_supported(opcode::RemoveBuffers::CODE);
+    );
+
+    println!("test tcp_buffer_select_readv");
+
+    let (mut send_stream, recv_stream) = tcp_pair()?;
+
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+
+    const BGID: u16 = 0xdeb0;
+    const INPUT_BID: u16 = 200;
+
+    // provide buf for readv
+    let mut buf = [0u8; 512];
+    let provide_bufs_e = opcode::ProvideBuffers::new(buf.as_mut_ptr(), 512, 1, BGID, INPUT_BID);
+
+    unsafe {
+        ring.submission()
+            .push(&provide_bufs_e.build().user_data(0x29).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x29);
+
+    // send for readv
+    send_stream.write_all(&[0x7bu8; 512])?;
+
+    let iovec = libc::iovec {
+        iov_base: std::ptr::null_mut(),
+        iov_len: 512, // Bug in earlier kernels requires this length to be the buffer pool
+                      // length. By 6.1, this could be passed in as zero.
+    };
+
+    // readv
+    // N.B. This op will only support a BUFFER_SELECT when the iovec length is 1,
+    // the kernel should return EINVAL for anything else.
+    let op = opcode::Readv::new(recv_fd, &iovec, 1)
+        .buf_group(BGID)
+        .build()
+        .flags(squeue::Flags::BUFFER_SELECT)
+        .user_data(0x2a);
+
+    // Safety: The iovec addressed by the `op` remains live through the `submit_and_wait` call.
+    unsafe {
+        ring.submission().push(&op.into()).expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x2a);
+    assert_eq!(cqe.result(), 512);
+
+    let bid = cqueue::buffer_select(cqe.flags()).expect("no buffer id");
+    assert_eq!(bid, INPUT_BID);
+    // Test with buffer associated with the INPUT_BID.
+    assert_eq!(&(buf[..]), &([0x7bu8; 512][..]));
 
     Ok(())
 }
