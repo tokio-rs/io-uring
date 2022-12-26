@@ -488,7 +488,6 @@ where
     S: squeue::EntryMarker,
     C: cqueue::EntryMarker,
 {
-    _ = ring;
     // Create a BufRing
     // Register it
     // Unregister it
