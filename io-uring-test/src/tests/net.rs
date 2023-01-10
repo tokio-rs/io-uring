@@ -269,7 +269,7 @@ pub fn test_tcp_zero_copy_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::Ent
 
     require!(
         test;
-        test.probe.is_supported(opcode::SendMsg::CODE);
+        test.probe.is_supported(opcode::SendMsgZc::CODE);
         test.probe.is_supported(opcode::RecvMsg::CODE);
     );
 
