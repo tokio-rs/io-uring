@@ -335,14 +335,27 @@ pub fn test_tcp_zero_copy_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::Ent
     // complete
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
-    assert_eq!(cqes.len(), 2);
+    assert_eq!(cqes.len(), 3);
+
+    // Send completion is ordered w.r.t recv
     assert_eq!(cqes[0].user_data(), 0x01);
-    assert_eq!(cqes[1].user_data(), 0x02);
+    assert!(io_uring::cqueue::more(cqes[0].flags()));
     assert_eq!(cqes[0].result(), text.len() as i32);
-    assert_eq!(cqes[1].result(), text.len() as i32);
 
-    assert_eq!(buf2, text);
-
+    // Notification is not ordered w.r.t recv
+    match (cqes[1].user_data(), cqes[2].user_data()) {
+        (0x01, 0x02) => {
+            assert!(!io_uring::cqueue::more(cqes[1].flags()));
+            assert_eq!(cqes[2].result(), text.len() as i32);
+            assert_eq!(&output[..cqes[2].result() as usize], text);
+        }
+        (0x02, 0x01) => {
+            assert!(!io_uring::cqueue::more(cqes[2].flags()));
+            assert_eq!(cqes[1].result(), text.len() as i32);
+            assert_eq!(&output[..cqes[1].result() as usize], text);
+        }
+        _ => unreachable!(),
+    }
     Ok(())
 }
 
