@@ -273,7 +273,7 @@ pub fn test_tcp_zero_copy_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::Ent
         test.probe.is_supported(opcode::RecvMsg::CODE);
     );
 
-    println!("test tcp_sendmsg_recvmsg");
+    println!("test_tcp_zero_copy_sendmsg_recvmsg");
 
     let (send_stream, recv_stream) = tcp_pair()?;
 
