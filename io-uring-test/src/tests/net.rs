@@ -347,12 +347,12 @@ pub fn test_tcp_zero_copy_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::Ent
         (0x01, 0x02) => {
             assert!(!io_uring::cqueue::more(cqes[1].flags()));
             assert_eq!(cqes[2].result(), text.len() as i32);
-            assert_eq!(&output[..cqes[2].result() as usize], text);
+            assert_eq!(&buf2[..cqes[2].result() as usize], text);
         }
         (0x02, 0x01) => {
             assert!(!io_uring::cqueue::more(cqes[2].flags()));
             assert_eq!(cqes[1].result(), text.len() as i32);
-            assert_eq!(&output[..cqes[1].result() as usize], text);
+            assert_eq!(&buf2[..cqes[1].result() as usize], text);
         }
         _ => unreachable!(),
     }
