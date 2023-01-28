@@ -261,6 +261,104 @@ pub fn test_tcp_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_tcp_zero_copy_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    use std::mem::MaybeUninit;
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::SendMsgZc::CODE);
+        test.probe.is_supported(opcode::RecvMsg::CODE);
+    );
+
+    println!("test_tcp_zero_copy_sendmsg_recvmsg");
+
+    let (send_stream, recv_stream) = tcp_pair()?;
+
+    let addr = recv_stream.local_addr()?;
+    let sockaddr = socket2::SockAddr::from(addr);
+    let send_fd = types::Fd(send_stream.as_raw_fd());
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+
+    let text = b"The quick brown fox jumps over the lazy dog.";
+    let mut buf2 = vec![0; text.len()];
+    let bufs = [io::IoSlice::new(text)];
+    let mut bufs2 = [io::IoSliceMut::new(&mut buf2)];
+
+    // build sendmsg
+    let mut msg = MaybeUninit::<libc::msghdr>::zeroed();
+
+    unsafe {
+        let p = msg.as_mut_ptr();
+        (*p).msg_name = sockaddr.as_ptr() as *const _ as *mut _;
+        (*p).msg_namelen = sockaddr.len();
+        (*p).msg_iov = bufs.as_ptr() as *const _ as *mut _;
+        (*p).msg_iovlen = 1;
+    }
+
+    let sendmsg_e = opcode::SendMsgZc::new(send_fd, msg.as_ptr());
+
+    // build recvmsg
+    let mut msg = MaybeUninit::<libc::msghdr>::zeroed();
+
+    unsafe {
+        let p = msg.as_mut_ptr();
+        (*p).msg_name = sockaddr.as_ptr() as *const _ as *mut _;
+        (*p).msg_namelen = sockaddr.len();
+        (*p).msg_iov = bufs2.as_mut_ptr() as *mut _;
+        (*p).msg_iovlen = 1;
+    }
+
+    let recvmsg_e = opcode::RecvMsg::new(recv_fd, msg.as_mut_ptr());
+
+    // submit
+    unsafe {
+        let mut queue = ring.submission();
+        queue
+            .push(
+                &sendmsg_e
+                    .build()
+                    .user_data(0x01)
+                    .flags(squeue::Flags::IO_LINK)
+                    .into(),
+            )
+            .expect("queue is full");
+        queue
+            .push(&recvmsg_e.build().user_data(0x02).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(2)?;
+
+    // complete
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 3);
+
+    // Send completion is ordered w.r.t recv
+    assert_eq!(cqes[0].user_data(), 0x01);
+    assert!(io_uring::cqueue::more(cqes[0].flags()));
+    assert_eq!(cqes[0].result(), text.len() as i32);
+
+    // Notification is not ordered w.r.t recv
+    match (cqes[1].user_data(), cqes[2].user_data()) {
+        (0x01, 0x02) => {
+            assert!(!io_uring::cqueue::more(cqes[1].flags()));
+            assert_eq!(cqes[2].result(), text.len() as i32);
+            assert_eq!(&buf2[..cqes[2].result() as usize], text);
+        }
+        (0x02, 0x01) => {
+            assert!(!io_uring::cqueue::more(cqes[2].flags()));
+            assert_eq!(cqes[1].result(), text.len() as i32);
+            assert_eq!(&buf2[..cqes[1].result() as usize], text);
+        }
+        _ => unreachable!(),
+    }
+    Ok(())
+}
+
 pub fn test_tcp_accept<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,

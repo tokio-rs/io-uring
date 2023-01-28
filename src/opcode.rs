@@ -1369,6 +1369,39 @@ opcode!(
     }
 );
 
+// === 5.18 ===
+
+opcode!(
+    /// Send a message (with data) to a target ring.
+    pub struct MsgRingData {
+        ring_fd: { impl sealed::UseFd },
+        result: { i32 },
+        user_data: { u64 },
+        user_flags: { Option<u32> },
+        ;;
+        opcode_flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_MSG_RING;
+
+    pub fn build(self) -> Entry {
+        let MsgRingData { ring_fd, result, user_data, user_flags, opcode_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.__bindgen_anon_2.addr = sys::IORING_MSG_DATA.into();
+        sqe.fd = ring_fd;
+        sqe.len = result as u32;
+        sqe.__bindgen_anon_1.off = user_data;
+        sqe.__bindgen_anon_3.msg_ring_flags = opcode_flags;
+        if let Some(_flags) = user_flags {
+            // TODO(lucab): add IORING_MSG_RING_FLAGS_PASS support (in v6.3):
+            // https://lore.kernel.org/all/20230103160507.617416-1-leitao@debian.org/t/#u
+        }
+        Entry(sqe)
+    }
+);
+
 // === 5.19 ===
 
 opcode!(
@@ -1447,6 +1480,38 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.ioprio = zc_flags;
+        Entry(sqe)
+    }
+);
+
+// === 6.1 ===
+
+opcode!(
+    /// Send a zerocopy message on a socket, equivalent to `send(2)`.
+    ///
+    /// fd must be set to the socket file descriptor, addr must contains a pointer to the msghdr
+    /// structure, and flags holds the flags associated with the system call.
+    #[derive(Debug)]
+    pub struct SendMsgZc {
+        fd: { impl sealed::UseFixed },
+        msg: { *const libc::msghdr },
+        ;;
+        ioprio: u16 = 0,
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_SENDMSG_ZC;
+
+    pub fn build(self) -> Entry {
+        let SendMsgZc { fd, msg, ioprio, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.__bindgen_anon_2.addr = msg as _;
+        sqe.len = 1;
+        sqe.__bindgen_anon_3.msg_flags = flags;
         Entry(sqe)
     }
 );

@@ -1,5 +1,5 @@
 use crate::Test;
-use io_uring::{cqueue, opcode, squeue, IoUring};
+use io_uring::{cqueue, opcode, squeue, types, IoUring};
 
 pub fn test_nop<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
@@ -148,6 +148,53 @@ pub fn test_debug_print<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         assert_eq!(cqe.result(), 0);
     }
     println!("Empty: {:?}", ring.submission());
+
+    Ok(())
+}
+
+pub fn test_msg_ring_data<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    use std::os::unix::io::AsRawFd;
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::MsgRingData::CODE);
+    );
+
+    println!("test msg_ring_data");
+
+    // Create a new destination ring and send a data message to it through
+    // the existing test/source ring. This will generate two completion events,
+    // one on each ring.
+    let mut dest_ring = IoUring::new(1)?;
+    let fd = types::Fd(dest_ring.as_raw_fd());
+    let result = 82; // b'R'
+    let user_data = 85; // b'U'
+    let flags = None;
+    unsafe {
+        ring.submission()
+            .push(
+                &opcode::MsgRingData::new(fd, result, user_data, flags)
+                    .build()
+                    .into(),
+            )
+            .expect("queue is full");
+    }
+    ring.submit_and_wait(1)?;
+
+    let source_cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(source_cqes.len(), 1);
+    assert_eq!(source_cqes[0].user_data(), 0);
+    assert_eq!(source_cqes[0].result(), 0);
+    assert_eq!(source_cqes[0].flags(), 0);
+
+    let dest_cqes: Vec<cqueue::Entry> = dest_ring.completion().map(Into::into).collect();
+    assert_eq!(dest_cqes.len(), 1);
+    assert_eq!(dest_cqes[0].user_data(), user_data);
+    assert_eq!(dest_cqes[0].result(), result);
+    assert_eq!(dest_cqes[0].flags(), flags.unwrap_or(0));
 
     Ok(())
 }
