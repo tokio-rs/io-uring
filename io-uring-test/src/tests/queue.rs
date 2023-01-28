@@ -135,7 +135,7 @@ pub fn test_debug_print<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
                 .expect("queue is full");
         }
     }
-    println!("Full: {:?}", sq);
+    println!("Full: {sq:?}");
     drop(sq);
 
     ring.submit_and_wait(num_to_sub)?;

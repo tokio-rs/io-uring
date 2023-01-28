@@ -134,7 +134,7 @@ impl InnerBufRing {
         }
 
         // entry_size is 16 bytes.
-        let entry_size = std::mem::size_of::<BufRingEntry>() as usize;
+        let entry_size = std::mem::size_of::<BufRingEntry>();
         assert_eq!(entry_size, 16);
         let ring_size = entry_size * (ring_entries as usize);
 
@@ -197,7 +197,7 @@ impl InnerBufRing {
                     // using buf_ring requires kernel 5.19 or greater.
                     return Err(io::Error::new(
                             io::ErrorKind::Other,
-                            format!("buf_ring.register returned {}, most likely indicating this kernel is not 5.19+", e),
+                            format!("buf_ring.register returned {e}, most likely indicating this kernel is not 5.19+"),
                             ));
                 }
                 Some(libc::EEXIST) => {
@@ -208,15 +208,14 @@ impl InnerBufRing {
                     return Err(io::Error::new(
                             io::ErrorKind::Other,
                             format!(
-                                "buf_ring.register returned `{}`, indicating the attempted buffer group id {} was already registered",
-                            e,
-                            bgid),
+                                "buf_ring.register returned `{e}`, indicating the attempted buffer group id {bgid} was already registered"
+                            ),
                         ));
                 }
                 _ => {
                     return Err(io::Error::new(
                         io::ErrorKind::Other,
-                        format!("buf_ring.register returned `{}` for group id {}", e, bgid),
+                        format!("buf_ring.register returned `{e}` for group id {bgid}"),
                     ));
                 }
             }

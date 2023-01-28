@@ -20,8 +20,7 @@ fn main() -> anyhow::Result<()> {
             Ok(r) => test(r)?,
             Err(e) => {
                 println!(
-                    "IoUring::<squeue::Entry128, cqueue::Entry>::generic_new(entries) failed: {}",
-                    e
+                    "IoUring::<squeue::Entry128, cqueue::Entry>::generic_new(entries) failed: {e}"
                 );
                 println!("Assume kernel doesn't support the new entry sizes so remaining tests being skipped.");
                 return Ok(());
@@ -58,7 +57,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
             .unwrap(),
     );
     println!("params: {:#?}", ring.params());
-    println!("probe: {:?}", probe);
+    println!("probe: {probe:?}");
     println!();
 
     let test = Test {
