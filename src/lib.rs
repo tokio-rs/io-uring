@@ -364,6 +364,15 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
+    /// Hint the kernel that a single task will submit requests. Used for optimizations. This is
+    /// enforced by the kernel, and request that don't respect that will fail with -EEXIST.
+    /// If [`Builder::setup_sqpoll`] is enabled, the polling task is doing the submissions and
+    /// multiple userspace tasks can call [`Submitter::enter`] and higher level APIs.
+    pub fn setup_single_issuer(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_SINGLE_ISSUER;
+        self
+    }
+
     /// Build an [IoUring], with the specified number of entries in the submission queue and
     /// completion queue unless [`setup_cqsize`](Self::setup_cqsize) has been called.
     pub fn build(&self, entries: u32) -> io::Result<IoUring<S, C>> {
@@ -391,6 +400,11 @@ impl Parameters {
     /// Enabled with [`Builder::setup_iopoll`].
     pub fn is_setup_iopoll(&self) -> bool {
         self.0.flags & sys::IORING_SETUP_IOPOLL != 0
+    }
+
+    /// Whether the single issuer hint is enabled. Enabled with [`Builder::setup_single_issuer`].
+    pub fn is_setup_single_issuer(&self) -> bool {
+        self.0.flags & sys::IORING_SETUP_SINGLE_ISSUER != 0
     }
 
     /// If this flag is set, the SQ and CQ rings were mapped with a single `mmap(2)` call. This
@@ -479,6 +493,7 @@ impl std::fmt::Debug for Parameters {
         f.debug_struct("Parameters")
             .field("is_setup_sqpoll", &self.is_setup_sqpoll())
             .field("is_setup_iopoll", &self.is_setup_iopoll())
+            .field("is_setup_single_issuer", &self.is_setup_single_issuer())
             .field("is_feature_single_mmap", &self.is_feature_single_mmap())
             .field("is_feature_nodrop", &self.is_feature_nodrop())
             .field("is_feature_submit_stable", &self.is_feature_submit_stable())
