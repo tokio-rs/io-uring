@@ -545,12 +545,13 @@ fn buf_ring_read<S, C>(
     ring: &mut IoUring<S, C>,
     buf_ring: &FixedSizeBufRing,
     fd: types::Fd,
+    len: u32,
 ) -> io::Result<GBuf>
 where
     S: squeue::EntryMarker,
     C: cqueue::EntryMarker,
 {
-    let read_e = opcode::Read::new(fd, std::ptr::null_mut(), 0)
+    let read_e = opcode::Read::new(fd, std::ptr::null_mut(), len)
         .offset(0)
         .buf_group(buf_ring.rc.bgid());
 
@@ -580,6 +581,7 @@ where
     }
 
     let result = result as u32;
+    assert_eq!(result, len);
     let flags = cqes[0].flags();
     let buf = buf_ring.rc.get_buf(buf_ring.clone(), result, flags)?;
 
@@ -602,6 +604,7 @@ fn buf_ring_play<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // by the uring interface.
 
     let text = b"The quick brown fox jumps over the lazy dog.";
+    let len = text.len() as u32;
 
     let normal_check = |buf: &GBuf, bid: Bid| {
         // Verify the buffer id that was returned to us.
@@ -634,15 +637,15 @@ fn buf_ring_play<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // from the file, returning the buffer here. The read function is designed to read the same
     // text each time - not normal, but sufficient for this unit test.
 
-    let buf0 = buf_ring_read(ring, &buf_ring, fd)?;
-    let buf1 = buf_ring_read(ring, &buf_ring, fd)?;
+    let buf0 = buf_ring_read(ring, &buf_ring, fd, len)?;
+    let buf1 = buf_ring_read(ring, &buf_ring, fd, len)?;
     normal_check(&buf0, 0);
     normal_check(&buf1, 1);
 
     // Expect next read to fail because the ring started with two buffers and those buffer wrappers
     // haven't been dropped yet so the ring should be empty.
 
-    let res2 = buf_ring_read(ring, &buf_ring, fd);
+    let res2 = buf_ring_read(ring, &buf_ring, fd, len);
     assert_eq!(Some(libc::ENOBUFS), res2.unwrap_err().raw_os_error());
 
     // Drop in reverse order and see that the two are then used in that reverse order by the uring
@@ -651,8 +654,8 @@ fn buf_ring_play<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     std::mem::drop(buf1);
     std::mem::drop(buf0);
 
-    let buf3 = buf_ring_read(ring, &buf_ring, fd)?;
-    let buf4 = buf_ring_read(ring, &buf_ring, fd)?;
+    let buf3 = buf_ring_read(ring, &buf_ring, fd, len)?;
+    let buf4 = buf_ring_read(ring, &buf_ring, fd, len)?;
     normal_check(&buf3, 1); // bid 1 should come back first.
     normal_check(&buf4, 0); // bid 0 should come back second.
 
