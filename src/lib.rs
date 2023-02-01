@@ -477,6 +477,33 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_NATIVE_WORKERS != 0
     }
 
+    /// Whether the kernel supports tagging resources.
+    ///
+    /// This feature allows attaching tags to resources.
+    /// Resources that are registered with a tag can be updated
+    /// in place, without having to unregister them first.
+    pub fn is_feature_resource_tagging(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_RSRC_TAGS != 0
+    }
+
+    /// Whether the kernel supports `IOSQE_CQE_SKIP_SUCCESS`.
+    ///
+    /// This feature allows skipping the generation of a CQE
+    /// if a SQE executes normally.
+    pub fn is_feature_skip_cqe_on_success(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_CQE_SKIP != 0
+    }
+
+    /// Whether the kernel supports deferred file assignment.
+    ///
+    /// This feature allows the kernel to operate lazily when
+    /// preparing fixed files for chained operations. Without this,
+    /// the kernel will prepare all files upfront for a whole chain
+    /// of linked operations.
+    pub fn is_feature_linked_file(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_LINKED_FILE != 0
+    }
+
     /// The number of submission queue entries allocated.
     pub fn sq_entries(&self) -> u32 {
         self.0.sq_entries
