@@ -42,6 +42,7 @@ pub(crate) mod sealed {
 
 use crate::sys;
 use bitflags::bitflags;
+use std::num::NonZeroU32;
 use std::os::unix::io::RawFd;
 
 use std::marker::PhantomData;
@@ -259,5 +260,48 @@ impl BufRingEntry {
     /// The entry must also be properly initialized.
     pub unsafe fn tail(ring_base: *const BufRingEntry) -> *const u16 {
         &(*ring_base).0.resv
+    }
+}
+
+/// A destination slot for sending fixed resources
+/// (e.g. [`opcode::MsgRingSendFd`](crate::opcode::MsgRingSendFd)).
+#[derive(Debug, Clone, Copy)]
+pub struct DestinationSlot {
+    /// Fixed slot as indexed by the kernel (target+1).
+    dest: NonZeroU32,
+}
+
+impl DestinationSlot {
+    const AUTO_ALLOC: u32 = sys::IORING_FILE_INDEX_ALLOC as u32;
+
+    /// Use an automatically allocated target slot.
+    pub const fn auto_target() -> Self {
+        // SAFETY: kernel constant, always non-zero.
+        let dest = unsafe { NonZeroU32::new_unchecked(DestinationSlot::AUTO_ALLOC) };
+        Self { dest }
+    }
+
+    /// Try to use a given target slot.
+    ///
+    /// Valid slots are in the range from `0` to `u32::MAX - 2` inclusive.
+    pub fn try_from_slot_target(target: u32) -> Result<Self, u32> {
+        const MAX_INDEX: u32 = DestinationSlot::AUTO_ALLOC - 2;
+
+        if target > MAX_INDEX {
+            return Err(target);
+        }
+
+        let kernel_index = target.saturating_add(1);
+        // SAFETY: by construction, always clamped between 1 and IORING_FILE_INDEX_ALLOC-1.
+        let dest = unsafe {
+            debug_assert!(0 < kernel_index && kernel_index < DestinationSlot::AUTO_ALLOC);
+            NonZeroU32::new_unchecked(kernel_index)
+        };
+
+        Ok(Self { dest })
+    }
+
+    pub(crate) fn kernel_index_arg(&self) -> u32 {
+        self.dest.get()
     }
 }

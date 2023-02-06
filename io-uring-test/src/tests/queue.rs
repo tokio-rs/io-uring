@@ -198,3 +198,110 @@ pub fn test_msg_ring_data<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     Ok(())
 }
+
+pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    use std::os::unix::io::AsRawFd;
+
+    // This test requires both `IORING_OP_MSG_RING` opcode and `IORING_MSG_SEND_FD` flag.
+    // We directly probe for the opcode, but the flag only appeared later
+    // (in kernel 6.0) and cannot be probed at runtime.
+    // Thus, we additionaly check for the `IORING_OP_SEND_ZC` opcode (>= 6.0)
+    // as a proxy instead.
+    require!(
+        test;
+        test.probe.is_supported(opcode::MsgRingData::CODE);
+        test.probe.is_supported(opcode::SendZc::CODE);
+    );
+
+    println!("test msg_ring_send_fd");
+
+    // Ensure there are no fixed files on the test ring, so that slots
+    // allocation will start at 0. Then create a tempfile and register it
+    // (at slot 0).
+    {
+        let _ = ring.submitter().unregister_files();
+        let tmp1 = tempfile::tempfile()?;
+        ring.submitter()
+            .register_files(&[tmp1.as_raw_fd()])
+            .unwrap();
+    }
+
+    // Create a new destination ring.
+    // FD sending only works if the receiving ring already has a slot
+    // registered for it. Thus we register some sparse files (slots 0 and 1).
+    let mut temp_ring = IoUring::new(8)?;
+    temp_ring.submitter().register_files_sparse(2).unwrap();
+
+    // Send the fixed file from the source ring (on slot 0)
+    // to the temp ring (to slot 1).
+    // This will generate two completion events, one on each ring.
+    unsafe {
+        let fd = types::Fd(temp_ring.as_raw_fd());
+        let dest_slot = types::DestinationSlot::try_from_slot_target(1).unwrap();
+        ring.submission()
+            .push(
+                &opcode::MsgRingSendFd::new(fd, types::Fixed(0), dest_slot, 11, 22)
+                    .build()
+                    .into(),
+            )
+            .expect("queue is full");
+    }
+    ring.submit_and_wait(1)?;
+    {
+        let source_cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(source_cqes.len(), 1);
+        assert_eq!(source_cqes[0].user_data(), 0);
+        assert_eq!(source_cqes[0].result(), 0);
+        assert_eq!(source_cqes[0].flags(), 0);
+
+        let dest_cqes: Vec<cqueue::Entry> = temp_ring.completion().map(Into::into).collect();
+        assert_eq!(dest_cqes.len(), 1);
+        assert_eq!(dest_cqes[0].user_data(), 22);
+        assert_eq!(dest_cqes[0].result(), 11);
+        assert_eq!(dest_cqes[0].flags(), 0);
+    }
+
+    // Unregister the fixed files from the source ring, then reserve some empty slots
+    // (0 through 3).
+    ring.submitter().unregister_files().unwrap();
+    ring.submitter().register_files_sparse(4).unwrap();
+
+    // Send back the fixed file from the temp ring (on slot 1)
+    // to the temp ring (to slot 2).
+    // This will again generate two completion events, one on each ring.
+    unsafe {
+        let fd = types::Fd(ring.as_raw_fd());
+        let dest_slot = types::DestinationSlot::try_from_slot_target(2).unwrap();
+        temp_ring
+            .submission()
+            .push(&opcode::MsgRingSendFd::new(fd, types::Fixed(1), dest_slot, 33, 44).build())
+            .expect("queue is full");
+    }
+    temp_ring.submit_and_wait(1)?;
+    {
+        let source_cqes: Vec<cqueue::Entry> = temp_ring.completion().map(Into::into).collect();
+        assert_eq!(source_cqes.len(), 1);
+        assert_eq!(source_cqes[0].user_data(), 0);
+        assert_eq!(source_cqes[0].result(), 0);
+        assert_eq!(source_cqes[0].flags(), 0);
+
+        let dest_cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(dest_cqes.len(), 1);
+        assert_eq!(dest_cqes[0].user_data(), 44);
+        assert_eq!(dest_cqes[0].result(), 33);
+        assert_eq!(dest_cqes[0].flags(), 0);
+    }
+
+    // Unregister the fixed files from both rings, then repeat again to
+    // ensure that all previous files have been unregistered (on empty rings
+    // the operation will fail with `-ENXIO`).
+    ring.submitter().unregister_files().unwrap();
+    temp_ring.submitter().unregister_files().unwrap();
+    ring.submitter().unregister_files().unwrap_err();
+    temp_ring.submitter().unregister_files().unwrap_err();
+
+    Ok(())
+}
