@@ -42,6 +42,7 @@ pub(crate) mod sealed {
 
 use crate::sys;
 use bitflags::bitflags;
+use std::num::NonZeroU32;
 use std::os::unix::io::RawFd;
 
 use std::marker::PhantomData;
@@ -259,5 +260,73 @@ impl BufRingEntry {
     /// The entry must also be properly initialized.
     pub unsafe fn tail(ring_base: *const BufRingEntry) -> *const u16 {
         &(*ring_base).0.resv
+    }
+}
+
+/// Convert a valid `u32` constant.
+///
+/// This is a workaround for the lack of panic-in-const in older
+/// toolchains.
+#[allow(unconditional_panic)]
+const fn unwrap_u32(t: Option<u32>) -> u32 {
+    match t {
+        Some(v) => v,
+        None => [][1],
+    }
+}
+
+/// Convert a valid `NonZeroU32` constant.
+///
+/// This is a workaround for the lack of panic-in-const in older
+/// toolchains.
+#[allow(unconditional_panic)]
+const fn unwrap_nonzero(t: Option<NonZeroU32>) -> NonZeroU32 {
+    match t {
+        Some(v) => v,
+        None => [][1],
+    }
+}
+
+/// A destination slot for sending fixed resources
+/// (e.g. [`opcode::MsgRingSendFd`](crate::opcode::MsgRingSendFd)).
+#[derive(Debug, Clone, Copy)]
+pub struct DestinationSlot {
+    /// Fixed slot as indexed by the kernel (target+1).
+    dest: NonZeroU32,
+}
+
+impl DestinationSlot {
+    // SAFETY: kernel constant, `IORING_FILE_INDEX_ALLOC` is always > 0.
+    const AUTO_ALLOC: NonZeroU32 =
+        unwrap_nonzero(NonZeroU32::new(sys::IORING_FILE_INDEX_ALLOC as u32));
+
+    /// Use an automatically allocated target slot.
+    pub const fn auto_target() -> Self {
+        Self {
+            dest: DestinationSlot::AUTO_ALLOC,
+        }
+    }
+
+    /// Try to use a given target slot.
+    ///
+    /// Valid slots are in the range from `0` to `u32::MAX - 2` inclusive.
+    pub fn try_from_slot_target(target: u32) -> Result<Self, u32> {
+        // SAFETY: kernel constant, `IORING_FILE_INDEX_ALLOC` is always >= 2.
+        const MAX_INDEX: u32 = unwrap_u32(DestinationSlot::AUTO_ALLOC.get().checked_sub(2));
+
+        if target > MAX_INDEX {
+            return Err(target);
+        }
+
+        let kernel_index = target.saturating_add(1);
+        // SAFETY: by construction, always clamped between 1 and IORING_FILE_INDEX_ALLOC-1.
+        debug_assert!(0 < kernel_index && kernel_index < DestinationSlot::AUTO_ALLOC.get());
+        let dest = NonZeroU32::new(kernel_index).unwrap();
+
+        Ok(Self { dest })
+    }
+
+    pub(crate) fn kernel_index_arg(&self) -> u32 {
+        self.dest.get()
     }
 }

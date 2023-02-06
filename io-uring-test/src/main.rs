@@ -70,6 +70,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::queue::test_queue_split(&mut ring, &test)?;
     tests::queue::test_debug_print(&mut ring, &test)?;
     tests::queue::test_msg_ring_data(&mut ring, &test)?;
+    tests::queue::test_msg_ring_send_fd(&mut ring, &test)?;
 
     tests::queue::test_batch(&mut ring, &test)?;
 
