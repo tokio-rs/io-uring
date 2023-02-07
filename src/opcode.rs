@@ -1455,6 +1455,33 @@ opcode!(
     }
 );
 
+// === 5.19 ===
+
+opcode!(
+    /// Create an endpoint for communication, equivalent to `socket(2)`.
+    pub struct Socket {
+        domain: { i32 },
+        socket_type: { i32 },
+        protocol: { i32 },
+        ;;
+        flags: types::RwFlags = 0
+    }
+
+    pub const CODE = sys::IORING_OP_SOCKET;
+
+    pub fn build(self) -> Entry {
+        let Socket { domain, socket_type, protocol, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = domain as _;
+        sqe.__bindgen_anon_1.off = socket_type as _;
+        sqe.len = protocol as _;
+        sqe.__bindgen_anon_3.rw_flags = flags;
+        Entry(sqe)
+    }
+);
+
 // === 6.0 ===
 
 opcode!(
