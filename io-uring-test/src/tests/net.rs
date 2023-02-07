@@ -811,5 +811,37 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     drop(plain_socket);
     drop(io_uring_socket);
 
+    // Cleanup all fixed files (if any), then reserve slot 0.
+    let _ = ring.submitter().unregister_files();
+    ring.submitter().register_files_sparse(1).unwrap();
+
+    let fixed_socket_op = opcode::Socket::new(
+        Domain::IPV4.into(),
+        Type::DGRAM.into(),
+        Protocol::UDP.into(),
+    );
+    let dest_slot = types::DestinationSlot::try_from_slot_target(0).unwrap();
+    unsafe {
+        ring.submission()
+            .push(
+                &fixed_socket_op
+                    .file_index(Some(dest_slot))
+                    .build()
+                    .user_data(55)
+                    .into(),
+            )
+            .expect("queue is full");
+    }
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 55);
+    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(cqes[0].flags(), 0);
+
+    // If the fixed-socket operation worked properly, this must not fail.
+    ring.submitter().unregister_files().unwrap();
+
     Ok(())
 }
