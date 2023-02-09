@@ -302,6 +302,11 @@ impl Debug for Entry32 {
     }
 }
 
+/// Return which dynamic buffer was used by this operation.
+///
+/// This corresponds to the `IORING_CQE_F_BUFFER` flag (and related bit-shifting),
+/// and it signals to the consumer which provided contains the result of this
+/// operation.
 pub fn buffer_select(flags: u32) -> Option<u16> {
     if flags & sys::IORING_CQE_F_BUFFER != 0 {
         let id = flags >> sys::IORING_CQE_BUFFER_SHIFT;
@@ -315,6 +320,12 @@ pub fn buffer_select(flags: u32) -> Option<u16> {
     }
 }
 
+/// Return whether further completion events will be submitted for
+/// this same operation.
+///
+/// This corresponds to the `IORING_CQE_F_MORE` flag, and it signals to
+/// the consumer that it should expect further CQE entries after this one,
+/// still from the same original SQE request (e.g. for multishot operations).
 pub fn more(flags: u32) -> bool {
     flags & sys::IORING_CQE_F_MORE != 0
 }
