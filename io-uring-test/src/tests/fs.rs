@@ -375,7 +375,6 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
     Ok(())
 }
 
-
 // This is like the openat2 test of the same name, but uses openat instead.
 pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
@@ -403,10 +402,9 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
     // One more round than table size.
     for round in 0..3 {
-        let path = dir.path().join(format!(
-            "test-io-uring-openat-file_index-a-round-{}",
-            round
-        ));
+        let path = dir
+            .path()
+            .join(format!("test-io-uring-openat-file_index-a-round-{}", round));
         let path = CString::new(path.as_os_str().as_bytes())?;
 
         let file_index = types::DestinationSlot::auto_target();
@@ -462,10 +460,9 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
     // One more round than table size.
     for round in (0..3).rev() {
-        let path = dir.path().join(format!(
-            "test-io-uring-openat-file_index-b-round-{}",
-            round
-        ));
+        let path = dir
+            .path()
+            .join(format!("test-io-uring-openat-file_index-b-round-{}", round));
         let path = CString::new(path.as_os_str().as_bytes())?;
 
         let file_index = types::DestinationSlot::try_from_slot_target(round).unwrap();
