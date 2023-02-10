@@ -88,6 +88,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::fs::test_file_fallocate64(&mut ring, &test)?;
     tests::fs::test_file_openat2(&mut ring, &test)?;
     tests::fs::test_file_openat2_close_file_index(&mut ring, &test)?;
+    tests::fs::test_file_openat_close_file_index(&mut ring, &test)?;
     tests::fs::test_file_close(&mut ring, &test)?;
     #[cfg(not(feature = "ci"))]
     tests::fs::test_file_direct_write_read(&mut ring, &test)?;
