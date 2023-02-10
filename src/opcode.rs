@@ -752,19 +752,28 @@ opcode!(
 
 opcode!(
     /// Close a file descriptor, equivalent to `close(2)`.
+    ///
+    /// The `file_index` method can be used to close an io_uring direct descriptor. In this case,
+    /// the index may not represent the auto value; doing so will result in the Invalid error,
+    /// EINVAL. Also in this case, the required fd value must be zero; any other value will also
+    /// result in EINVAL.
     pub struct Close {
         fd: { impl sealed::UseFd }
         ;;
+        file_index: Option<types::DestinationSlot> = None,
     }
 
     pub const CODE = sys::IORING_OP_CLOSE;
 
     pub fn build(self) -> Entry {
-        let Close { fd } = self;
+        let Close { fd, file_index } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = fd;
+        if let Some(dest) = file_index {
+            sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
+        }
         Entry(sqe)
     }
 );
