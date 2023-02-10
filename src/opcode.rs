@@ -727,6 +727,7 @@ opcode!(
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
         ;;
+        file_index: Option<types::DestinationSlot> = None,
         flags: i32 = 0,
         mode: libc::mode_t = 0
     }
@@ -734,7 +735,7 @@ opcode!(
     pub const CODE = sys::IORING_OP_OPENAT;
 
     pub fn build(self) -> Entry {
-        let OpenAt { dirfd, pathname, flags, mode } = self;
+        let OpenAt { dirfd, pathname, file_index, flags, mode } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -742,6 +743,9 @@ opcode!(
         sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mode;
         sqe.__bindgen_anon_3.open_flags = flags as _;
+        if let Some(dest) = file_index {
+            sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
+        }
         Entry(sqe)
     }
 );
@@ -1047,12 +1051,13 @@ opcode!(
         pathname: { *const libc::c_char },
         how: { *const types::OpenHow }
         ;;
+        file_index: Option<types::DestinationSlot> = None,
     }
 
     pub const CODE = sys::IORING_OP_OPENAT2;
 
     pub fn build(self) -> Entry {
-        let OpenAt2 { dirfd, pathname, how } = self;
+        let OpenAt2 { dirfd, pathname, how, file_index } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -1060,6 +1065,9 @@ opcode!(
         sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mem::size_of::<sys::open_how>() as _;
         sqe.__bindgen_anon_1.off = how as _;
+        if let Some(dest) = file_index {
+            sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
+        }
         Entry(sqe)
     }
 );
