@@ -405,6 +405,8 @@ pub fn test_tcp_accept<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+/// Skip ci, because multi accept does not exist in old release.
+#[cfg(not(feature = "ci"))]
 pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -481,6 +483,8 @@ pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+/// Skip ci, because multi accept does not exist in old release.
+#[cfg(not(feature = "ci"))]
 pub fn test_tcp_accept_multi_file_index<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
