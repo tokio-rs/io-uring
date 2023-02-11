@@ -586,18 +586,18 @@ opcode!(
 opcode!(
     /// Accept multiple new connections on a socket.
     ///
-    /// Set the fixed property if fixed file table entries should be used.
+    /// Set the `allocate_file_index` property if fixed file table entries should be used.
     pub struct AcceptMulti {
         fd: { impl sealed::UseFixed },
         ;;
-        fixed: bool = false,
+        allocate_file_index: bool = false,
         flags: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_ACCEPT;
 
     pub fn build(self) -> Entry {
-        let AcceptMulti { fd, fixed, flags } = self;
+        let AcceptMulti { fd, allocate_file_index, flags } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -606,7 +606,7 @@ opcode!(
         // No out SockAddr is passed for the multishot accept case.
         // The user should perform a syscall to get any resulting connection's remote address.
         sqe.__bindgen_anon_3.accept_flags = flags as _;
-        if fixed {
+        if allocate_file_index {
             sqe.__bindgen_anon_5.file_index = sys::IORING_FILE_INDEX_ALLOC as u32;
         }
         Entry(sqe)
