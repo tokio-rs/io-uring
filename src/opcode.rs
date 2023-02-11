@@ -1041,6 +1041,33 @@ opcode!(
 );
 
 opcode!(
+    /// Receive multiple messages from a socket, equivalent to `recv(2)`.
+    ///
+    /// MSG_WAITALL should not be set in flags.
+    pub struct RecvMulti {
+        fd: { impl sealed::UseFixed },
+        buf_group: { u16 },
+        ;;
+        flags: i32 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_RECV;
+
+    pub fn build(self) -> Entry {
+        let RecvMulti { fd, buf_group, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        sqe.flags = 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.ioprio = sys::IORING_RECV_MULTISHOT as _;
+        Entry(sqe)
+    }
+);
+
+opcode!(
     /// Open a file, equivalent to `openat2(2)`.
     pub struct OpenAt2 {
         dirfd: { impl sealed::UseFd },
