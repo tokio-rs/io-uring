@@ -330,3 +330,37 @@ impl DestinationSlot {
         self.dest.get()
     }
 }
+
+/// multishot header struct
+/// multishot recvmsg layout: <header><name><control><payload>
+/// https://lwn.net/Articles/901221/ 
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct RecvmsgOut(sys::io_uring_recvmsg_out);
+
+impl RecvmsgOut {
+    pub fn new() -> Self {
+        RecvmsgOut(sys::io_uring_recvmsg_out {
+            namelen: 0,
+            controllen: 0,
+            payloadlen: 0,
+            flags: 0,
+        })
+    }
+
+    pub fn namelen(self) -> u32 {
+        self.0.namelen
+    }
+
+    pub fn controllen(self) -> u32 {
+        self.0.controllen
+    }
+
+    pub fn payloadlen(self) -> u32 {
+        self.0.payloadlen
+    }
+
+    pub fn flags(self) -> u32 {
+        self.0.flags
+    }
+}
