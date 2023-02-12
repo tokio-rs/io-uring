@@ -801,7 +801,7 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // so the first buffer received should be length 1024 and the second length 256.
     let mut input = vec![0xde; 1024];
     input.extend_from_slice(&[0xad; 256]);
-    let mut bufs = vec![0; 2*1024];
+    let mut bufs = vec![0; 2 * 1024];
 
     // provide bufs
     let provide_bufs_e = opcode::ProvideBuffers::new(bufs.as_mut_ptr(), 1024, 2, 0xdead, 0);
@@ -846,7 +846,7 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes[1].result(), 256); // length 256
     assert!(cqueue::more(cqes[1].flags()));
     assert_eq!(cqueue::buffer_select(cqes[1].flags()), Some(1));
-    assert_eq!(&bufs[1024..(1024+256)], &input[1024..(1024+256)]);
+    assert_eq!(&bufs[1024..(1024 + 256)], &input[1024..(1024 + 256)]);
 
     assert_eq!(cqes[2].user_data(), 0x22);
     assert!(cqueue::more(cqes[1].flags()));
