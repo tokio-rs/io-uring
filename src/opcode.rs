@@ -1591,7 +1591,7 @@ opcode!(
         len: { u32 },
         ;;
         flags: i32 = 0,
-        zc_flags: u16 =0,
+        zc_flags: u16 = 0,
     }
 
     pub const CODE = sys::IORING_OP_SEND_ZC;
@@ -1606,6 +1606,43 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.ioprio = zc_flags;
+        Entry(sqe)
+    }
+);
+
+opcode!(
+    /// Send a zerocopy message on a socket, equivalent to `send(2)` using a pre-mapped buffer that
+    /// has been previously registered with
+    /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
+    pub struct SendZcFixed {
+        /// The `buf_index` is an index into an array of fixed buffers,
+        /// and is only valid if fixed buffers were registered.
+        ///
+        /// The buf and len arguments must fall within a region specified by buf_index in the
+        /// previously registered buffer. The buffer need not be aligned with the start of the
+        /// registered buffer.
+        fd: { impl sealed::UseFixed },
+        buf: { *const u8 },
+        len: { u32 },
+        buf_index: { u16 },
+        ;;
+        flags: i32 = 0,
+        zc_flags: u16 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_SEND_ZC;
+
+    pub fn build(self) -> Entry {
+        let SendZcFixed { fd, buf, len, buf_index, flags, zc_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = buf as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.__bindgen_anon_4.buf_index = buf_index;
+        sqe.ioprio = zc_flags | sys::IORING_RECVSEND_FIXED_BUF as u16;
         Entry(sqe)
     }
 );
