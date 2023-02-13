@@ -111,12 +111,18 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::net::test_tcp_zero_copy_sendmsg_recvmsg(&mut ring, &test)?;
     tests::net::test_tcp_accept(&mut ring, &test)?;
     tests::net::test_tcp_accept_file_index(&mut ring, &test)?;
+    #[cfg(not(feature = "ci"))]
+    tests::net::test_tcp_accept_multi(&mut ring, &test)?;
+    #[cfg(not(feature = "ci"))]
+    tests::net::test_tcp_accept_multi_file_index(&mut ring, &test)?;
     tests::net::test_tcp_connect(&mut ring, &test)?;
     tests::net::test_tcp_buffer_select(&mut ring, &test)?;
     #[cfg(not(feature = "ci"))]
     tests::net::test_tcp_buffer_select_recvmsg(&mut ring, &test)?;
     #[cfg(not(feature = "ci"))]
     tests::net::test_tcp_buffer_select_readv(&mut ring, &test)?;
+    #[cfg(not(feature = "ci"))]
+    tests::net::test_tcp_recv_multi(&mut ring, &test)?;
     tests::net::test_socket(&mut ring, &test)?;
 
     // queue
