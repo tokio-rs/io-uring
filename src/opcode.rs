@@ -349,7 +349,12 @@ opcode!(
     /// Unlike poll or epoll without `EPOLLONESHOT`, this interface defaults to work in one shot mode.
     /// That is, once the poll operation is completed, it will have to be resubmitted.
     ///
-    /// Since 5.13, the multi-shot mode is available.
+    /// If multi is set, the poll will work in multi shot mode instead. That means it will
+    /// repeatedly trigger when the requested event becomes true, and hence multiple CQEs can be
+    /// generated from this single submission. The CQE flags field will have IORING_CQE_F_MORE set
+    /// on completion if the application should expect further CQE entries from the original
+    /// request. If this flag isn't set on completion, then the poll request has been terminated
+    /// and no further events will be generated. This mode is available since 5.13.
     #[derive(Debug)]
     pub struct PollAdd {
         /// The bits that may be set in `flags` are defined in `<poll.h>`,
