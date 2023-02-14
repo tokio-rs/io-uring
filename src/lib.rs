@@ -473,6 +473,10 @@ impl Parameters {
 
     /// Whether poll events are stored using 32 bits instead of 16. This allows the user to use
     /// `EPOLLEXCLUSIVE`.
+    ///
+    /// If this flag is set, the IORING_OP_POLL_ADD command accepts the full 32-bit range of epoll
+    /// based flags. Most notably EPOLLEXCLUSIVE which allows exclusive (waking single waiters)
+    /// behavior. Available since kernel 5.9.
     pub fn is_feature_poll_32bits(&self) -> bool {
         self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
     }
