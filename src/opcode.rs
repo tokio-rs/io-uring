@@ -576,13 +576,14 @@ opcode!(
         addr: { *mut libc::sockaddr },
         addrlen: { *mut libc::socklen_t },
         ;;
+        file_index: Option<types::DestinationSlot> = None,
         flags: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_ACCEPT;
 
     pub fn build(self) -> Entry {
-        let Accept { fd, addr, addrlen, flags } = self;
+        let Accept { fd, addr, addrlen, file_index, flags } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -590,6 +591,9 @@ opcode!(
         sqe.__bindgen_anon_2.addr = addr as _;
         sqe.__bindgen_anon_1.addr2 = addrlen as _;
         sqe.__bindgen_anon_3.accept_flags = flags as _;
+        if let Some(dest) = file_index {
+            sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
+        }
         Entry(sqe)
     }
 );
