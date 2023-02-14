@@ -534,10 +534,13 @@ impl Parameters {
 
     /// Whether the kernel supports deferred file assignment.
     ///
-    /// This feature allows the kernel to operate lazily when
-    /// preparing fixed files for chained operations. Without this,
-    /// the kernel will prepare all files upfront for a whole chain
-    /// of linked operations.
+    /// If this flag is set, then io_uring supports sane assignment of files for SQEs that have
+    /// dependencies. For example, if a chain of SQEs are submitted with IOSQE_IO_LINK, then
+    /// kernels without this flag will prepare the file for each link upfront. If a previous link
+    /// opens a file with a known index, eg if direct descriptors are used with open or accept,
+    /// then file assignment needs to happen post execution of that SQE. If this flag is set, then
+    /// the kernel will defer file assignment until execution of a given request is started.
+    /// Available since kernel 5.17.
     pub fn is_feature_linked_file(&self) -> bool {
         self.0.features & sys::IORING_FEAT_LINKED_FILE != 0
     }
