@@ -372,6 +372,16 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
+    /// By default, io_uring will interrupt a task running in userspace when a completion event
+    /// comes in. This is to ensure that completions run in a timely manner. For a lot of use
+    /// cases, this is overkill and can cause reduced performance from both the inter-processor
+    /// interrupt used to do this, the kernel/user transition, the needless interruption of the
+    /// tasks userspace activities, and reduced batching if completions come in at a rapid rate.
+    /// Most applications don't need the forceful interruption, as the events are processed at any
+    /// kernel/user transition. The exception are setups where the application uses multiple
+    /// threads operating on the same ring, where the application waiting on completions isn't the
+    /// one that submitted them. For most other use cases, setting this flag will improve
+    /// performance. Available since 5.19.
     pub fn setup_coop_taskrun(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_COOP_TASKRUN;
         self
