@@ -516,9 +516,10 @@ impl Parameters {
 
     /// Whether the kernel supports tagging resources.
     ///
-    /// This feature allows attaching tags to resources.
-    /// Resources that are registered with a tag can be updated
-    /// in place, without having to unregister them first.
+    /// If this flag is set, then io_uring supports a variety of features related to fixed files
+    /// and buffers. In particular, it indicates that registered buffers can be updated in-place,
+    /// whereas before the full set would have to be unregistered first. Available since kernel
+    /// 5.13.
     pub fn is_feature_resource_tagging(&self) -> bool {
         self.0.features & sys::IORING_FEAT_RSRC_TAGS != 0
     }
