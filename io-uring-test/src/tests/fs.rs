@@ -291,9 +291,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
     // Drop two.
     for round in 0..2 {
-        let dest_slot = types::DestinationSlot::try_from_slot_target(round).unwrap();
-        let fd = types::Fd(0); // Have to pass 0 for the fd when using the file_index.
-        let op = opcode::Close::new(fd).file_index(Some(dest_slot));
+        let op = opcode::Close::new(types::Fixed(round));
 
         unsafe {
             ring.submission()
@@ -351,9 +349,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
     // Drop two.
     for round in 0..2 {
-        let dest_slot = types::DestinationSlot::try_from_slot_target(round).unwrap();
-        let fd = types::Fd(0); // Have to pass 0 for the fd when using the file_index.
-        let op = opcode::Close::new(fd).file_index(Some(dest_slot));
+        let op = opcode::Close::new(types::Fixed(round));
 
         unsafe {
             ring.submission()
@@ -434,9 +430,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
     // Drop two.
     for round in 0..2 {
-        let dest_slot = types::DestinationSlot::try_from_slot_target(round).unwrap();
-        let fd = types::Fd(0); // Have to pass 0 for the fd when using the file_index.
-        let op = opcode::Close::new(fd).file_index(Some(dest_slot));
+        let op = opcode::Close::new(types::Fixed(round));
 
         unsafe {
             ring.submission()
@@ -492,9 +486,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
     // Drop two.
     for round in 0..2 {
-        let dest_slot = types::DestinationSlot::try_from_slot_target(round).unwrap();
-        let fd = types::Fd(0); // Have to pass 0 for the fd when using the file_index.
-        let op = opcode::Close::new(fd).file_index(Some(dest_slot));
+        let op = opcode::Close::new(types::Fixed(round));
 
         unsafe {
             ring.submission()
