@@ -526,8 +526,8 @@ impl Parameters {
 
     /// Whether the kernel supports `IOSQE_CQE_SKIP_SUCCESS`.
     ///
-    /// This feature allows skipping the generation of a CQE
-    /// if a SQE executes normally.
+    /// This feature allows skipping the generation of a CQE if a SQE executes normally. Available
+    /// since kernel 5.17.
     pub fn is_feature_skip_cqe_on_success(&self) -> bool {
         self.0.features & sys::IORING_FEAT_CQE_SKIP != 0
     }
