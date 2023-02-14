@@ -359,6 +359,18 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
+    /// Normally io_uring stops submitting a batch of request, if one of these requests results in
+    /// an error. This can cause submission of less than what is expected, if a request ends in
+    /// error while being submitted. If the ring is created with this flag, io_uring_enter(2) will
+    /// continue submitting requests even if it encounters an error submitting a request. CQEs are
+    /// still posted for errored request regardless of whether or not this flag is set at ring
+    /// creation time, the only difference is if the submit sequence is halted or continued when an
+    /// error is observed. Available since 5.18.
+    pub fn setup_submit_all(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_SUBMIT_ALL;
+        self
+    }
+
     pub fn setup_coop_taskrun(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_COOP_TASKRUN;
         self
