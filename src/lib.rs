@@ -506,6 +506,10 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_EXT_ARG != 0
     }
 
+    /// If this flag is set, io_uring is using native workers for its async helpers. Previous
+    /// kernels used kernel threads that assumed the identity of the original io_uring owning task,
+    /// but later kernels will actively create what looks more like regular process threads
+    /// instead. Available since kernel 5.12.
     pub fn is_feature_native_workers(&self) -> bool {
         self.0.features & sys::IORING_FEAT_NATIVE_WORKERS != 0
     }
