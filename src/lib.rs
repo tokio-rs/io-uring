@@ -387,6 +387,18 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
+    /// Used in conjunction with IORING_SETUP_COOP_TASKRUN, this provides a flag,
+    /// IORING_SQ_TASKRUN, which is set in the SQ ring flags whenever completions are pending that
+    /// should be processed. As an example, liburing will check for this flag even when doing
+    /// io_uring_peek_cqe(3) and enter the kernel to process them, and applications can do the
+    /// same. This makes IORING_SETUP_TASKRUN_FLAG safe to use even when applications rely on a
+    /// peek style operation on the CQ ring to see if anything might be pending to reap. Available
+    /// since 5.19.
+    pub fn setup_taskrun_flag(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_TASKRUN_FLAG;
+        self
+    }
+
     /// Hint the kernel that a single task will submit requests. Used for optimizations. This is
     /// enforced by the kernel, and request that don't respect that will fail with -EEXIST.
     /// If [`Builder::setup_sqpoll`] is enabled, the polling task is doing the submissions and
