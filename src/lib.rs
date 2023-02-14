@@ -308,10 +308,15 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// again with a system call (this is handled by [`Submitter::submit`] and
     /// [`Submitter::submit_and_wait`] automatically).
     ///
-    /// When using this, you _must_ register all file descriptors with the [`Submitter`] via
-    /// [`Submitter::register_files`].
-    ///
-    /// This requires root priviliges.
+    /// Before version 5.11 of the Linux kernel, to successfully use this feature, the application
+    /// must register a set of files to be used for IO through io_uring_register(2) using the
+    /// IORING_REGISTER_FILES opcode. Failure to do so will result in submitted IO being errored
+    /// with EBADF. The presence of this feature can be detected by the IORING_FEAT_SQPOLL_NONFIXED
+    /// feature flag. In version 5.11 and later, it is no longer necessary to register files to use
+    /// this feature. 5.11 also allows using this as non-root, if the user has the CAP_SYS_NICE
+    /// capability. In 5.13 this requirement was also relaxed, and no special privileges are needed
+    /// for SQPOLL in newer kernels. Certain stable kernels older than 5.13 may also support
+    /// unprivileged SQPOLL.
     pub fn setup_sqpoll(&mut self, idle: u32) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SQPOLL;
         self.params.sq_thread_idle = idle;
