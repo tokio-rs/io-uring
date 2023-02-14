@@ -488,6 +488,20 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_SQPOLL_NONFIXED != 0
     }
 
+    /// If this flag is set, then the io_uring_enter(2) system call supports passing in an extended
+    /// argument instead of just the sigset_t of earlier kernels. This extended argument is of type
+    /// struct io_uring_getevents_arg and allows the caller to pass in both a sigset_t and a
+    /// timeout argument for waiting on events. The struct layout is as follows:
+    ///
+    /// // struct io_uring_getevents_arg {
+    /// //     __u64 sigmask;
+    /// //     __u32 sigmask_sz;
+    /// //     __u32 pad;
+    /// //     __u64 ts;
+    /// // };
+    ///
+    /// and a pointer to this struct must be passed in if IORING_ENTER_EXT_ARG is set in the flags
+    /// for the enter system call. Available since kernel 5.11.
     pub fn is_feature_ext_arg(&self) -> bool {
         self.0.features & sys::IORING_FEAT_EXT_ARG != 0
     }
