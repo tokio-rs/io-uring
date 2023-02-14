@@ -460,6 +460,13 @@ impl Parameters {
     /// See [the commit message that introduced
     /// it](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=d7718a9d25a61442da8ee8aeeff6a0097f0ccfd6)
     /// for more details.
+    ///
+    /// If this flag is set, then io_uring supports using an internal poll mechanism to drive
+    /// data/space readiness. This means that requests that cannot read or write data to a file no
+    /// longer need to be punted to an async thread for handling, instead they will begin operation
+    /// when the file is ready. This is similar to doing poll + read/write in userspace, but
+    /// eliminates the need to do so. If this flag is set, requests waiting on space/data consume a
+    /// lot less resources doing so as they are not blocking a thread. Available since kernel 5.7.
     pub fn is_feature_fast_poll(&self) -> bool {
         self.0.features & sys::IORING_FEAT_FAST_POLL != 0
     }
