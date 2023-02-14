@@ -128,6 +128,8 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::poll::test_eventfd_poll(&mut ring, &test)?;
     tests::poll::test_eventfd_poll_remove(&mut ring, &test)?;
     tests::poll::test_eventfd_poll_remove_failed(&mut ring, &test)?;
+    #[cfg(not(feature = "ci"))]
+    tests::poll::test_eventfd_poll_multi(&mut ring, &test)?;
 
     // regression test
     tests::regression::test_issue154(&mut ring, &test)?;
