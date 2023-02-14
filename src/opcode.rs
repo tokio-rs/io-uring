@@ -1604,16 +1604,16 @@ opcode!(
     /// A fixed (pre-mapped) buffer can optionally be used from pre-mapped buffers that have been
     /// previously registered with [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     pub struct SendZc {
-        /// The `buf_index` is an index into an array of fixed buffers,
-        /// and is only valid if fixed buffers were registered.
-        ///
-        /// The buf and len arguments must fall within a region specified by buf_index in the
-        /// previously registered buffer. The buffer need not be aligned with the start of the
-        /// registered buffer.
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
         len: { u32 },
         ;;
+        /// The `buf_index` is an index into an array of fixed buffers, and is only valid if fixed
+        /// buffers were registered.
+        ///
+        /// The buf and len arguments must fall within a region specified by buf_index in the
+        /// previously registered buffer. The buffer need not be aligned with the start of the
+        /// registered buffer.
         buf_index: Option<u16> = None,
         flags: i32 = 0,
         zc_flags: u16 = 0,
