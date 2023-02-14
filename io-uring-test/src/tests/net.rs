@@ -211,12 +211,12 @@ pub fn test_tcp_zero_copy_send_fixed<S: squeue::EntryMarker, C: cqueue::EntryMar
     let text_len = text.len();
 
     // This works but is boring, sending data from the head of the registered buffer.
-    //buf0[..text_len].copy_from_slice(&text[..]);
-    //let send_e = opcode::SendZcFixed::new(send_fd, buf0.as_ptr(), text_len as _, 0);
+    // buf0[..text_len].copy_from_slice(&text[..]);
+    // let send_e = opcode::SendZc::new(send_fd, buf0.as_ptr(), text_len as _).buf_index(Some(0));
 
     // Here, send data from the seventh position of the registered buffer.
     buf0[7..(text_len + 7)].copy_from_slice(&text[..]);
-    let send_e = opcode::SendZcFixed::new(send_fd, buf0[7..].as_ptr(), text_len as _, 0);
+    let send_e = opcode::SendZc::new(send_fd, buf0[7..].as_ptr(), text_len as _).buf_index(Some(0));
 
     let recv_e = opcode::Recv::new(recv_fd, output.as_mut_ptr(), output.len() as _);
 
