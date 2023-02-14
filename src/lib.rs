@@ -401,8 +401,8 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
 
     /// Hint the kernel that a single task will submit requests. Used for optimizations. This is
     /// enforced by the kernel, and request that don't respect that will fail with -EEXIST.
-    /// If [`Builder::setup_sqpoll`] is enabled, the polling task is doing the submissions and
-    /// multiple userspace tasks can call [`Submitter::enter`] and higher level APIs.
+    /// If [`Builder::setup_sqpoll`] is enabled, the polling task is doing the submissions and multiple
+    /// userspace tasks can call [`Submitter::enter`] and higher level APIs. Available since 6.0.
     pub fn setup_single_issuer(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SINGLE_ISSUER;
         self
