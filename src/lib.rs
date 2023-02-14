@@ -399,6 +399,21 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
+    /// By default, io_uring will process all outstanding work at the end of any system call or
+    /// thread interrupt. This can delay the application from making other progress. Setting this
+    /// flag will hint to io_uring that it should defer work until an io_uring_enter(2) call with
+    /// the IORING_ENTER_GETEVENTS flag set. This allows the application to request work to run
+    /// just just before it wants to process completions. This flag requires the
+    /// IORING_SETUP_SINGLE_ISSUER flag to be set, and also enforces that the call to
+    /// io_uring_enter(2) is called from the same thread that submitted requests. Note that if this
+    /// flag is set then it is the application's responsibility to periodically trigger work (for
+    /// example via any of the CQE waiting functions) or else completions may not be delivered.
+    /// Available since 6.1.
+    pub fn setup_defer_taskrun(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_DEFER_TASKRUN;
+        self
+    }
+
     /// Hint the kernel that a single task will submit requests. Used for optimizations. This is
     /// enforced by the kernel, and request that don't respect that will fail with -EEXIST.
     /// If [`Builder::setup_sqpoll`] is enabled, the polling task is doing the submissions and multiple
