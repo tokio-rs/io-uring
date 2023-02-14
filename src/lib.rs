@@ -481,6 +481,9 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
     }
 
+    /// If this flag is set, the IORING_SETUP_SQPOLL feature no longer requires the use of fixed
+    /// files. Any normal file descriptor can be used for IO commands without needing registration.
+    /// Available since kernel 5.11.
     pub fn is_feature_sqpoll_nonfixed(&self) -> bool {
         self.0.features & sys::IORING_FEAT_SQPOLL_NONFIXED != 0
     }
