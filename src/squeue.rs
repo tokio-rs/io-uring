@@ -205,6 +205,12 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
         }
     }
 
+    /// Returns `true` if completions are pending that should be processed. Only relevant when used
+    /// in conjuction with the `setup_taskrun_flag` function. Available since 5.19.
+    pub fn taskrun(&self) -> bool {
+        unsafe { (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_TASKRUN != 0 }
+    }
+
     /// Get the total number of entries in the submission queue ring buffer.
     #[inline]
     pub fn capacity(&self) -> usize {
