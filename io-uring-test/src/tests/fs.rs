@@ -231,6 +231,283 @@ pub fn test_file_openat2<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    // Tests close too.
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::OpenAt2::CODE);
+        test.probe.is_supported(opcode::Close::CODE);
+        test.probe.is_supported(opcode::Socket::CODE); // to ensure fixed table support
+    );
+
+    // Cleanup all fixed files (if any), then reserve two slots.
+    let _ = ring.submitter().unregister_files();
+    ring.submitter().register_files_sparse(2).unwrap();
+
+    use tempfile::tempdir;
+
+    println!("test file_openat2_close_file_index");
+
+    let dir = tempdir()?;
+    let dirfd = types::Fd(libc::AT_FDCWD);
+
+    // One more round than table size.
+    for round in 0..3 {
+        let path = dir.path().join(format!(
+            "test-io-uring-openat2-file_index-a-round-{}",
+            round
+        ));
+        let path = CString::new(path.as_os_str().as_bytes())?;
+
+        let openhow = types::OpenHow::new().flags(libc::O_CREAT as _);
+
+        let file_index = types::DestinationSlot::auto_target();
+
+        let op = opcode::OpenAt2::new(dirfd, path.as_ptr(), &openhow);
+        let op = op.file_index(Some(file_index));
+
+        unsafe {
+            ring.submission()
+                .push(&op.build().user_data(0x11).into())
+                .expect("queue is full");
+        }
+
+        ring.submit_and_wait(1)?;
+
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 0x11);
+        if round == 2 {
+            assert!(cqes[0].result() < 0); // expect no room
+        } else {
+            assert_eq!(cqes[0].result(), round); // expect auto selection to go 0, then 1.
+        }
+    }
+
+    // Drop two.
+    for round in 0..2 {
+        let op = opcode::Close::new(types::Fixed(round));
+
+        unsafe {
+            ring.submission()
+                .push(&op.build().user_data(0x12).into())
+                .expect("queue is full");
+        }
+
+        ring.submit_and_wait(1)?;
+
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 0x12);
+        assert_eq!(cqes[0].result(), 0); // successful close iff result is 0
+    }
+
+    // Redo the tests but with manual selection of the file_index value,
+    // and reverse the order for good measure: so 2, 1, then 0.
+    // Another difference: the sucessful result should be zero, not the fixed slot number since
+    // we have not asked for an auto selection to be made for us.
+
+    // One more round than table size.
+    for round in (0..3).rev() {
+        let path = dir.path().join(format!(
+            "test-io-uring-openat2-file_index-b-round-{}",
+            round
+        ));
+        let path = CString::new(path.as_os_str().as_bytes())?;
+
+        let openhow = types::OpenHow::new().flags(libc::O_CREAT as _);
+
+        let file_index = types::DestinationSlot::try_from_slot_target(round).unwrap();
+
+        let op = opcode::OpenAt2::new(dirfd, path.as_ptr(), &openhow);
+        let op = op.file_index(Some(file_index));
+
+        unsafe {
+            ring.submission()
+                .push(&op.build().user_data(0x11).into())
+                .expect("queue is full");
+        }
+
+        ring.submit_and_wait(1)?;
+
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 0x11);
+        if round == 2 {
+            assert!(cqes[0].result() < 0); // expect 2 won't fit, even though it is being asked for first.
+        } else {
+            assert_eq!(cqes[0].result(), 0); // success iff zero
+        }
+    }
+
+    // Drop two.
+    for round in 0..2 {
+        let op = opcode::Close::new(types::Fixed(round));
+
+        unsafe {
+            ring.submission()
+                .push(&op.build().user_data(0x12).into())
+                .expect("queue is full");
+        }
+
+        ring.submit_and_wait(1)?;
+
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 0x12);
+        assert_eq!(cqes[0].result(), 0); // successful close iff result is 0
+    }
+    // If the fixed-socket operation worked properly, this must not fail.
+    ring.submitter().unregister_files().unwrap();
+
+    Ok(())
+}
+
+// This is like the openat2 test of the same name, but uses openat instead.
+pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    // Tests close too.
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::OpenAt::CODE);
+        test.probe.is_supported(opcode::Close::CODE);
+        test.probe.is_supported(opcode::Socket::CODE); // to ensure fixed table support
+    );
+
+    // Cleanup all fixed files (if any), then reserve two slots.
+    let _ = ring.submitter().unregister_files();
+    ring.submitter().register_files_sparse(2).unwrap();
+
+    use tempfile::tempdir;
+
+    println!("test file_openat_close_file_index");
+
+    let dir = tempdir()?;
+    let dirfd = types::Fd(libc::AT_FDCWD);
+
+    // One more round than table size.
+    for round in 0..3 {
+        let path = dir
+            .path()
+            .join(format!("test-io-uring-openat-file_index-a-round-{}", round));
+        let path = CString::new(path.as_os_str().as_bytes())?;
+
+        let file_index = types::DestinationSlot::auto_target();
+
+        let op = opcode::OpenAt::new(dirfd, path.as_ptr());
+        let op = op.flags(libc::O_CREAT as _);
+        let op = op.file_index(Some(file_index));
+
+        unsafe {
+            ring.submission()
+                .push(&op.build().user_data(0x11).into())
+                .expect("queue is full");
+        }
+
+        ring.submit_and_wait(1)?;
+
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 0x11);
+        if round == 2 {
+            assert!(cqes[0].result() < 0); // expect no room
+        } else {
+            assert_eq!(cqes[0].result(), round); // expect auto selection to go 0, then 1.
+        }
+    }
+
+    // Drop two.
+    for round in 0..2 {
+        let op = opcode::Close::new(types::Fixed(round));
+
+        unsafe {
+            ring.submission()
+                .push(&op.build().user_data(0x12).into())
+                .expect("queue is full");
+        }
+
+        ring.submit_and_wait(1)?;
+
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 0x12);
+        assert_eq!(cqes[0].result(), 0); // successful close iff result is 0
+    }
+
+    // Redo the tests but with manual selection of the file_index value,
+    // and reverse the order for good measure: so 2, 1, then 0.
+    // Another difference: the sucessful result should be zero, not the fixed slot number since
+    // we have not asked for an auto selection to be made for us.
+
+    // One more round than table size.
+    for round in (0..3).rev() {
+        let path = dir
+            .path()
+            .join(format!("test-io-uring-openat-file_index-b-round-{}", round));
+        let path = CString::new(path.as_os_str().as_bytes())?;
+
+        let file_index = types::DestinationSlot::try_from_slot_target(round).unwrap();
+
+        let op = opcode::OpenAt::new(dirfd, path.as_ptr());
+        let op = op.flags(libc::O_CREAT as _);
+        let op = op.file_index(Some(file_index));
+
+        unsafe {
+            ring.submission()
+                .push(&op.build().user_data(0x11).into())
+                .expect("queue is full");
+        }
+
+        ring.submit_and_wait(1)?;
+
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 0x11);
+        if round == 2 {
+            assert!(cqes[0].result() < 0); // expect 2 won't fit, even though it is being asked for first.
+        } else {
+            assert_eq!(cqes[0].result(), 0); // success iff zero
+        }
+    }
+
+    // Drop two.
+    for round in 0..2 {
+        let op = opcode::Close::new(types::Fixed(round));
+
+        unsafe {
+            ring.submission()
+                .push(&op.build().user_data(0x12).into())
+                .expect("queue is full");
+        }
+
+        ring.submit_and_wait(1)?;
+
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 0x12);
+        assert_eq!(cqes[0].result(), 0); // successful close iff result is 0
+    }
+    // If the fixed-socket operation worked properly, this must not fail.
+    ring.submitter().unregister_files().unwrap();
+
+    Ok(())
+}
+
 pub fn test_file_close<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
