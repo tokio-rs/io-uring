@@ -353,7 +353,8 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// restrictions, buffers and files before the kernel starts processing submission queue
     /// events. You are only able to [register restrictions](Submitter::register_restrictions) when
     /// the rings are disabled due to concurrency issues. You can enable the rings with
-    /// [`Submitter::register_enable_rings`].
+    /// [`Submitter::register_enable_rings`]. Available since 5.10.
+
     pub fn setup_r_disabled(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_R_DISABLED;
         self
