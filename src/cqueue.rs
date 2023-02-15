@@ -329,3 +329,14 @@ pub fn buffer_select(flags: u32) -> Option<u16> {
 pub fn more(flags: u32) -> bool {
     flags & sys::IORING_CQE_F_MORE != 0
 }
+
+/// Return whether socket has more data ready to read.
+///
+/// This corresponds to the `IORING_CQE_F_SOCK_NONEMPTY` flag, and it signals to
+/// the consumer that the socket has more data that can be read immediately.
+///
+/// The io_uring documentation says recv, recv-multishot, recvmsg, and recvmsg-multishot
+/// can provide this bit in their respective CQE.
+pub fn sock_nonempty(flags: u32) -> bool {
+    flags & sys::IORING_CQE_F_SOCK_NONEMPTY != 0
+}
