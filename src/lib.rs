@@ -353,21 +353,71 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// restrictions, buffers and files before the kernel starts processing submission queue
     /// events. You are only able to [register restrictions](Submitter::register_restrictions) when
     /// the rings are disabled due to concurrency issues. You can enable the rings with
-    /// [`Submitter::register_enable_rings`].
+    /// [`Submitter::register_enable_rings`]. Available since 5.10.
+
     pub fn setup_r_disabled(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_R_DISABLED;
         self
     }
 
+    /// Normally io_uring stops submitting a batch of request, if one of these requests results in
+    /// an error. This can cause submission of less than what is expected, if a request ends in
+    /// error while being submitted. If the ring is created with this flag, io_uring_enter(2) will
+    /// continue submitting requests even if it encounters an error submitting a request. CQEs are
+    /// still posted for errored request regardless of whether or not this flag is set at ring
+    /// creation time, the only difference is if the submit sequence is halted or continued when an
+    /// error is observed. Available since 5.18.
+    pub fn setup_submit_all(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_SUBMIT_ALL;
+        self
+    }
+
+    /// By default, io_uring will interrupt a task running in userspace when a completion event
+    /// comes in. This is to ensure that completions run in a timely manner. For a lot of use
+    /// cases, this is overkill and can cause reduced performance from both the inter-processor
+    /// interrupt used to do this, the kernel/user transition, the needless interruption of the
+    /// tasks userspace activities, and reduced batching if completions come in at a rapid rate.
+    /// Most applications don't need the forceful interruption, as the events are processed at any
+    /// kernel/user transition. The exception are setups where the application uses multiple
+    /// threads operating on the same ring, where the application waiting on completions isn't the
+    /// one that submitted them. For most other use cases, setting this flag will improve
+    /// performance. Available since 5.19.
     pub fn setup_coop_taskrun(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_COOP_TASKRUN;
         self
     }
 
+    /// Used in conjunction with IORING_SETUP_COOP_TASKRUN, this provides a flag,
+    /// IORING_SQ_TASKRUN, which is set in the SQ ring flags whenever completions are pending that
+    /// should be processed. As an example, liburing will check for this flag even when doing
+    /// io_uring_peek_cqe(3) and enter the kernel to process them, and applications can do the
+    /// same. This makes IORING_SETUP_TASKRUN_FLAG safe to use even when applications rely on a
+    /// peek style operation on the CQ ring to see if anything might be pending to reap. Available
+    /// since 5.19.
+    pub fn setup_taskrun_flag(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_TASKRUN_FLAG;
+        self
+    }
+
+    /// By default, io_uring will process all outstanding work at the end of any system call or
+    /// thread interrupt. This can delay the application from making other progress. Setting this
+    /// flag will hint to io_uring that it should defer work until an io_uring_enter(2) call with
+    /// the IORING_ENTER_GETEVENTS flag set. This allows the application to request work to run
+    /// just just before it wants to process completions. This flag requires the
+    /// IORING_SETUP_SINGLE_ISSUER flag to be set, and also enforces that the call to
+    /// io_uring_enter(2) is called from the same thread that submitted requests. Note that if this
+    /// flag is set then it is the application's responsibility to periodically trigger work (for
+    /// example via any of the CQE waiting functions) or else completions may not be delivered.
+    /// Available since 6.1.
+    pub fn setup_defer_taskrun(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_DEFER_TASKRUN;
+        self
+    }
+
     /// Hint the kernel that a single task will submit requests. Used for optimizations. This is
     /// enforced by the kernel, and request that don't respect that will fail with -EEXIST.
-    /// If [`Builder::setup_sqpoll`] is enabled, the polling task is doing the submissions and
-    /// multiple userspace tasks can call [`Submitter::enter`] and higher level APIs.
+    /// If [`Builder::setup_sqpoll`] is enabled, the polling task is doing the submissions and multiple
+    /// userspace tasks can call [`Submitter::enter`] and higher level APIs. Available since 6.0.
     pub fn setup_single_issuer(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SINGLE_ISSUER;
         self
