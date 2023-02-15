@@ -144,7 +144,7 @@ impl<'a> Submitter<'a> {
         let len = self.sq_len();
         let mut flags = sys::IORING_ENTER_EXT_ARG;
 
-        if want > 0 {
+        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow() {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
