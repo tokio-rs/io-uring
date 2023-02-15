@@ -177,6 +177,92 @@ pub fn test_tcp_zero_copy_send_recv<S: squeue::EntryMarker, C: cqueue::EntryMark
     Ok(())
 }
 
+pub fn test_tcp_zero_copy_send_fixed<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::SendZc::CODE);
+        test.probe.is_supported(opcode::Recv::CODE);
+    );
+
+    println!("test tcp_zero_copy_send_fixed");
+
+    let (send_stream, recv_stream) = tcp_pair()?;
+
+    let send_fd = types::Fd(send_stream.as_raw_fd());
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+
+    let text = b"The quick brown fox jumps over the lazy dog.";
+    let mut output = vec![0; text.len()];
+
+    // Cleanup all fixed buffers (if any), then register one, with id 0.
+    let _ = ring.submitter().unregister_buffers();
+
+    let mut buf0 = vec![0; 1024];
+    let iovec = libc::iovec {
+        iov_base: buf0.as_ptr() as _,
+        iov_len: buf0.len() as _,
+    };
+    let iovecs = [iovec];
+    ring.submitter().register_buffers(&iovecs).unwrap();
+
+    let text_len = text.len();
+
+    // This works but is boring, sending data from the head of the registered buffer.
+    // buf0[..text_len].copy_from_slice(&text[..]);
+    // let send_e = opcode::SendZc::new(send_fd, buf0.as_ptr(), text_len as _).buf_index(Some(0));
+
+    // Here, send data from the seventh position of the registered buffer.
+    buf0[7..(text_len + 7)].copy_from_slice(&text[..]);
+    let send_e = opcode::SendZc::new(send_fd, buf0[7..].as_ptr(), text_len as _).buf_index(Some(0));
+
+    let recv_e = opcode::Recv::new(recv_fd, output.as_mut_ptr(), output.len() as _);
+
+    unsafe {
+        let mut queue = ring.submission();
+        let send_e = send_e
+            .build()
+            .user_data(0x01)
+            .flags(squeue::Flags::IO_LINK)
+            .into();
+        queue.push(&send_e).expect("queue is full");
+        queue
+            .push(&recv_e.build().user_data(0x02).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(2)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 3);
+    // Send completion is ordered w.r.t recv
+    assert_eq!(cqes[0].user_data(), 0x01);
+    assert!(io_uring::cqueue::more(cqes[0].flags()));
+    assert_eq!(cqes[0].result(), text.len() as i32);
+
+    // Notification is not ordered w.r.t recv
+    match (cqes[1].user_data(), cqes[2].user_data()) {
+        (0x01, 0x02) => {
+            assert!(!io_uring::cqueue::more(cqes[1].flags()));
+            assert_eq!(cqes[2].result(), text.len() as i32);
+            assert_eq!(&output[..cqes[2].result() as usize], text);
+        }
+        (0x02, 0x01) => {
+            assert!(!io_uring::cqueue::more(cqes[2].flags()));
+            assert_eq!(cqes[1].result(), text.len() as i32);
+            assert_eq!(&output[..cqes[1].result() as usize], text);
+        }
+        _ => unreachable!(),
+    }
+
+    let _ = ring.submitter().unregister_buffers();
+
+    Ok(())
+}
+
 pub fn test_tcp_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
