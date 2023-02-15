@@ -308,10 +308,15 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// again with a system call (this is handled by [`Submitter::submit`] and
     /// [`Submitter::submit_and_wait`] automatically).
     ///
-    /// When using this, you _must_ register all file descriptors with the [`Submitter`] via
-    /// [`Submitter::register_files`].
-    ///
-    /// This requires root priviliges.
+    /// Before version 5.11 of the Linux kernel, to successfully use this feature, the application
+    /// must register a set of files to be used for IO through io_uring_register(2) using the
+    /// IORING_REGISTER_FILES opcode. Failure to do so will result in submitted IO being errored
+    /// with EBADF. The presence of this feature can be detected by the IORING_FEAT_SQPOLL_NONFIXED
+    /// feature flag. In version 5.11 and later, it is no longer necessary to register files to use
+    /// this feature. 5.11 also allows using this as non-root, if the user has the CAP_SYS_NICE
+    /// capability. In 5.13 this requirement was also relaxed, and no special privileges are needed
+    /// for SQPOLL in newer kernels. Certain stable kernels older than 5.13 may also support
+    /// unprivileged SQPOLL.
     pub fn setup_sqpoll(&mut self, idle: u32) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SQPOLL;
         self.params.sq_thread_idle = idle;
@@ -505,51 +510,87 @@ impl Parameters {
     /// See [the commit message that introduced
     /// it](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=d7718a9d25a61442da8ee8aeeff6a0097f0ccfd6)
     /// for more details.
+    ///
+    /// If this flag is set, then io_uring supports using an internal poll mechanism to drive
+    /// data/space readiness. This means that requests that cannot read or write data to a file no
+    /// longer need to be punted to an async thread for handling, instead they will begin operation
+    /// when the file is ready. This is similar to doing poll + read/write in userspace, but
+    /// eliminates the need to do so. If this flag is set, requests waiting on space/data consume a
+    /// lot less resources doing so as they are not blocking a thread. Available since kernel 5.7.
     pub fn is_feature_fast_poll(&self) -> bool {
         self.0.features & sys::IORING_FEAT_FAST_POLL != 0
     }
 
     /// Whether poll events are stored using 32 bits instead of 16. This allows the user to use
     /// `EPOLLEXCLUSIVE`.
+    ///
+    /// If this flag is set, the IORING_OP_POLL_ADD command accepts the full 32-bit range of epoll
+    /// based flags. Most notably EPOLLEXCLUSIVE which allows exclusive (waking single waiters)
+    /// behavior. Available since kernel 5.9.
     pub fn is_feature_poll_32bits(&self) -> bool {
         self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
     }
 
+    /// If this flag is set, the IORING_SETUP_SQPOLL feature no longer requires the use of fixed
+    /// files. Any normal file descriptor can be used for IO commands without needing registration.
+    /// Available since kernel 5.11.
     pub fn is_feature_sqpoll_nonfixed(&self) -> bool {
         self.0.features & sys::IORING_FEAT_SQPOLL_NONFIXED != 0
     }
 
+    /// If this flag is set, then the io_uring_enter(2) system call supports passing in an extended
+    /// argument instead of just the sigset_t of earlier kernels. This extended argument is of type
+    /// struct io_uring_getevents_arg and allows the caller to pass in both a sigset_t and a
+    /// timeout argument for waiting on events. The struct layout is as follows:
+    ///
+    /// // struct io_uring_getevents_arg {
+    /// //     __u64 sigmask;
+    /// //     __u32 sigmask_sz;
+    /// //     __u32 pad;
+    /// //     __u64 ts;
+    /// // };
+    ///
+    /// and a pointer to this struct must be passed in if IORING_ENTER_EXT_ARG is set in the flags
+    /// for the enter system call. Available since kernel 5.11.
     pub fn is_feature_ext_arg(&self) -> bool {
         self.0.features & sys::IORING_FEAT_EXT_ARG != 0
     }
 
+    /// If this flag is set, io_uring is using native workers for its async helpers. Previous
+    /// kernels used kernel threads that assumed the identity of the original io_uring owning task,
+    /// but later kernels will actively create what looks more like regular process threads
+    /// instead. Available since kernel 5.12.
     pub fn is_feature_native_workers(&self) -> bool {
         self.0.features & sys::IORING_FEAT_NATIVE_WORKERS != 0
     }
 
     /// Whether the kernel supports tagging resources.
     ///
-    /// This feature allows attaching tags to resources.
-    /// Resources that are registered with a tag can be updated
-    /// in place, without having to unregister them first.
+    /// If this flag is set, then io_uring supports a variety of features related to fixed files
+    /// and buffers. In particular, it indicates that registered buffers can be updated in-place,
+    /// whereas before the full set would have to be unregistered first. Available since kernel
+    /// 5.13.
     pub fn is_feature_resource_tagging(&self) -> bool {
         self.0.features & sys::IORING_FEAT_RSRC_TAGS != 0
     }
 
     /// Whether the kernel supports `IOSQE_CQE_SKIP_SUCCESS`.
     ///
-    /// This feature allows skipping the generation of a CQE
-    /// if a SQE executes normally.
+    /// This feature allows skipping the generation of a CQE if a SQE executes normally. Available
+    /// since kernel 5.17.
     pub fn is_feature_skip_cqe_on_success(&self) -> bool {
         self.0.features & sys::IORING_FEAT_CQE_SKIP != 0
     }
 
     /// Whether the kernel supports deferred file assignment.
     ///
-    /// This feature allows the kernel to operate lazily when
-    /// preparing fixed files for chained operations. Without this,
-    /// the kernel will prepare all files upfront for a whole chain
-    /// of linked operations.
+    /// If this flag is set, then io_uring supports sane assignment of files for SQEs that have
+    /// dependencies. For example, if a chain of SQEs are submitted with IOSQE_IO_LINK, then
+    /// kernels without this flag will prepare the file for each link upfront. If a previous link
+    /// opens a file with a known index, eg if direct descriptors are used with open or accept,
+    /// then file assignment needs to happen post execution of that SQE. If this flag is set, then
+    /// the kernel will defer file assignment until execution of a given request is started.
+    /// Available since kernel 5.17.
     pub fn is_feature_linked_file(&self) -> bool {
         self.0.features & sys::IORING_FEAT_LINKED_FILE != 0
     }
