@@ -330,3 +330,148 @@ impl DestinationSlot {
         self.dest.get()
     }
 }
+
+/// Helper structure for parsing the result of a multishot [`opcode::RecvMsg`](crate::opcode::RecvMsg).
+#[derive(Debug)]
+pub struct RecvMsgOut<'buf> {
+    header: sys::io_uring_recvmsg_out,
+    /// The fixed length of the name field, in bytes.
+    ///
+    /// If the incoming name data is larger than this, it gets truncated to this.
+    /// If it is smaller, it gets 0-padded to fill the whole field. In either case,
+    /// this fixed amount of space is reserved in the result buffer.
+    msghdr_name_len: usize,
+    /// The fixed length of the control field, in bytes.
+    ///
+    /// This follows the same semantics as the field above, but for control data.
+    msghdr_control_len: usize,
+    name_data: &'buf [u8],
+    control_data: &'buf [u8],
+    payload_data: &'buf [u8],
+}
+
+impl<'buf> RecvMsgOut<'buf> {
+    const DATA_START: usize = std::mem::size_of::<sys::io_uring_recvmsg_out>();
+
+    /// Parse the data buffered upon completion of a `RecvMsg` multishot operation.
+    ///
+    /// `buffer` is the whole buffer previously provided to the ring, while `msghdr`
+    /// is the same content provided as input to the corresponding SQE
+    /// (only `msg_namelen` and `msg_controllen` fields are relevant).
+    pub fn parse(buffer: &'buf [u8], msghdr: &libc::msghdr) -> Result<Self, ()> {
+        if buffer.len() < std::mem::size_of::<sys::io_uring_recvmsg_out>() {
+            return Err(());
+        }
+        // SAFETY: buffer (minimum) length is checked here above.
+        let header: sys::io_uring_recvmsg_out =
+            unsafe { std::ptr::read_unaligned(buffer.as_ptr() as _) };
+
+        let msghdr_name_len = msghdr.msg_namelen as _;
+        let msghdr_control_len = msghdr.msg_controllen as _;
+
+        // Check total length upfront, so that further logic here
+        // below can safely use unchecked/saturating math.
+        let length_overflow = Some(Self::DATA_START)
+            .and_then(|acc| acc.checked_add(msghdr_name_len))
+            .and_then(|acc| acc.checked_add(msghdr_control_len))
+            .and_then(|acc| acc.checked_add(header.payloadlen as usize))
+            .map(|total_len| total_len > buffer.len())
+            .unwrap_or(true);
+        if length_overflow {
+            return Err(());
+        }
+
+        let (name_data, control_start) = {
+            let name_start = Self::DATA_START;
+            let name_size = usize::min(header.namelen as usize, msghdr_name_len);
+            let name_data_end = name_start.saturating_add(name_size);
+            let name_data = &buffer[name_start..name_data_end];
+            let name_field_end = name_start.saturating_add(msghdr_name_len);
+            (name_data, name_field_end)
+        };
+        let (control_data, payload_start) = {
+            let control_size = usize::min(header.controllen as usize, msghdr_control_len);
+            let control_data_end = control_start.saturating_add(control_size);
+            let control_data = &buffer[control_start..control_data_end];
+            let control_field_end = control_start.saturating_add(msghdr_control_len);
+            (control_data, control_field_end)
+        };
+        let payload_data = {
+            let payload_data_end = payload_start.saturating_add(header.payloadlen as usize);
+            &buffer[payload_start..payload_data_end]
+        };
+
+        Ok(Self {
+            header,
+            msghdr_name_len,
+            msghdr_control_len,
+            name_data,
+            control_data,
+            payload_data,
+        })
+    }
+
+    /// Return the length of the incoming `name` data.
+    ///
+    /// This may be larger than the size of the content returned by
+    /// `name_data()`, if the kernel could not fit all the incoming
+    /// data in the provided buffer size. In that case, name data in
+    /// the result buffer gets truncated.
+    pub fn incoming_name_len(&self) -> u32 {
+        self.header.namelen
+    }
+
+    /// Return whether the incoming name data was larger than the provided limit/buffer.
+    ///
+    /// When `true`, data returned by `name_data()` is truncated and
+    /// incomplete.
+    pub fn is_name_data_truncated(&self) -> bool {
+        self.header.namelen as usize > self.msghdr_name_len
+    }
+
+    /// Message control data, with the same semantics as `msghdr.msg_control`.
+    pub fn name_data(&self) -> &[u8] {
+        self.name_data
+    }
+
+    /// Return the length of the incoming `control` data.
+    ///
+    /// This may be larger than the size of the content returned by
+    /// `control_data()`, if the kernel could not fit all the incoming
+    /// data in the provided buffer size. In that case, control data in
+    /// the result buffer gets truncated.
+    pub fn incoming_control_len(&self) -> u32 {
+        self.header.controllen
+    }
+
+    /// Return whether the incoming control data was larger than the provided limit/buffer.
+    ///
+    /// When `true`, data returned by `control_data()` is truncated and
+    /// incomplete.
+    pub fn is_control_data_truncated(&self) -> bool {
+        self.header.controllen as usize > self.msghdr_control_len
+    }
+
+    /// Message control data, with the same semantics as `msghdr.msg_control`.
+    pub fn control_data(&self) -> &[u8] {
+        self.control_data
+    }
+
+    /// Return whether the incoming payload was larger than the provided limit/buffer.
+    ///
+    /// When `true`, data returned by `payload_data()` is truncated and
+    /// incomplete.
+    pub fn is_payload_truncated(&self) -> bool {
+        self.header.flags & (libc::MSG_TRUNC as u32) != 0
+    }
+
+    /// Message payload, as buffered by the kernel.
+    pub fn payload_data(&self) -> &[u8] {
+        self.payload_data
+    }
+
+    /// Message flags, with the same semantics as `msghdr.msg_flags`.
+    pub fn flags(&self) -> u32 {
+        self.header.flags
+    }
+}
