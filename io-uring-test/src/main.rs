@@ -127,6 +127,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     #[cfg(not(feature = "ci"))]
     tests::net::test_tcp_recv_multi(&mut ring, &test)?;
     tests::net::test_socket(&mut ring, &test)?;
+    tests::net::test_udp_recvmsg_multishot(&mut ring, &test)?;
 
     // queue
     tests::poll::test_eventfd_poll(&mut ring, &test)?;
