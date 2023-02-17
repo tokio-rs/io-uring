@@ -1292,16 +1292,11 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     msghdr.msg_namelen = 32;
     msghdr.msg_controllen = 0;
 
-    // TODO(lucab): make this more ergonomic to use.
-    const IORING_RECV_MULTISHOT: u16 = 2;
-
-    let recvmsg_e = io_uring::opcode::RecvMsg::new(socket_slot, &mut msghdr as *mut _)
-        .ioprio(IORING_RECV_MULTISHOT)
-        .buf_group(BUF_GROUP)
-        .build()
-        .flags(io_uring::squeue::Flags::BUFFER_SELECT)
-        .user_data(77)
-        .into();
+    let recvmsg_e =
+        io_uring::opcode::RecvMsgMulti::new(socket_slot, &mut msghdr as *mut _, BUF_GROUP)
+            .build()
+            .user_data(77)
+            .into();
     unsafe { ring.submission().push(&recvmsg_e)? };
     ring.submitter().submit().unwrap();
 
