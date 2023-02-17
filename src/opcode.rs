@@ -536,7 +536,7 @@ opcode!(
     #[derive(Debug)]
     pub struct RecvMsgMulti {
         fd: { impl sealed::UseFixed },
-        msg: { *mut libc::msghdr },
+        msg: { *const libc::msghdr },
         buf_group: { u16 },
         ;;
         ioprio: u16 = 0,
