@@ -1293,7 +1293,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     msghdr.msg_controllen = 0;
 
     let recvmsg_e =
-        io_uring::opcode::RecvMsgMulti::new(socket_slot, &mut msghdr as *mut _, BUF_GROUP)
+        io_uring::opcode::RecvMsgMulti::new(socket_slot, &msghdr as *const _, BUF_GROUP)
             .build()
             .user_data(77)
             .into();
