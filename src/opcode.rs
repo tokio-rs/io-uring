@@ -510,6 +510,58 @@ opcode!(
 );
 
 opcode!(
+    /// Receive multiple messages on a socket, equivalent to `recvmsg(2)`.
+    ///
+    /// Parameters:
+    ///     msg:       For this multishot variant of ResvMsg, only the msg_namelen and msg_controllen
+    ///                fields are relevant.
+    ///     buf_group: The id of the provided buffer pool to use for each received message.
+    ///
+    /// See also the description of [`SendMsg`] and [`types::RecvMsgOut`].
+    ///
+    /// The multishot version allows the application to issue a single receive request, which
+    /// repeatedly posts a CQE when data is available. It requires the MSG_WAITALL flag is not set.
+    /// Each CQE will take a buffer out of a provided buffer pool for receiving. The application
+    /// should check the flags of each CQE, regardless of its result. If a posted CQE does not have
+    /// the IORING_CQE_F_MORE flag set then the multishot receive will be done and the application
+    /// should issue a new request.
+    ///
+    /// Unlike [`RecvMsg`], this multishot recvmsg will prepend a struct which describes the layout
+    /// of the rest of the buffer in combination with the initial msghdr structure submitted with
+    /// the request. Use [`types::RecvMsgOut`] to parse the data received and access its
+    /// components.
+    ///
+    /// The recvmsg multishot variant is available since kernel 6.0.
+
+    #[derive(Debug)]
+    pub struct RecvMsgMulti {
+        fd: { impl sealed::UseFixed },
+        msg: { *const libc::msghdr },
+        buf_group: { u16 },
+        ;;
+        ioprio: u16 = 0,
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_RECVMSG;
+
+    pub fn build(self) -> Entry {
+        let RecvMsgMulti { fd, msg, buf_group, ioprio, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = msg as _;
+        sqe.len = 1;
+        sqe.__bindgen_anon_3.msg_flags = flags;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.ioprio = ioprio | (sys::IORING_RECV_MULTISHOT as u16);
+        Entry(sqe)
+    }
+);
+
+opcode!(
     /// Register a timeout operation.
     ///
     /// A timeout will trigger a wakeup event on the completion ring for anyone waiting for events.
@@ -1100,7 +1152,19 @@ opcode!(
 opcode!(
     /// Receive multiple messages from a socket, equivalent to `recv(2)`.
     ///
+    /// Parameter:
+    ///     buf_group: The id of the provided buffer pool to use for each received message.
+    ///
     /// MSG_WAITALL should not be set in flags.
+    ///
+    /// The multishot version allows the application to issue a single receive request, which
+    /// repeatedly posts a CQE when data is available. Each CQE will take a buffer out of a
+    /// provided buffer pool for receiving. The application should check the flags of each CQE,
+    /// regardless of its result. If a posted CQE does not have the IORING_CQE_F_MORE flag set then
+    /// the multishot receive will be done and the application should issue a new request.
+    ///
+    /// Multishot variants are available since kernel 6.0.
+
     pub struct RecvMulti {
         fd: { impl sealed::UseFixed },
         buf_group: { u16 },
@@ -1118,7 +1182,7 @@ opcode!(
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
-        sqe.flags = 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
         sqe.ioprio = sys::IORING_RECV_MULTISHOT as _;
         Entry(sqe)
     }
