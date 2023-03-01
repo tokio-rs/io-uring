@@ -17,18 +17,12 @@ exclude = []
 members = [ "io-uring-test", "io-uring-bench" ]
 
 [features]
-unstable = []
-overwrite = [ "bindgen" ]
-direct-syscall = [ "sc" ]
-io_safety = []
+default = ["std"]
+std = ["rustix/std"]
 
 [dependencies]
-bitflags = "1"
 libc = { version = "0.2.98", default-features = false }
-sc = { version = "0.2", optional = true }
-
-[build-dependencies]
-bindgen = { version = "0.61", optional = true }
+rustix = { git = "https://github.com/jordanisaacs/rustix.git", branch = "iouring-flags", default-features = false, features = ["io_uring", "mm", "time"] }
 
 [dev-dependencies]
 anyhow = "1"

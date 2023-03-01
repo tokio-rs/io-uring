@@ -3,6 +3,7 @@
 //! The crate only provides a summary of the parameters.
 //! For more detailed documentation, see manpage.
 #![warn(rust_2018_idioms, unused_qualifications)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[macro_use]
 mod util;
@@ -11,24 +12,25 @@ pub mod opcode;
 pub mod register;
 pub mod squeue;
 mod submit;
-mod sys;
 pub mod types;
 
-use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::{cmp, io, mem};
+use core::marker::PhantomData;
+use core::mem::ManuallyDrop;
+use core::{cmp, mem};
 
-#[cfg(feature = "io_safety")]
-use std::os::unix::io::{AsFd, BorrowedFd};
+use cqueue::Sealed as _;
+use rustix::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
+use rustix::io_uring::{IoringFeatureFlags, IoringSetupFlags};
+use rustix::{io, io_uring};
+use squeue::Sealed as _;
+use util::Mmap;
 
 pub use cqueue::CompletionQueue;
-use cqueue::Sealed as _;
 pub use register::Probe;
-use squeue::Sealed as _;
 pub use squeue::SubmissionQueue;
 pub use submit::Submitter;
-use util::{Mmap, OwnedFd};
+
+extern crate alloc;
 
 /// IoUring instance
 ///
@@ -55,13 +57,13 @@ struct MemoryMap {
 #[derive(Clone, Default)]
 pub struct Builder<S: squeue::EntryMarker = squeue::Entry, C: cqueue::EntryMarker = cqueue::Entry> {
     dontfork: bool,
-    params: sys::io_uring_params,
+    params: io_uring::io_uring_params,
     phantom: PhantomData<(S, C)>,
 }
 
 /// The parameters that were used to construct an [`IoUring`].
 #[derive(Clone)]
-pub struct Parameters(sys::io_uring_params);
+pub struct Parameters(io_uring::io_uring_params);
 
 unsafe impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Send for IoUring<S, C> {}
 unsafe impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Sync for IoUring<S, C> {}
@@ -83,7 +85,7 @@ impl IoUring<squeue::Entry, cqueue::Entry> {
     pub fn builder() -> Builder<squeue::Entry, cqueue::Entry> {
         Builder {
             dontfork: false,
-            params: sys::io_uring_params {
+            params: io_uring::io_uring_params {
                 flags: squeue::Entry::ADDITIONAL_FLAGS | cqueue::Entry::ADDITIONAL_FLAGS,
                 ..Default::default()
             },
@@ -115,7 +117,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
     pub fn generic_builder() -> Builder<S, C> {
         Builder {
             dontfork: false,
-            params: sys::io_uring_params {
+            params: io_uring::io_uring_params {
                 flags: S::ADDITIONAL_FLAGS | C::ADDITIONAL_FLAGS,
                 ..Default::default()
             },
@@ -123,7 +125,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
         }
     }
 
-    fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<Self> {
+    fn with_params(entries: u32, mut p: io_uring::io_uring_params) -> io::Result<Self> {
         // NOTE: The `SubmissionQueue` and `CompletionQueue` are references,
         // and their lifetime can never exceed `MemoryMap`.
         //
@@ -134,16 +136,19 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
         #[inline]
         unsafe fn setup_queue<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
             fd: &OwnedFd,
-            p: &sys::io_uring_params,
+            p: &io_uring::io_uring_params,
         ) -> io::Result<(MemoryMap, squeue::Inner<S>, cqueue::Inner<C>)> {
             let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
             let cq_len = p.cq_off.cqes as usize + p.cq_entries as usize * mem::size_of::<C>();
             let sqe_len = p.sq_entries as usize * mem::size_of::<S>();
-            let sqe_mmap = Mmap::new(fd, sys::IORING_OFF_SQES as _, sqe_len)?;
+            let sqe_mmap = Mmap::new(fd, io_uring::IORING_OFF_SQES, sqe_len)?;
 
-            if p.features & sys::IORING_FEAT_SINGLE_MMAP != 0 {
-                let scq_mmap =
-                    Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, cmp::max(sq_len, cq_len))?;
+            if p.features.intersects(IoringFeatureFlags::SINGLE_MMAP) {
+                let scq_mmap = Mmap::new(
+                    fd,
+                    io_uring::IORING_OFF_SQ_RING as _,
+                    cmp::max(sq_len, cq_len),
+                )?;
 
                 let sq = squeue::Inner::new(&scq_mmap, &sqe_mmap, p);
                 let cq = cqueue::Inner::new(&scq_mmap, p);
@@ -155,8 +160,8 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
 
                 Ok((mm, sq, cq))
             } else {
-                let sq_mmap = Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, sq_len)?;
-                let cq_mmap = Mmap::new(fd, sys::IORING_OFF_CQ_RING as _, cq_len)?;
+                let sq_mmap = Mmap::new(fd, io_uring::IORING_OFF_SQ_RING as _, sq_len)?;
+                let cq_mmap = Mmap::new(fd, io_uring::IORING_OFF_CQ_RING as _, cq_len)?;
 
                 let sq = squeue::Inner::new(&sq_mmap, &sqe_mmap, p);
                 let cq = cqueue::Inner::new(&cq_mmap, p);
@@ -170,8 +175,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
             }
         }
 
-        let fd: OwnedFd =
-            unsafe { sys::io_uring_setup(entries, &mut p).map(|fd| OwnedFd::from_raw_fd(fd))? };
+        let fd: OwnedFd = io_uring::io_uring_setup(entries, &mut p)?;
 
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
@@ -296,7 +300,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     ///
     /// This is only usable on file systems that support polling and files opened with `O_DIRECT`.
     pub fn setup_iopoll(&mut self) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_IOPOLL;
+        self.params.flags |= IoringSetupFlags::IOPOLL;
         self
     }
 
@@ -311,14 +315,14 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// Before version 5.11 of the Linux kernel, to successfully use this feature, the application
     /// must register a set of files to be used for IO through io_uring_register(2) using the
     /// IORING_REGISTER_FILES opcode. Failure to do so will result in submitted IO being errored
-    /// with EBADF. The presence of this feature can be detected by the IORING_FEAT_SQPOLL_NONFIXED
+    /// with EBADF. The presence of this feature can be detected by the IORING_SQPOLL_NONFIXED
     /// feature flag. In version 5.11 and later, it is no longer necessary to register files to use
     /// this feature. 5.11 also allows using this as non-root, if the user has the CAP_SYS_NICE
     /// capability. In 5.13 this requirement was also relaxed, and no special privileges are needed
     /// for SQPOLL in newer kernels. Certain stable kernels older than 5.13 may also support
     /// unprivileged SQPOLL.
     pub fn setup_sqpoll(&mut self, idle: u32) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_SQPOLL;
+        self.params.flags |= IoringSetupFlags::SQPOLL;
         self.params.sq_thread_idle = idle;
         self
     }
@@ -326,7 +330,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// Bind the kernel's poll thread to the specified cpu. This flag is only meaningful when
     /// [`Builder::setup_sqpoll`] is enabled.
     pub fn setup_sqpoll_cpu(&mut self, cpu: u32) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_SQ_AFF;
+        self.params.flags |= IoringSetupFlags::SQ_AFF;
         self.params.sq_thread_cpu = cpu;
         self
     }
@@ -334,7 +338,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// Create the completion queue with the specified number of entries. The value must be greater
     /// than `entries`, and may be rounded up to the next power-of-two.
     pub fn setup_cqsize(&mut self, entries: u32) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_CQSIZE;
+        self.params.flags |= IoringSetupFlags::CQSIZE;
         self.params.cq_entries = entries;
         self
     }
@@ -342,14 +346,14 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// Clamp the sizes of the submission queue and completion queue at their maximum values instead
     /// of returning an error when you attempt to resize them beyond their maximum values.
     pub fn setup_clamp(&mut self) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_CLAMP;
+        self.params.flags |= IoringSetupFlags::CLAMP;
         self
     }
 
     /// Share the asynchronous worker thread backend of this io_uring with the specified io_uring
     /// file descriptor instead of creating a new thread pool.
     pub fn setup_attach_wq(&mut self, fd: RawFd) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_ATTACH_WQ;
+        self.params.flags |= IoringSetupFlags::ATTACH_WQ;
         self.params.wq_fd = fd as _;
         self
     }
@@ -361,7 +365,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// [`Submitter::register_enable_rings`]. Available since 5.10.
 
     pub fn setup_r_disabled(&mut self) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_R_DISABLED;
+        self.params.flags |= IoringSetupFlags::R_DISABLED;
         self
     }
 
@@ -373,7 +377,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// creation time, the only difference is if the submit sequence is halted or continued when an
     /// error is observed. Available since 5.18.
     pub fn setup_submit_all(&mut self) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_SUBMIT_ALL;
+        self.params.flags |= IoringSetupFlags::SUBMIT_ALL;
         self
     }
 
@@ -388,19 +392,19 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// one that submitted them. For most other use cases, setting this flag will improve
     /// performance. Available since 5.19.
     pub fn setup_coop_taskrun(&mut self) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_COOP_TASKRUN;
+        self.params.flags |= IoringSetupFlags::COOP_TASKRUN;
         self
     }
 
-    /// Used in conjunction with IORING_SETUP_COOP_TASKRUN, this provides a flag,
+    /// Used in conjunction with IORING_COOP_TASKRUN, this provides a flag,
     /// IORING_SQ_TASKRUN, which is set in the SQ ring flags whenever completions are pending that
     /// should be processed. As an example, liburing will check for this flag even when doing
     /// io_uring_peek_cqe(3) and enter the kernel to process them, and applications can do the
-    /// same. This makes IORING_SETUP_TASKRUN_FLAG safe to use even when applications rely on a
+    /// same. This makes IORING_TASKRUN_FLAG safe to use even when applications rely on a
     /// peek style operation on the CQ ring to see if anything might be pending to reap. Available
     /// since 5.19.
     pub fn setup_taskrun_flag(&mut self) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_TASKRUN_FLAG;
+        self.params.flags |= IoringSetupFlags::TASKRUN_FLAG;
         self
     }
 
@@ -409,13 +413,13 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// flag will hint to io_uring that it should defer work until an io_uring_enter(2) call with
     /// the IORING_ENTER_GETEVENTS flag set. This allows the application to request work to run
     /// just just before it wants to process completions. This flag requires the
-    /// IORING_SETUP_SINGLE_ISSUER flag to be set, and also enforces that the call to
+    /// IORING_SINGLE_ISSUER flag to be set, and also enforces that the call to
     /// io_uring_enter(2) is called from the same thread that submitted requests. Note that if this
     /// flag is set then it is the application's responsibility to periodically trigger work (for
     /// example via any of the CQE waiting functions) or else completions may not be delivered.
     /// Available since 6.1.
     pub fn setup_defer_taskrun(&mut self) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_DEFER_TASKRUN;
+        self.params.flags |= IoringSetupFlags::SETUP_DEFER_TASKRUN;
         self
     }
 
@@ -424,7 +428,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// If [`Builder::setup_sqpoll`] is enabled, the polling task is doing the submissions and multiple
     /// userspace tasks can call [`Submitter::enter`] and higher level APIs. Available since 6.0.
     pub fn setup_single_issuer(&mut self) -> &mut Self {
-        self.params.flags |= sys::IORING_SETUP_SINGLE_ISSUER;
+        self.params.flags |= IoringSetupFlags::SETUP_SINGLE_ISSUER;
         self
     }
 
@@ -448,37 +452,41 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
 impl Parameters {
     /// Whether a kernel thread is performing queue polling. Enabled with [`Builder::setup_sqpoll`].
     pub fn is_setup_sqpoll(&self) -> bool {
-        self.0.flags & sys::IORING_SETUP_SQPOLL != 0
+        self.0.flags.intersects(IoringSetupFlags::SQPOLL)
     }
 
     /// Whether waiting for completion events is done with a busy loop instead of using IRQs.
     /// Enabled with [`Builder::setup_iopoll`].
     pub fn is_setup_iopoll(&self) -> bool {
-        self.0.flags & sys::IORING_SETUP_IOPOLL != 0
+        self.0.flags.intersects(IoringSetupFlags::IOPOLL)
     }
 
     /// Whether the single issuer hint is enabled. Enabled with [`Builder::setup_single_issuer`].
     pub fn is_setup_single_issuer(&self) -> bool {
-        self.0.flags & sys::IORING_SETUP_SINGLE_ISSUER != 0
+        self.0
+            .flags
+            .intersects(IoringSetupFlags::SETUP_SINGLE_ISSUER)
     }
 
     /// If this flag is set, the SQ and CQ rings were mapped with a single `mmap(2)` call. This
     /// means that only two syscalls were used instead of three.
     pub fn is_feature_single_mmap(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_SINGLE_MMAP != 0
+        self.0.features.intersects(IoringFeatureFlags::SINGLE_MMAP)
     }
 
     /// If this flag is set, io_uring supports never dropping completion events. If a completion
     /// event occurs and the CQ ring is full, the kernel stores the event internally until such a
     /// time that the CQ ring has room for more entries.
     pub fn is_feature_nodrop(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_NODROP != 0
+        self.0.features.intersects(IoringFeatureFlags::NODROP)
     }
 
     /// If this flag is set, applications can be certain that any data for async offload has been
     /// consumed when the kernel has consumed the SQE.
     pub fn is_feature_submit_stable(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_SUBMIT_STABLE != 0
+        self.0
+            .features
+            .intersects(IoringFeatureFlags::SUBMIT_STABLE)
     }
 
     /// If this flag is set, applications can specify offset == -1 with [`Readv`](opcode::Readv),
@@ -491,7 +499,7 @@ impl Parameters {
     /// then the end result will not be as expected.
     /// This is similar to threads sharing a file descriptor and doing IO using the current file position.
     pub fn is_feature_rw_cur_pos(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_RW_CUR_POS != 0
+        self.0.features.intersects(IoringFeatureFlags::RW_CUR_POS)
     }
 
     /// If this flag is set, then io_uring guarantees that both sync and async execution of
@@ -502,7 +510,9 @@ impl Parameters {
     /// Note that this is the default behavior, tasks can still register different personalities
     /// through [`Submitter::register_personality`].
     pub fn is_feature_cur_personality(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_CUR_PERSONALITY != 0
+        self.0
+            .features
+            .intersects(IoringFeatureFlags::CUR_PERSONALITY)
     }
 
     /// Whether async pollable I/O is fast.
@@ -518,7 +528,7 @@ impl Parameters {
     /// eliminates the need to do so. If this flag is set, requests waiting on space/data consume a
     /// lot less resources doing so as they are not blocking a thread. Available since kernel 5.7.
     pub fn is_feature_fast_poll(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_FAST_POLL != 0
+        self.0.features.intersects(IoringFeatureFlags::FAST_POLL)
     }
 
     /// Whether poll events are stored using 32 bits instead of 16. This allows the user to use
@@ -528,14 +538,16 @@ impl Parameters {
     /// based flags. Most notably EPOLLEXCLUSIVE which allows exclusive (waking single waiters)
     /// behavior. Available since kernel 5.9.
     pub fn is_feature_poll_32bits(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_POLL_32BITS != 0
+        self.0.features.intersects(IoringFeatureFlags::POLL_32BITS)
     }
 
-    /// If this flag is set, the IORING_SETUP_SQPOLL feature no longer requires the use of fixed
+    /// If this flag is set, the IORING_SQPOLL feature no longer requires the use of fixed
     /// files. Any normal file descriptor can be used for IO commands without needing registration.
     /// Available since kernel 5.11.
     pub fn is_feature_sqpoll_nonfixed(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_SQPOLL_NONFIXED != 0
+        self.0
+            .features
+            .intersects(IoringFeatureFlags::SQPOLL_NONFIXED)
     }
 
     /// If this flag is set, then the io_uring_enter(2) system call supports passing in an extended
@@ -553,7 +565,7 @@ impl Parameters {
     /// and a pointer to this struct must be passed in if IORING_ENTER_EXT_ARG is set in the flags
     /// for the enter system call. Available since kernel 5.11.
     pub fn is_feature_ext_arg(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_EXT_ARG != 0
+        self.0.features.intersects(IoringFeatureFlags::EXT_ARG)
     }
 
     /// If this flag is set, io_uring is using native workers for its async helpers. Previous
@@ -561,7 +573,9 @@ impl Parameters {
     /// but later kernels will actively create what looks more like regular process threads
     /// instead. Available since kernel 5.12.
     pub fn is_feature_native_workers(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_NATIVE_WORKERS != 0
+        self.0
+            .features
+            .intersects(IoringFeatureFlags::NATIVE_WORKERS)
     }
 
     /// Whether the kernel supports tagging resources.
@@ -571,7 +585,7 @@ impl Parameters {
     /// whereas before the full set would have to be unregistered first. Available since kernel
     /// 5.13.
     pub fn is_feature_resource_tagging(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_RSRC_TAGS != 0
+        self.0.features.intersects(IoringFeatureFlags::RSRC_TAGS)
     }
 
     /// Whether the kernel supports `IOSQE_CQE_SKIP_SUCCESS`.
@@ -579,7 +593,7 @@ impl Parameters {
     /// This feature allows skipping the generation of a CQE if a SQE executes normally. Available
     /// since kernel 5.17.
     pub fn is_feature_skip_cqe_on_success(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_CQE_SKIP != 0
+        self.0.features.intersects(IoringFeatureFlags::CQE_SKIP)
     }
 
     /// Whether the kernel supports deferred file assignment.
@@ -592,7 +606,7 @@ impl Parameters {
     /// the kernel will defer file assignment until execution of a given request is started.
     /// Available since kernel 5.17.
     pub fn is_feature_linked_file(&self) -> bool {
-        self.0.features & sys::IORING_FEAT_LINKED_FILE != 0
+        self.0.features.intersects(IoringFeatureFlags::LINKED_FILE)
     }
 
     /// The number of submission queue entries allocated.
@@ -606,8 +620,8 @@ impl Parameters {
     }
 }
 
-impl std::fmt::Debug for Parameters {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for Parameters {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Parameters")
             .field("is_setup_sqpoll", &self.is_setup_sqpoll())
             .field("is_setup_iopoll", &self.is_setup_iopoll())
@@ -633,7 +647,6 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> AsRawFd for IoUring<S, C> {
     }
 }
 
-#[cfg(feature = "io_safety")]
 impl AsFd for IoUring {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.fd.as_fd()

@@ -1,8 +1,47 @@
 //! Common Linux types not provided by libc.
 
+use core::marker::PhantomData;
+use core::num::NonZeroU32;
+use rustix::io_uring;
+
+pub use rustix::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
+pub use rustix::fs::Advice;
+pub use rustix::fs::AtFlags;
+pub use rustix::fs::RenameFlags;
+pub use rustix::io::ReadWriteFlags;
+pub use rustix::net::AcceptFlags;
+pub use rustix::net::{RecvFlags, SendFlags};
+
+pub use rustix::io_uring::IoringAcceptFlags;
+pub use rustix::io_uring::IoringFsyncFlags;
+pub use rustix::io_uring::IoringOp;
+pub use rustix::io_uring::IoringPollFlags;
+pub use rustix::io_uring::IoringRecvsendFlags;
+pub use rustix::io_uring::IoringSqeFlags;
+pub use rustix::io_uring::IoringTimeoutFlags;
+pub use rustix::io_uring::SpliceFlags;
+pub use rustix::io_uring::{IoringCqFlags, IoringCqeFlags, IoringSetupFlags};
+pub use rustix::io_uring::{IoringRegisterOp, RecvmsgOutFlags};
+
+pub use rustix::io_uring::IoringMsgringCmds;
+pub use rustix::io_uring::IoringOpFlags;
+pub use rustix::io_uring::IoringRestrictionOp;
+pub use rustix::io_uring::IoringSqFlags;
+
+pub use rustix::io_uring::IoringAsyncCancelFlags;
+pub use rustix::io_uring::IoringMsgringFlags;
+
+pub use rustix::io::Errno;
+pub use rustix::io_uring::io_uring_user_data;
+pub use rustix::time::Timespec;
+
+pub use rustix::fs::{OFlags, ResolveFlags};
+
+use crate::util::cast_ptr;
+
 pub(crate) mod sealed {
     use super::{Fd, Fixed};
-    use std::os::unix::io::RawFd;
+    use rustix::fd::RawFd;
 
     #[derive(Debug)]
     pub enum Target {
@@ -40,29 +79,6 @@ pub(crate) mod sealed {
     }
 }
 
-use crate::sys;
-use bitflags::bitflags;
-use std::num::NonZeroU32;
-use std::os::unix::io::RawFd;
-
-use std::marker::PhantomData;
-
-use crate::util::cast_ptr;
-
-pub use sys::__kernel_rwf_t as RwFlags;
-
-/// Opaque types, you should use [`statx`](struct@libc::statx) instead.
-#[repr(C)]
-pub struct statx {
-    _priv: (),
-}
-
-/// Opaque types, you should use [`epoll_event`](libc::epoll_event) instead.
-#[repr(C)]
-pub struct epoll_event {
-    _priv: (),
-}
-
 /// A file descriptor that has not been registered with io_uring.
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
@@ -74,79 +90,6 @@ pub struct Fd(pub RawFd);
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct Fixed(pub u32);
-
-bitflags! {
-    /// Options for [`Timeout`](super::Timeout).
-    pub struct TimeoutFlags: u32 {
-        const ABS = sys::IORING_TIMEOUT_ABS;
-
-        const UPDATE = sys::IORING_TIMEOUT_UPDATE;
-    }
-}
-
-bitflags! {
-    /// Options for [`Fsync`](super::Fsync).
-    pub struct FsyncFlags: u32 {
-        const DATASYNC = sys::IORING_FSYNC_DATASYNC;
-    }
-}
-
-/// Wrapper around `open_how` as used in [the `openat2(2)` system
-/// call](https://man7.org/linux/man-pages/man2/openat2.2.html).
-#[derive(Default, Debug, Clone, Copy)]
-#[repr(transparent)]
-pub struct OpenHow(sys::open_how);
-
-impl OpenHow {
-    pub const fn new() -> Self {
-        OpenHow(sys::open_how {
-            flags: 0,
-            mode: 0,
-            resolve: 0,
-        })
-    }
-
-    pub const fn flags(mut self, flags: u64) -> Self {
-        self.0.flags = flags;
-        self
-    }
-
-    pub const fn mode(mut self, mode: u64) -> Self {
-        self.0.mode = mode;
-        self
-    }
-
-    pub const fn resolve(mut self, resolve: u64) -> Self {
-        self.0.resolve = resolve;
-        self
-    }
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-#[repr(transparent)]
-pub struct Timespec(sys::__kernel_timespec);
-
-impl Timespec {
-    #[inline]
-    pub const fn new() -> Self {
-        Timespec(sys::__kernel_timespec {
-            tv_sec: 0,
-            tv_nsec: 0,
-        })
-    }
-
-    #[inline]
-    pub const fn sec(mut self, sec: u64) -> Self {
-        self.0.tv_sec = sec as _;
-        self
-    }
-
-    #[inline]
-    pub const fn nsec(mut self, nsec: u32) -> Self {
-        self.0.tv_nsec = nsec as _;
-        self
-    }
-}
 
 /// Submit arguments
 ///
@@ -169,7 +112,7 @@ impl Timespec {
 /// ```
 #[derive(Default, Debug, Clone, Copy)]
 pub struct SubmitArgs<'prev: 'now, 'now> {
-    pub(crate) args: sys::io_uring_getevents_arg,
+    pub(crate) args: io_uring::io_uring_getevents_arg,
     prev: PhantomData<&'prev ()>,
     now: PhantomData<&'now ()>,
 }
@@ -177,7 +120,7 @@ pub struct SubmitArgs<'prev: 'now, 'now> {
 impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     #[inline]
     pub const fn new() -> SubmitArgs<'static, 'static> {
-        let args = sys::io_uring_getevents_arg {
+        let args = io_uring::io_uring_getevents_arg {
             sigmask: 0,
             sigmask_sz: 0,
             pad: 0,
@@ -194,7 +137,7 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     #[inline]
     pub fn sigmask<'new>(mut self, sigmask: &'new libc::sigset_t) -> SubmitArgs<'now, 'new> {
         self.args.sigmask = cast_ptr(sigmask) as _;
-        self.args.sigmask_sz = std::mem::size_of::<libc::sigset_t>() as _;
+        self.args.sigmask_sz = core::mem::size_of::<libc::sigset_t>() as _;
 
         SubmitArgs {
             args: self.args,
@@ -216,7 +159,7 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
 }
 
 #[repr(transparent)]
-pub struct BufRingEntry(sys::io_uring_buf);
+pub struct BufRingEntry(io_uring::io_uring_buf);
 
 /// An entry in a buf_ring that allows setting the address, length and buffer id.
 impl BufRingEntry {
@@ -287,6 +230,37 @@ const fn unwrap_nonzero(t: Option<NonZeroU32>) -> NonZeroU32 {
     }
 }
 
+/// Wrapper around `open_how` as used in [the `openat2(2)` system
+/// call](https://man7.org/linux/man-pages/man2/openat2.2.html).
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct OpenHow(io_uring::open_how);
+
+impl OpenHow {
+    pub const fn new() -> Self {
+        OpenHow(io_uring::open_how {
+            flags: 0,
+            mode: 0,
+            resolve: ResolveFlags::empty(),
+        })
+    }
+
+    pub const fn flags(mut self, flags: OFlags) -> Self {
+        self.0.flags = flags.bits() as _;
+        self
+    }
+
+    pub const fn mode(mut self, mode: u64) -> Self {
+        self.0.mode = mode;
+        self
+    }
+
+    pub const fn resolve(mut self, resolve: ResolveFlags) -> Self {
+        self.0.resolve = resolve;
+        self
+    }
+}
+
 /// A destination slot for sending fixed resources
 /// (e.g. [`opcode::MsgRingSendFd`](crate::opcode::MsgRingSendFd)).
 #[derive(Debug, Clone, Copy)]
@@ -298,7 +272,7 @@ pub struct DestinationSlot {
 impl DestinationSlot {
     // SAFETY: kernel constant, `IORING_FILE_INDEX_ALLOC` is always > 0.
     const AUTO_ALLOC: NonZeroU32 =
-        unwrap_nonzero(NonZeroU32::new(sys::IORING_FILE_INDEX_ALLOC as u32));
+        unwrap_nonzero(NonZeroU32::new(io_uring::IORING_FILE_INDEX_ALLOC as u32));
 
     /// Use an automatically allocated target slot.
     pub const fn auto_target() -> Self {
@@ -334,7 +308,7 @@ impl DestinationSlot {
 /// Helper structure for parsing the result of a multishot [`opcode::RecvMsg`](crate::opcode::RecvMsg).
 #[derive(Debug)]
 pub struct RecvMsgOut<'buf> {
-    header: sys::io_uring_recvmsg_out,
+    header: io_uring::io_uring_recvmsg_out,
     /// The fixed length of the name field, in bytes.
     ///
     /// If the incoming name data is larger than this, it gets truncated to this.
@@ -351,7 +325,7 @@ pub struct RecvMsgOut<'buf> {
 }
 
 impl<'buf> RecvMsgOut<'buf> {
-    const DATA_START: usize = std::mem::size_of::<sys::io_uring_recvmsg_out>();
+    const DATA_START: usize = core::mem::size_of::<io_uring::io_uring_recvmsg_out>();
 
     /// Parse the data buffered upon completion of a `RecvMsg` multishot operation.
     ///
@@ -359,12 +333,12 @@ impl<'buf> RecvMsgOut<'buf> {
     /// is the same content provided as input to the corresponding SQE
     /// (only `msg_namelen` and `msg_controllen` fields are relevant).
     pub fn parse(buffer: &'buf [u8], msghdr: &libc::msghdr) -> Result<Self, ()> {
-        if buffer.len() < std::mem::size_of::<sys::io_uring_recvmsg_out>() {
+        if buffer.len() < core::mem::size_of::<io_uring::io_uring_recvmsg_out>() {
             return Err(());
         }
         // SAFETY: buffer (minimum) length is checked here above.
-        let header: sys::io_uring_recvmsg_out =
-            unsafe { std::ptr::read_unaligned(buffer.as_ptr() as _) };
+        let header: io_uring::io_uring_recvmsg_out =
+            unsafe { core::ptr::read_unaligned(buffer.as_ptr() as _) };
 
         let msghdr_name_len = msghdr.msg_namelen as _;
         let msghdr_control_len = msghdr.msg_controllen as _;
@@ -462,7 +436,7 @@ impl<'buf> RecvMsgOut<'buf> {
     /// When `true`, data returned by `payload_data()` is truncated and
     /// incomplete.
     pub fn is_payload_truncated(&self) -> bool {
-        self.header.flags & (libc::MSG_TRUNC as u32) != 0
+        self.header.flags.intersects(RecvmsgOutFlags::TRUNC)
     }
 
     /// Message payload, as buffered by the kernel.
@@ -471,7 +445,7 @@ impl<'buf> RecvMsgOut<'buf> {
     }
 
     /// Message flags, with the same semantics as `msghdr.msg_flags`.
-    pub fn flags(&self) -> u32 {
+    pub fn flags(&self) -> RecvmsgOutFlags {
         self.header.flags
     }
 }

@@ -1,12 +1,15 @@
 //! Completion Queue
 
-use std::fmt::{self, Debug};
-use std::mem;
-use std::mem::MaybeUninit;
-use std::sync::atomic;
+use core::fmt::{self, Debug};
+use core::mem;
+use core::mem::MaybeUninit;
+use core::sync::atomic;
 
-use crate::sys;
 use crate::util::{unsync_load, Mmap};
+
+use crate::io_uring;
+use crate::types::{IoringCqFlags, IoringCqeFlags, IoringSetupFlags};
+pub(crate) use private::Sealed;
 
 pub(crate) struct Inner<E: EntryMarker> {
     head: *const atomic::AtomicU32,
@@ -28,13 +31,13 @@ pub struct CompletionQueue<'a, E: EntryMarker = Entry> {
     tail: u32,
     queue: &'a Inner<E>,
 }
-
-pub(crate) use private::Sealed;
 mod private {
+    use rustix::io_uring::IoringSetupFlags;
+
     /// Private trait that we use as a supertrait of `EntryMarker` to prevent it from being
     /// implemented from outside this crate: https://jack.wrenn.fyi/blog/private-trait-methods/
     pub trait Sealed {
-        const ADDITIONAL_FLAGS: u32;
+        const ADDITIONAL_FLAGS: IoringSetupFlags;
     }
 }
 
@@ -45,7 +48,7 @@ pub trait EntryMarker: Clone + Debug + Into<Entry> + Sealed {}
 
 /// A 16-byte completion queue entry (CQE), representing a complete I/O operation.
 #[repr(C)]
-pub struct Entry(pub(crate) sys::io_uring_cqe);
+pub struct Entry(pub(crate) io_uring::io_uring_cqe);
 
 /// A 32-byte completion queue entry (CQE), representing a complete I/O operation.
 #[repr(C)]
@@ -60,7 +63,7 @@ fn test_entry_sizes() {
 
 impl<E: EntryMarker> Inner<E> {
     #[rustfmt::skip]
-    pub(crate) unsafe fn new(cq_mmap: &Mmap, p: &sys::io_uring_params) -> Self {
+    pub(crate) unsafe fn new(cq_mmap: &Mmap, p: &io_uring::io_uring_params) -> Self {
         let head         = cq_mmap.offset(p.cq_off.head         ) as *const atomic::AtomicU32;
         let tail         = cq_mmap.offset(p.cq_off.tail         ) as *const atomic::AtomicU32;
         let ring_mask    = cq_mmap.offset(p.cq_off.ring_mask    ).cast::<u32>().read();
@@ -119,7 +122,8 @@ impl<E: EntryMarker> CompletionQueue<'_, E> {
     /// `false`.
     pub fn eventfd_disabled(&self) -> bool {
         unsafe {
-            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_CQ_EVENTFD_DISABLED
+            (*self.queue.flags).load(atomic::Ordering::Acquire)
+                & IoringCqFlags::EVENTFD_DISABLED.bits()
                 != 0
         }
     }
@@ -146,13 +150,13 @@ impl<E: EntryMarker> CompletionQueue<'_, E> {
 
     #[inline]
     pub fn fill<'a>(&mut self, entries: &'a mut [MaybeUninit<E>]) -> &'a mut [E] {
-        let len = std::cmp::min(self.len(), entries.len());
+        let len = core::cmp::min(self.len(), entries.len());
 
         for entry in &mut entries[..len] {
             *entry = MaybeUninit::new(unsafe { self.pop() });
         }
 
-        unsafe { std::slice::from_raw_parts_mut(entries as *mut _ as *mut E, len) }
+        unsafe { core::slice::from_raw_parts_mut(entries as *mut _ as *mut E, len) }
     }
 
     #[inline]
@@ -209,7 +213,7 @@ impl Entry {
     /// The user data of the request, as set by
     /// [`Entry::user_data`](crate::squeue::Entry::user_data) on the submission queue event.
     #[inline]
-    pub fn user_data(&self) -> u64 {
+    pub fn user_data(&self) -> io_uring::io_uring_user_data {
         self.0.user_data
     }
 
@@ -219,13 +223,13 @@ impl Entry {
     /// - Storing the selected buffer ID, if one was selected. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     #[inline]
-    pub fn flags(&self) -> u32 {
+    pub fn flags(&self) -> IoringCqeFlags {
         self.0.flags
     }
 }
 
 impl Sealed for Entry {
-    const ADDITIONAL_FLAGS: u32 = 0;
+    const ADDITIONAL_FLAGS: IoringSetupFlags = IoringSetupFlags::empty();
 }
 
 impl EntryMarker for Entry {}
@@ -258,7 +262,7 @@ impl Entry32 {
     /// The user data of the request, as set by
     /// [`Entry::user_data`](crate::squeue::Entry::user_data) on the submission queue event.
     #[inline]
-    pub fn user_data(&self) -> u64 {
+    pub fn user_data(&self) -> io_uring::io_uring_user_data {
         self.0 .0.user_data
     }
 
@@ -268,7 +272,7 @@ impl Entry32 {
     /// - Storing the selected buffer ID, if one was selected. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     #[inline]
-    pub fn flags(&self) -> u32 {
+    pub fn flags(&self) -> IoringCqeFlags {
         self.0 .0.flags
     }
 
@@ -280,7 +284,7 @@ impl Entry32 {
 }
 
 impl Sealed for Entry32 {
-    const ADDITIONAL_FLAGS: u32 = sys::IORING_SETUP_CQE32;
+    const ADDITIONAL_FLAGS: IoringSetupFlags = IoringSetupFlags::CQE32;
 }
 
 impl EntryMarker for Entry32 {}
@@ -307,9 +311,9 @@ impl Debug for Entry32 {
 /// This corresponds to the `IORING_CQE_F_BUFFER` flag (and related bit-shifting),
 /// and it signals to the consumer which provided contains the result of this
 /// operation.
-pub fn buffer_select(flags: u32) -> Option<u16> {
-    if flags & sys::IORING_CQE_F_BUFFER != 0 {
-        let id = flags >> sys::IORING_CQE_BUFFER_SHIFT;
+pub fn buffer_select(flags: IoringCqeFlags) -> Option<u16> {
+    if flags.intersects(IoringCqeFlags::BUFFER) {
+        let id = flags.bits() >> io_uring::IORING_CQE_BUFFER_SHIFT;
 
         // FIXME
         //
@@ -326,8 +330,8 @@ pub fn buffer_select(flags: u32) -> Option<u16> {
 /// This corresponds to the `IORING_CQE_F_MORE` flag, and it signals to
 /// the consumer that it should expect further CQE entries after this one,
 /// still from the same original SQE request (e.g. for multishot operations).
-pub fn more(flags: u32) -> bool {
-    flags & sys::IORING_CQE_F_MORE != 0
+pub fn more(flags: IoringCqeFlags) -> bool {
+    flags.intersects(IoringCqeFlags::MORE)
 }
 
 /// Return whether socket has more data ready to read.
@@ -337,6 +341,6 @@ pub fn more(flags: u32) -> bool {
 ///
 /// The io_uring documentation says recv, recv-multishot, recvmsg, and recvmsg-multishot
 /// can provide this bit in their respective CQE.
-pub fn sock_nonempty(flags: u32) -> bool {
-    flags & sys::IORING_CQE_F_SOCK_NONEMPTY != 0
+pub fn sock_nonempty(flags: IoringCqeFlags) -> bool {
+    flags.intersects(IoringCqeFlags::SOCK_NONEMPTY)
 }

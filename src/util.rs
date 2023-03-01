@@ -1,6 +1,10 @@
-use std::os::unix::io::AsRawFd;
-use std::sync::atomic;
-use std::{io, ptr};
+use core::ptr;
+use core::sync::atomic;
+use rustix::{
+    fd::OwnedFd,
+    io,
+    mm::{madvise, mmap, Advice, MapFlags, ProtFlags},
+};
 
 /// A region of memory mapped using `mmap(2)`.
 pub struct Mmap {
@@ -10,32 +14,27 @@ pub struct Mmap {
 
 impl Mmap {
     /// Map `len` bytes starting from the offset `offset` in the file descriptor `fd` into memory.
-    pub fn new(fd: &OwnedFd, offset: libc::off_t, len: usize) -> io::Result<Mmap> {
+    pub fn new(fd: &OwnedFd, offset: u64, len: usize) -> io::Result<Mmap> {
         unsafe {
-            match libc::mmap(
+            mmap(
                 ptr::null_mut(),
                 len,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_SHARED | libc::MAP_POPULATE,
-                fd.as_raw_fd(),
+                ProtFlags::READ | ProtFlags::WRITE,
+                MapFlags::SHARED | MapFlags::POPULATE,
+                fd,
                 offset,
-            ) {
-                libc::MAP_FAILED => Err(io::Error::last_os_error()),
-                addr => {
-                    // here, `mmap` will never return null
-                    let addr = ptr::NonNull::new_unchecked(addr);
-                    Ok(Mmap { addr, len })
-                }
-            }
+            )
+            .map(|addr| {
+                // here, `mmap` will never return null
+                let addr = ptr::NonNull::new_unchecked(addr);
+                Mmap { addr, len }
+            })
         }
     }
 
     /// Do not make the stored memory accessible by child processes after a `fork`.
     pub fn dontfork(&self) -> io::Result<()> {
-        match unsafe { libc::madvise(self.addr.as_ptr(), self.len, libc::MADV_DONTFORK) } {
-            0 => Ok(()),
-            _ => Err(io::Error::last_os_error()),
-        }
+        unsafe { madvise(self.addr.as_ptr(), self.len, Advice::LinuxDontFork) }
     }
 
     /// Get a pointer to the memory.
@@ -55,53 +54,6 @@ impl Drop for Mmap {
     fn drop(&mut self) {
         unsafe {
             libc::munmap(self.addr.as_ptr(), self.len);
-        }
-    }
-}
-
-pub use fd::OwnedFd;
-
-#[cfg(feature = "io_safety")]
-mod fd {
-    pub use std::os::unix::io::OwnedFd;
-}
-
-#[cfg(not(feature = "io_safety"))]
-mod fd {
-    use std::mem;
-    use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
-
-    /// API-compatible with the `OwnedFd` type in the Rust stdlib.
-    pub struct OwnedFd(RawFd);
-
-    impl AsRawFd for OwnedFd {
-        #[inline]
-        fn as_raw_fd(&self) -> RawFd {
-            self.0
-        }
-    }
-
-    impl IntoRawFd for OwnedFd {
-        #[inline]
-        fn into_raw_fd(self) -> RawFd {
-            let fd = self.0;
-            mem::forget(self);
-            fd
-        }
-    }
-
-    impl FromRawFd for OwnedFd {
-        #[inline]
-        unsafe fn from_raw_fd(fd: RawFd) -> OwnedFd {
-            OwnedFd(fd)
-        }
-    }
-
-    impl Drop for OwnedFd {
-        fn drop(&mut self) {
-            unsafe {
-                libc::close(self.0);
-            }
         }
     }
 }

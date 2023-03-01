@@ -1,14 +1,13 @@
 //! Submission Queue
 
-use std::error::Error;
-use std::fmt::{self, Debug, Display, Formatter};
-use std::mem;
-use std::sync::atomic;
+use core::fmt::{self, Debug, Display, Formatter};
+use core::mem;
+use core::sync::atomic;
 
-use crate::sys;
 use crate::util::{unsync_load, Mmap};
 
-use bitflags::bitflags;
+use crate::types::{IoringSetupFlags, IoringSqFlags, IoringSqeFlags};
+use rustix::io_uring;
 
 pub(crate) struct Inner<E: EntryMarker> {
     pub(crate) head: *const atomic::AtomicU32,
@@ -30,10 +29,11 @@ pub struct SubmissionQueue<'a, E: EntryMarker = Entry> {
 
 pub(crate) use private::Sealed;
 mod private {
+    use rustix::io_uring::IoringSetupFlags;
     /// Private trait that we use as a supertrait of `EntryMarker` to prevent it from being
     /// implemented from outside this crate: https://jack.wrenn.fyi/blog/private-trait-methods/
     pub trait Sealed {
-        const ADDITIONAL_FLAGS: u32;
+        const ADDITIONAL_FLAGS: IoringSetupFlags;
     }
 }
 
@@ -46,7 +46,7 @@ pub trait EntryMarker: Clone + Debug + From<Entry> + Sealed {}
 ///
 /// These can be created via opcodes in [`opcode`](crate::opcode).
 #[repr(C)]
-pub struct Entry(pub(crate) sys::io_uring_sqe);
+pub struct Entry(pub(crate) io_uring::io_uring_sqe);
 
 /// A 128-byte submission queue entry (SQE), representing a request for an I/O operation.
 ///
@@ -61,72 +61,12 @@ fn test_entry_sizes() {
     assert_eq!(mem::size_of::<Entry128>(), 128);
 }
 
-bitflags! {
-    /// Submission flags
-    pub struct Flags: u8 {
-        /// When this flag is specified,
-        /// `fd` is an index into the files array registered with the io_uring instance.
-        #[doc(hidden)]
-        const FIXED_FILE = 1 << sys::IOSQE_FIXED_FILE_BIT;
-
-        /// When this flag is specified,
-        /// the SQE will not be started before previously submitted SQEs have completed,
-        /// and new SQEs will not be started before this one completes.
-        const IO_DRAIN = 1 << sys::IOSQE_IO_DRAIN_BIT;
-
-        /// When this flag is specified,
-        /// it forms a link with the next SQE in the submission ring.
-        /// That next SQE will not be started before this one completes.
-        const IO_LINK = 1 << sys::IOSQE_IO_LINK_BIT;
-
-        /// Like [`IO_LINK`](Self::IO_LINK), but it doesn’t sever regardless of the completion
-        /// result.
-        const IO_HARDLINK = 1 << sys::IOSQE_IO_HARDLINK_BIT;
-
-        /// Normal operation for io_uring is to try and issue an sqe as non-blocking first,
-        /// and if that fails, execute it in an async manner.
-        ///
-        /// To support more efficient overlapped operation of requests
-        /// that the application knows/assumes will always (or most of the time) block,
-        /// the application can ask for an sqe to be issued async from the start.
-        const ASYNC = 1 << sys::IOSQE_ASYNC_BIT;
-
-        /// Conceptually the kernel holds a set of buffers organized into groups. When you issue a
-        /// request with this flag and set `buf_group` to a valid buffer group ID (e.g.
-        /// [`buf_group` on `Read`](crate::opcode::Read::buf_group)) then once the file descriptor
-        /// becomes ready the kernel will try to take a buffer from the group.
-        ///
-        /// If there are no buffers in the group, your request will fail with `-ENOBUFS`. Otherwise,
-        /// the corresponding [`cqueue::Entry::flags`](crate::cqueue::Entry::flags) will contain the
-        /// chosen buffer ID, encoded with:
-        ///
-        /// ```text
-        /// (buffer_id << IORING_CQE_BUFFER_SHIFT) | IORING_CQE_F_BUFFER
-        /// ```
-        ///
-        /// You can use [`buffer_select`](crate::cqueue::buffer_select) to take the buffer ID.
-        ///
-        /// The buffer will then be removed from the group and won't be usable by other requests
-        /// anymore.
-        ///
-        /// You can provide new buffers in a group with
-        /// [`ProvideBuffers`](crate::opcode::ProvideBuffers).
-        ///
-        /// See also [the LWN thread on automatic buffer
-        /// selection](https://lwn.net/Articles/815491/).
-        const BUFFER_SELECT = 1 << sys::IOSQE_BUFFER_SELECT_BIT;
-
-        /// Don't post CQE if request succeeded.
-        const SKIP_SUCCESS = 1 << sys::IOSQE_CQE_SKIP_SUCCESS_BIT;
-    }
-}
-
 impl<E: EntryMarker> Inner<E> {
     #[rustfmt::skip]
     pub(crate) unsafe fn new(
         sq_mmap: &Mmap,
         sqe_mmap: &Mmap,
-        p: &sys::io_uring_params,
+        p: &io_uring::io_uring_params,
     ) -> Self {
         let head         = sq_mmap.offset(p.sq_off.head        ) as *const atomic::AtomicU32;
         let tail         = sq_mmap.offset(p.sq_off.tail        ) as *const atomic::AtomicU32;
@@ -188,7 +128,8 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     #[inline]
     pub fn need_wakeup(&self) -> bool {
         unsafe {
-            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
+            (*self.queue.flags).load(atomic::Ordering::Acquire) & IoringSqFlags::NEED_WAKEUP.bits()
+                != 0
         }
     }
 
@@ -201,14 +142,17 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     /// Returns `true` if the completion queue ring is overflown.
     pub fn cq_overflow(&self) -> bool {
         unsafe {
-            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0
+            (*self.queue.flags).load(atomic::Ordering::Acquire) & IoringSqFlags::CQ_OVERFLOW.bits()
+                != 0
         }
     }
 
     /// Returns `true` if completions are pending that should be processed. Only relevant when used
     /// in conjuction with the `setup_taskrun_flag` function. Available since 5.19.
     pub fn taskrun(&self) -> bool {
-        unsafe { (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_TASKRUN != 0 }
+        unsafe {
+            (*self.queue.flags).load(atomic::Ordering::Acquire) & IoringSqFlags::TASKRUN.bits() != 0
+        }
     }
 
     /// Get the total number of entries in the submission queue ring buffer.
@@ -294,15 +238,15 @@ impl<E: EntryMarker> Drop for SubmissionQueue<'_, E> {
 impl Entry {
     /// Set the submission event's [flags](Flags).
     #[inline]
-    pub fn flags(mut self, flags: Flags) -> Entry {
-        self.0.flags |= flags.bits();
+    pub fn flags(mut self, flags: IoringSqeFlags) -> Entry {
+        self.0.flags |= flags;
         self
     }
 
     /// Set the user data. This is an application-supplied value that will be passed straight
     /// through into the [completion queue entry](crate::cqueue::Entry::user_data).
     #[inline]
-    pub fn user_data(mut self, user_data: u64) -> Entry {
+    pub fn user_data(mut self, user_data: io_uring::io_uring_user_data) -> Entry {
         self.0.user_data = user_data;
         self
     }
@@ -316,7 +260,7 @@ impl Entry {
 }
 
 impl Sealed for Entry {
-    const ADDITIONAL_FLAGS: u32 = 0;
+    const ADDITIONAL_FLAGS: IoringSetupFlags = IoringSetupFlags::empty();
 }
 
 impl EntryMarker for Entry {}
@@ -341,15 +285,15 @@ impl Debug for Entry {
 impl Entry128 {
     /// Set the submission event's [flags](Flags).
     #[inline]
-    pub fn flags(mut self, flags: Flags) -> Entry128 {
-        self.0 .0.flags |= flags.bits();
+    pub fn flags(mut self, flags: IoringSqeFlags) -> Entry128 {
+        self.0 .0.flags |= flags;
         self
     }
 
     /// Set the user data. This is an application-supplied value that will be passed straight
     /// through into the [completion queue entry](crate::cqueue::Entry::user_data).
     #[inline]
-    pub fn user_data(mut self, user_data: u64) -> Entry128 {
+    pub fn user_data(mut self, user_data: io_uring::io_uring_user_data) -> Entry128 {
         self.0 .0.user_data = user_data;
         self
     }
@@ -363,7 +307,7 @@ impl Entry128 {
 }
 
 impl Sealed for Entry128 {
-    const ADDITIONAL_FLAGS: u32 = sys::IORING_SETUP_SQE128;
+    const ADDITIONAL_FLAGS: IoringSetupFlags = IoringSetupFlags::SQE128;
 }
 
 impl EntryMarker for Entry128 {}
@@ -395,7 +339,8 @@ impl Display for PushError {
     }
 }
 
-impl Error for PushError {}
+#[cfg(feature = "std")]
+impl std::error::Error for PushError {}
 
 impl<E: EntryMarker> Debug for SubmissionQueue<'_, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
