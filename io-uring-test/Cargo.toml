@@ -15,5 +15,4 @@ once_cell = "1"
 socket2 = "0.4"
 
 [features]
-direct-syscall = [ "io-uring/direct-syscall" ]
 ci = []

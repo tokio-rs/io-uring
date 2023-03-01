@@ -49,12 +49,17 @@ pub fn write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         let mut queue = ring.submission();
         let write_e = write_e
             .build()
-            .user_data(0x01)
-            .flags(squeue::Flags::IO_LINK)
+            .user_data(types::io_uring_user_data { u64_: 0x01 })
+            .flags(types::IoringSqeFlags::IO_LINK)
             .into();
         queue.push(&write_e).expect("queue is full");
         queue
-            .push(&read_e.build().user_data(0x02).into())
+            .push(
+                &read_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x02 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -63,8 +68,8 @@ pub fn write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
-    assert_eq!(cqes[0].user_data(), 0x01);
-    assert_eq!(cqes[1].user_data(), 0x02);
+    assert_eq!(cqes[0].user_data().u64_(), 0x01);
+    assert_eq!(cqes[1].user_data().u64_(), 0x02);
     assert_eq!(cqes[0].result(), text.len() as i32);
     assert_eq!(cqes[1].result(), text.len() as i32);
 
@@ -93,12 +98,17 @@ pub fn writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         let mut queue = ring.submission();
         let write_e = write_e
             .build()
-            .user_data(0x01)
-            .flags(squeue::Flags::IO_LINK)
+            .user_data(types::io_uring_user_data { u64_: 0x01 })
+            .flags(types::IoringSqeFlags::IO_LINK)
             .into();
         queue.push(&write_e).expect("queue is full");
         queue
-            .push(&read_e.build().user_data(0x02).into())
+            .push(
+                &read_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x02 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -107,8 +117,8 @@ pub fn writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
-    assert_eq!(cqes[0].user_data(), 0x01);
-    assert_eq!(cqes[1].user_data(), 0x02);
+    assert_eq!(cqes[0].user_data().u64_(), 0x01);
+    assert_eq!(cqes[1].user_data().u64_(), 0x02);
     assert_eq!(cqes[0].result(), (text.len() + text2.len()) as i32);
     assert_eq!(cqes[1].result(), (text.len() + text2.len()) as i32);
 

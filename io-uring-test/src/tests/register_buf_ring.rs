@@ -2,8 +2,8 @@
 // The entry point in this file can be found by searching for 'pub'.
 
 use crate::Test;
-use io_uring::types;
 use io_uring::types::BufRingEntry;
+use io_uring::types::{self, IoringCqeFlags};
 use io_uring::{cqueue, opcode, squeue, IoUring};
 
 use std::cell::Cell;
@@ -192,15 +192,15 @@ impl InnerBufRing {
         );
 
         if let Err(e) = res {
-            match e.raw_os_error() {
-                Some(libc::EINVAL) => {
+            match e {
+                types::Errno::INVAL => {
                     // using buf_ring requires kernel 5.19 or greater.
                     return Err(io::Error::new(
                             io::ErrorKind::Other,
                             format!("buf_ring.register returned {}, most likely indicating this kernel is not 5.19+", e),
                             ));
                 }
-                Some(libc::EEXIST) => {
+                types::Errno::EXIST => {
                     // Registering a duplicate bgid is not allowed. There is an `unregister`
                     // operations that can remove the first, but care must be taken that there
                     // are no outstanding operations that will still return a buffer from that
@@ -229,7 +229,7 @@ impl InnerBufRing {
         }
         self.buf_ring_sync();
 
-        res
+        res.map_err(|e| e.into())
     }
 
     // Unregister the buffer ring from the io_uring.
@@ -241,7 +241,9 @@ impl InnerBufRing {
     {
         let bgid = self.bgid;
 
-        ring.submitter().unregister_buf_ring(bgid)
+        ring.submitter()
+            .unregister_buf_ring(bgid)
+            .map_err(|e| e.into())
     }
 
     // Returns the buffer group id.
@@ -251,7 +253,12 @@ impl InnerBufRing {
 
     // Returns the buffer the uring interface picked from the buf_ring for the completion result
     // represented by the res and flags.
-    fn get_buf(&self, buf_ring: FixedSizeBufRing, res: u32, flags: u32) -> io::Result<GBuf> {
+    fn get_buf(
+        &self,
+        buf_ring: FixedSizeBufRing,
+        res: u32,
+        flags: IoringCqeFlags,
+    ) -> io::Result<GBuf> {
         // This fn does the odd thing of having self as the BufRing and taking an argument that is
         // the same BufRing but wrapped in Rc<_> so the wrapped buf_ring can be passed to the
         // outgoing GBuf.
@@ -526,8 +533,8 @@ where
         let mut queue = ring.submission();
         let write_e = write_e
             .build()
-            .user_data(0x01)
-            .flags(squeue::Flags::IO_LINK)
+            .user_data(types::io_uring_user_data { u64_: 0x01 })
+            .flags(types::IoringSqeFlags::IO_LINK)
             .into();
         queue.push(&write_e).expect("queue is full");
     }
@@ -535,7 +542,7 @@ where
 
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x01);
+    assert_eq!(cqes[0].user_data().u64_(), 0x01);
     assert_eq!(cqes[0].result(), text.len() as i32);
     Ok(())
 }
@@ -561,8 +568,8 @@ where
             .push(
                 &read_e
                     .build()
-                    .user_data(0x02)
-                    .flags(squeue::Flags::BUFFER_SELECT)
+                    .user_data(types::io_uring_user_data { u64_: 0x02 })
+                    .flags(types::IoringSqeFlags::BUFFER_SELECT)
                     .into(),
             )
             .expect("queue is full");
@@ -572,7 +579,7 @@ where
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x02);
+    assert_eq!(cqes[0].user_data().u64_(), 0x02);
 
     let result = cqes[0].result();
     if result < 0 {

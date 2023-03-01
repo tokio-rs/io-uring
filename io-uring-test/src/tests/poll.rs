@@ -32,7 +32,12 @@ pub fn test_eventfd_poll<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x04).into())
+            .push(
+                &poll_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x04 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -46,7 +51,7 @@ pub fn test_eventfd_poll<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x04);
+    assert_eq!(cqes[0].user_data().u64_(), 0x04);
     assert_eq!(cqes[0].result(), 1);
 
     Ok(())
@@ -81,7 +86,12 @@ pub fn test_eventfd_poll_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x05).into())
+            .push(
+                &poll_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x05 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -89,12 +99,17 @@ pub fn test_eventfd_poll_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // remove poll
 
-    let poll_e = opcode::PollRemove::new(0x05);
+    let poll_e = opcode::PollRemove::new(types::io_uring_user_data { u64_: 0x05 });
 
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x06).into())
+            .push(
+                &poll_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x06 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -106,11 +121,11 @@ pub fn test_eventfd_poll_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring.submit_and_wait(2)?;
 
     let mut cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
-    cqes.sort_by_key(|cqe| cqe.user_data());
+    cqes.sort_by_key(|cqe| cqe.user_data().u64_());
 
     assert_eq!(cqes.len(), 2);
-    assert_eq!(cqes[0].user_data(), 0x05);
-    assert_eq!(cqes[1].user_data(), 0x06);
+    assert_eq!(cqes[0].user_data().u64_(), 0x05);
+    assert_eq!(cqes[1].user_data().u64_(), 0x06);
     assert_eq!(cqes[0].result(), -libc::ECANCELED);
     assert_eq!(cqes[1].result(), 0);
 
@@ -146,7 +161,12 @@ pub fn test_eventfd_poll_remove_failed<S: squeue::EntryMarker, C: cqueue::EntryM
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x07).into())
+            .push(
+                &poll_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x07 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -156,23 +176,28 @@ pub fn test_eventfd_poll_remove_failed<S: squeue::EntryMarker, C: cqueue::EntryM
 
     // remove poll
 
-    let poll_e = opcode::PollRemove::new(0x08);
+    let poll_e = opcode::PollRemove::new(types::io_uring_user_data { u64_: 0x08 });
 
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x08).into())
+            .push(
+                &poll_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x08 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
     ring.submit_and_wait(2)?;
 
     let mut cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
-    cqes.sort_by_key(|cqe| cqe.user_data());
+    cqes.sort_by_key(|cqe| cqe.user_data().u64_());
 
     assert_eq!(cqes.len(), 2);
-    assert_eq!(cqes[0].user_data(), 0x07);
-    assert_eq!(cqes[1].user_data(), 0x08);
+    assert_eq!(cqes[0].user_data().u64_(), 0x07);
+    assert_eq!(cqes[1].user_data().u64_(), 0x08);
     assert_eq!(cqes[0].result(), 1);
     assert_eq!(cqes[1].result(), -libc::ENOENT);
 
@@ -208,7 +233,12 @@ pub fn test_eventfd_poll_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x04).into())
+            .push(
+                &poll_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x04 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -225,11 +255,11 @@ pub fn test_eventfd_poll_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 2);
 
-    assert_eq!(cqes[0].user_data(), 0x04);
+    assert_eq!(cqes[0].user_data().u64_(), 0x04);
     assert!(io_uring::cqueue::more(cqes[0].flags()));
     assert_eq!(cqes[0].result(), 1);
 
-    assert_eq!(cqes[1].user_data(), 0x04);
+    assert_eq!(cqes[1].user_data().u64_(), 0x04);
     assert!(io_uring::cqueue::more(cqes[1].flags()));
     assert_eq!(cqes[1].result(), 1);
 

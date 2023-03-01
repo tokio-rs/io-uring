@@ -1,5 +1,5 @@
 use crate::Test;
-use io_uring::{cqueue, opcode, squeue, IoUring};
+use io_uring::{cqueue, opcode, squeue, types, IoUring};
 
 pub fn test_register_files_sparse<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
@@ -43,15 +43,9 @@ pub fn test_register_files_sparse<S: squeue::EntryMarker, C: cqueue::EntryMarker
     // If it fails with EMFILE, print the ulimit command for changing this.
 
     if let Err(e) = ring.submitter().register_files_sparse(10_000) {
-        if let Some(raw_os_err) = e.raw_os_error() {
-            if raw_os_err == libc::EMFILE {
-                println!(
-                    "could not open 10,000 file descriptors, try `ulimit -Sn 11000` in the shell"
-                );
-                return Ok(());
-            } else {
-                return Err(anyhow::anyhow!("register_files_sparse should have succeeded after the previous one was removed: {}", e));
-            }
+        if e == types::Errno::MFILE {
+            println!("could not open 10,000 file descriptors, try `ulimit -Sn 11000` in the shell");
+            return Ok(());
         } else {
             return Err(anyhow::anyhow!("register_files_sparse should have succeeded after the previous one was removed: {}", e));
         }

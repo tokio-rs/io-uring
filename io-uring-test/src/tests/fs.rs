@@ -68,7 +68,12 @@ pub fn test_file_fsync<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&fsync_e.build().user_data(0x03).into())
+            .push(
+                &fsync_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x03 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -77,7 +82,7 @@ pub fn test_file_fsync<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x03);
+    assert_eq!(cqes[0].user_data().u64_(), 0x03);
     assert_eq!(cqes[0].result(), 0);
 
     Ok(())
@@ -106,7 +111,12 @@ pub fn test_file_fsync_file_range<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     unsafe {
         ring.submission()
-            .push(&fsync_e.build().user_data(0x04).into())
+            .push(
+                &fsync_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x04 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -115,7 +125,7 @@ pub fn test_file_fsync_file_range<S: squeue::EntryMarker, C: cqueue::EntryMarker
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x04);
+    assert_eq!(cqes[0].user_data().u64_(), 0x04);
     assert_eq!(cqes[0].result(), 0);
 
     Ok(())
@@ -140,7 +150,12 @@ pub fn test_file_fallocate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&falloc_e.build().user_data(0x10).into())
+            .push(
+                &falloc_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x10 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -149,7 +164,7 @@ pub fn test_file_fallocate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x10);
+    assert_eq!(cqes[0].user_data().u64_(), 0x10);
     assert_eq!(cqes[0].result(), 0);
 
     Ok(())
@@ -173,7 +188,12 @@ pub fn test_file_fallocate64<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&falloc_e.build().user_data(0x20).into())
+            .push(
+                &falloc_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x20 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -182,7 +202,7 @@ pub fn test_file_fallocate64<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x20);
+    assert_eq!(cqes[0].user_data().u64_(), 0x20);
     assert_eq!(cqes[0].result(), 0);
 
     Ok(())
@@ -207,12 +227,17 @@ pub fn test_file_openat2<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let path = dir.path().join("test-io-uring-openat2");
     let path = CString::new(path.as_os_str().as_bytes())?;
 
-    let openhow = types::OpenHow::new().flags(libc::O_CREAT as _);
+    let openhow = types::OpenHow::new().flags(types::OFlags::CREATE);
     let open_e = opcode::OpenAt2::new(dirfd, path.as_ptr(), &openhow);
 
     unsafe {
         ring.submission()
-            .push(&open_e.build().user_data(0x11).into())
+            .push(
+                &open_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x11 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -221,7 +246,7 @@ pub fn test_file_openat2<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x11);
+    assert_eq!(cqes[0].user_data().u64_(), 0x11);
     assert!(cqes[0].result() > 0);
 
     let fd = unsafe { fs::File::from_raw_fd(cqes[0].result()) };
@@ -263,7 +288,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
         ));
         let path = CString::new(path.as_os_str().as_bytes())?;
 
-        let openhow = types::OpenHow::new().flags(libc::O_CREAT as _);
+        let openhow = types::OpenHow::new().flags(types::OFlags::CREATE);
 
         let file_index = types::DestinationSlot::auto_target();
 
@@ -272,7 +297,11 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x11).into())
+                .push(
+                    &op.build()
+                        .user_data(types::io_uring_user_data { u64_: 0x11 })
+                        .into(),
+                )
                 .expect("queue is full");
         }
 
@@ -281,7 +310,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
         let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
         assert_eq!(cqes.len(), 1);
-        assert_eq!(cqes[0].user_data(), 0x11);
+        assert_eq!(cqes[0].user_data().u64_(), 0x11);
         if round == 2 {
             assert!(cqes[0].result() < 0); // expect no room
         } else {
@@ -295,7 +324,11 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x12).into())
+                .push(
+                    &op.build()
+                        .user_data(types::io_uring_user_data { u64_: 0x12 })
+                        .into(),
+                )
                 .expect("queue is full");
         }
 
@@ -304,7 +337,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
         let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
         assert_eq!(cqes.len(), 1);
-        assert_eq!(cqes[0].user_data(), 0x12);
+        assert_eq!(cqes[0].user_data().u64_(), 0x12);
         assert_eq!(cqes[0].result(), 0); // successful close iff result is 0
     }
 
@@ -321,7 +354,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
         ));
         let path = CString::new(path.as_os_str().as_bytes())?;
 
-        let openhow = types::OpenHow::new().flags(libc::O_CREAT as _);
+        let openhow = types::OpenHow::new().flags(types::OFlags::CREATE);
 
         let file_index = types::DestinationSlot::try_from_slot_target(round).unwrap();
 
@@ -330,7 +363,11 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x11).into())
+                .push(
+                    &op.build()
+                        .user_data(types::io_uring_user_data { u64_: 0x11 })
+                        .into(),
+                )
                 .expect("queue is full");
         }
 
@@ -339,7 +376,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
         let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
         assert_eq!(cqes.len(), 1);
-        assert_eq!(cqes[0].user_data(), 0x11);
+        assert_eq!(cqes[0].user_data().u64_(), 0x11);
         if round == 2 {
             assert!(cqes[0].result() < 0); // expect 2 won't fit, even though it is being asked for first.
         } else {
@@ -353,7 +390,11 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x12).into())
+                .push(
+                    &op.build()
+                        .user_data(types::io_uring_user_data { u64_: 0x12 })
+                        .into(),
+                )
                 .expect("queue is full");
         }
 
@@ -362,7 +403,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
         let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
         assert_eq!(cqes.len(), 1);
-        assert_eq!(cqes[0].user_data(), 0x12);
+        assert_eq!(cqes[0].user_data().u64_(), 0x12);
         assert_eq!(cqes[0].result(), 0); // successful close iff result is 0
     }
     // If the fixed-socket operation worked properly, this must not fail.
@@ -406,12 +447,16 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
         let file_index = types::DestinationSlot::auto_target();
 
         let op = opcode::OpenAt::new(dirfd, path.as_ptr());
-        let op = op.flags(libc::O_CREAT as _);
+        let op = op.flags(types::OFlags::CREATE);
         let op = op.file_index(Some(file_index));
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x11).into())
+                .push(
+                    &op.build()
+                        .user_data(types::io_uring_user_data { u64_: 0x11 })
+                        .into(),
+                )
                 .expect("queue is full");
         }
 
@@ -420,7 +465,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
         let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
         assert_eq!(cqes.len(), 1);
-        assert_eq!(cqes[0].user_data(), 0x11);
+        assert_eq!(cqes[0].user_data().u64_(), 0x11);
         if round == 2 {
             assert!(cqes[0].result() < 0); // expect no room
         } else {
@@ -434,7 +479,11 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x12).into())
+                .push(
+                    &op.build()
+                        .user_data(types::io_uring_user_data { u64_: 0x12 })
+                        .into(),
+                )
                 .expect("queue is full");
         }
 
@@ -443,7 +492,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
         let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
         assert_eq!(cqes.len(), 1);
-        assert_eq!(cqes[0].user_data(), 0x12);
+        assert_eq!(cqes[0].user_data().u64_(), 0x12);
         assert_eq!(cqes[0].result(), 0); // successful close iff result is 0
     }
 
@@ -462,12 +511,16 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
         let file_index = types::DestinationSlot::try_from_slot_target(round).unwrap();
 
         let op = opcode::OpenAt::new(dirfd, path.as_ptr());
-        let op = op.flags(libc::O_CREAT as _);
+        let op = op.flags(types::OFlags::CREATE);
         let op = op.file_index(Some(file_index));
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x11).into())
+                .push(
+                    &op.build()
+                        .user_data(types::io_uring_user_data { u64_: 0x11 })
+                        .into(),
+                )
                 .expect("queue is full");
         }
 
@@ -476,7 +529,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
         let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
         assert_eq!(cqes.len(), 1);
-        assert_eq!(cqes[0].user_data(), 0x11);
+        assert_eq!(cqes[0].user_data().u64_(), 0x11);
         if round == 2 {
             assert!(cqes[0].result() < 0); // expect 2 won't fit, even though it is being asked for first.
         } else {
@@ -490,7 +543,11 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x12).into())
+                .push(
+                    &op.build()
+                        .user_data(types::io_uring_user_data { u64_: 0x12 })
+                        .into(),
+                )
                 .expect("queue is full");
         }
 
@@ -499,7 +556,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
         let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
         assert_eq!(cqes.len(), 1);
-        assert_eq!(cqes[0].user_data(), 0x12);
+        assert_eq!(cqes[0].user_data().u64_(), 0x12);
         assert_eq!(cqes[0].result(), 0); // successful close iff result is 0
     }
     // If the fixed-socket operation worked properly, this must not fail.
@@ -526,7 +583,12 @@ pub fn test_file_close<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&close_e.build().user_data(0x12).into())
+            .push(
+                &close_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x12 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -535,7 +597,7 @@ pub fn test_file_close<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x12);
+    assert_eq!(cqes[0].user_data().u64_(), 0x12);
     assert_eq!(cqes[0].result(), 0);
 
     Ok(())
@@ -561,9 +623,9 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let mut output = vec![0; text.len()];
 
     let write_e = opcode::Write::new(fd, text.as_ptr(), 22)
-        .offset(-1)
+        .offset(u64::MAX)
         .build()
-        .user_data(0x01)
+        .user_data(types::io_uring_user_data { u64_: 0x01 })
         .into();
 
     unsafe {
@@ -573,9 +635,9 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring.submit_and_wait(1)?;
 
     let write_e = opcode::Write::new(fd, unsafe { text.as_ptr().add(22) }, 22)
-        .offset(-1)
+        .offset(u64::MAX)
         .build()
-        .user_data(0x02)
+        .user_data(types::io_uring_user_data { u64_: 0x02 })
         .into();
 
     unsafe {
@@ -588,7 +650,12 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x03).into())
+            .push(
+                &read_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x03 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -597,9 +664,9 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 3);
-    assert_eq!(cqes[0].user_data(), 0x01);
-    assert_eq!(cqes[1].user_data(), 0x02);
-    assert_eq!(cqes[2].user_data(), 0x03);
+    assert_eq!(cqes[0].user_data().u64_(), 0x01);
+    assert_eq!(cqes[1].user_data().u64_(), 0x02);
+    assert_eq!(cqes[2].user_data().u64_(), 0x03);
     assert_eq!(cqes[0].result(), 22);
     assert_eq!(cqes[1].result(), 22);
     assert_eq!(cqes[2].result(), text.len() as i32);
@@ -615,6 +682,8 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
 ) -> anyhow::Result<()> {
+    use io_uring::types::AtFlags;
+
     require!(
         test;
         test.probe.is_supported(opcode::Statx::CODE);
@@ -636,7 +705,7 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     )
     .mask(libc::STATX_ALL)
     .build()
-    .user_data(0x99)
+    .user_data(types::io_uring_user_data { u64_: 0x99 })
     .into();
 
     unsafe {
@@ -648,7 +717,7 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x99);
+    assert_eq!(cqes[0].user_data().u64_(), 0x99);
     assert_eq!(cqes[0].result(), 0);
 
     // check
@@ -675,10 +744,10 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         b"\0".as_ptr().cast(),
         &mut statxbuf3 as *mut libc::statx as *mut _,
     )
-    .flags(libc::AT_EMPTY_PATH)
+    .flags(AtFlags::EMPTY_PATH)
     .mask(libc::STATX_ALL)
     .build()
-    .user_data(0x9a)
+    .user_data(types::io_uring_user_data { u64_: 0x9a })
     .into();
 
     unsafe {
@@ -690,7 +759,7 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x9a);
+    assert_eq!(cqes[0].user_data().u64_(), 0x9a);
     assert_eq!(cqes[0].result(), 0);
 
     assert_eq!(statxbuf3, statxbuf2);
@@ -737,7 +806,12 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
 
     unsafe {
         ring.submission()
-            .push(&write_e.build().user_data(0x01).into())
+            .push(
+                &write_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x01 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -745,7 +819,12 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
 
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x02).into())
+            .push(
+                &read_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x02 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -754,8 +833,8 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
-    assert_eq!(cqes[0].user_data(), 0x01);
-    assert_eq!(cqes[1].user_data(), 0x02);
+    assert_eq!(cqes[0].user_data().u64_(), 0x01);
+    assert_eq!(cqes[1].user_data().u64_(), 0x02);
     assert_eq!(cqes[0].result(), input.0.len() as i32);
     assert_eq!(cqes[1].result(), input.0.len() as i32);
 
@@ -770,7 +849,12 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
 
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x03).into())
+            .push(
+                &read_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x03 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -779,7 +863,7 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x03);
+    assert_eq!(cqes[0].user_data().u64_(), 0x03);
     assert_eq!(cqes[0].result(), -libc::EINVAL);
 
     Ok(())
@@ -825,7 +909,12 @@ pub fn test_file_splice<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&splice_e.build().user_data(0x33).into())
+            .push(
+                &splice_e
+                    .build()
+                    .user_data(types::io_uring_user_data { u64_: 0x33 })
+                    .into(),
+            )
             .expect("queue is full");
     }
 
@@ -834,7 +923,7 @@ pub fn test_file_splice<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
-    assert_eq!(cqes[0].user_data(), 0x33);
+    assert_eq!(cqes[0].user_data().u64_(), 0x33);
     assert_eq!(cqes[0].result(), 1024);
 
     let mut output = [0; 1024];
