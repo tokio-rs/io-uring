@@ -14,23 +14,32 @@ jobs:
           - x86_64-unknown-linux-gnu
           - aarch64-unknown-linux-gnu
 
+        os:
+          - name: openbsd
+            architecture: x86-64
+            version: '9.2'
+
+          - name: openbsd
+            architecture: arm64
+            version: '7.2'
+
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          override: true
       - uses: actions-rs/cargo@v1
         with:
           command: test
           use-cross: true
           args: --target ${{ matrix.target }}
       - uses: actions-rs/cargo@v1
+      - uses: cross-platform-actions/action@v0.10.0
         with:
+          operating_system: ${{ matrix.os.architecture }}
+          version: ${{ matrix.os.version }}
           command: run
           use-cross: true
           args: --package io-uring-test --features io-uring-test/ci --target ${{ matrix.target }}
+          run: |
+            uname -a
 
   check-bench:
     runs-on: ubuntu-latest
@@ -84,7 +93,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --target ${{ matrix.target }}
-
 
   fmt:
     name: fmt
