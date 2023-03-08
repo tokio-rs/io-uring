@@ -1375,6 +1375,8 @@ opcode!(
 // === 5.11 ===
 
 opcode!(
+    /// Shut down all or part of a full duplex connection on a socket, equivalent to `shutdown(2)`.
+    /// Available since kernel 5.11.
     pub struct Shutdown {
         fd: { impl sealed::UseFixed },
         how: { i32 },
