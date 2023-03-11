@@ -21,9 +21,20 @@ fn main() {
     #[cfg(feature = "overwrite")]
     let outdir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("src/sys");
 
-    bindgen::Builder::default()
-        .header_contents("include-file.h", INCLUDE)
+    let mut builder = bindgen::Builder::default();
+
+    if let Some(path) = env::var("BUILD_IO_URING_INCLUDE_FILE")
+        .ok()
+        .filter(|path| !path.is_empty())
+    {
+        builder = builder.header(path);
+    } else {
+        builder = builder.header_contents("include-file.h", INCLUDE);
+    }
+
+    builder
         .ctypes_prefix("libc")
+        .prepend_enum_name(false)
         .derive_default(true)
         .generate_comments(true)
         .use_core()

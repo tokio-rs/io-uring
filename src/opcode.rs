@@ -2,10 +2,12 @@
 
 #![allow(clippy::new_without_default)]
 
+use std::convert::TryInto;
 use std::mem;
 use std::os::unix::io::RawFd;
 
 use crate::squeue::Entry;
+use crate::squeue::Entry128;
 use crate::sys;
 use crate::types::{self, sealed};
 
@@ -53,7 +55,7 @@ macro_rules! opcode {
         pub const CODE = $opcode:expr;
 
         $( #[$build_meta:meta] )*
-        pub fn build($self:ident) -> Entry $build_block:block
+        pub fn build($self:ident) -> $entry:ty $build_block:block
     ) => {
         $( #[$outer] )*
         pub struct $name {
@@ -61,6 +63,7 @@ macro_rules! opcode {
             $( $opt_field : $opt_tname, )*
         }
 
+        #[allow(deprecated)]
         impl $name {
             $( #[$new_meta] )*
             #[inline]
@@ -87,7 +90,7 @@ macro_rules! opcode {
 
             $( #[$build_meta] )*
             #[inline]
-            pub fn build($self) -> Entry $build_block
+            pub fn build($self) -> $entry $build_block
         }
     }
 }
@@ -126,10 +129,11 @@ opcode!(
         len: { u32 },
         ;;
         ioprio: u16 = 0,
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
-        rw_flags: types::RwFlags = 0
+        rw_flags: types::RwFlags = 0,
+        buf_group: u16 = 0
     }
 
     pub const CODE = sys::IORING_OP_READV;
@@ -137,8 +141,9 @@ opcode!(
     pub fn build(self) -> Entry {
         let Readv {
             fd,
-            iovec, len, offset,
-            ioprio, rw_flags
+            iovec, len, offset64,
+            ioprio, rw_flags,
+            buf_group
         } = self;
 
         let mut sqe = sqe_zeroed();
@@ -147,11 +152,19 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 );
+
+impl Readv {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Vectored write, equivalent to `pwritev2(2)`.
@@ -162,7 +175,7 @@ opcode!(
         len: { u32 },
         ;;
         ioprio: u16 = 0,
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
@@ -173,7 +186,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Writev {
             fd,
-            iovec, len, offset,
+            iovec, len, offset64,
             ioprio, rw_flags
         } = self;
 
@@ -183,11 +196,18 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
+
+impl Writev {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// File sync, equivalent to `fsync(2)`.
@@ -235,7 +255,7 @@ opcode!(
         len: { u32 },
         buf_index: { u16 },
         ;;
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         ioprio: u16 = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
@@ -247,7 +267,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let ReadFixed {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             buf_index,
             ioprio, rw_flags
         } = self;
@@ -258,12 +278,19 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
 );
+
+impl ReadFixed {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Write to pre-mapped buffers that have been previously registered with
@@ -280,7 +307,7 @@ opcode!(
         buf_index: { u16 },
         ;;
         ioprio: u16 = 0,
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
@@ -291,7 +318,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let WriteFixed {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             buf_index,
             ioprio, rw_flags
         } = self;
@@ -302,35 +329,53 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
 );
 
+impl WriteFixed {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
+
 opcode!(
     /// Poll the specified fd.
     ///
-    /// Unlike poll or epoll without `EPOLLONESHOT`, this interface always works in one shot mode.
+    /// Unlike poll or epoll without `EPOLLONESHOT`, this interface defaults to work in one shot mode.
     /// That is, once the poll operation is completed, it will have to be resubmitted.
+    ///
+    /// If multi is set, the poll will work in multi shot mode instead. That means it will
+    /// repeatedly trigger when the requested event becomes true, and hence multiple CQEs can be
+    /// generated from this single submission. The CQE flags field will have IORING_CQE_F_MORE set
+    /// on completion if the application should expect further CQE entries from the original
+    /// request. If this flag isn't set on completion, then the poll request has been terminated
+    /// and no further events will be generated. This mode is available since 5.13.
     #[derive(Debug)]
     pub struct PollAdd {
         /// The bits that may be set in `flags` are defined in `<poll.h>`,
         /// and documented in `poll(2)`.
         fd: { impl sealed::UseFixed },
-        flags: { u32 }
+        flags: { u32 },
         ;;
+        multi: bool = false
     }
 
     pub const CODE = sys::IORING_OP_POLL_ADD;
 
     pub fn build(self) -> Entry {
-        let PollAdd { fd, flags } = self;
+        let PollAdd { fd, flags, multi } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
+        if multi {
+            sqe.len = sys::IORING_POLL_ADD_MULTI;
+        }
 
         #[cfg(target_endian = "little")] {
             sqe.__bindgen_anon_3.poll32_events = flags;
@@ -443,13 +488,14 @@ opcode!(
         msg: { *mut libc::msghdr },
         ;;
         ioprio: u16 = 0,
-        flags: u32 = 0
+        flags: u32 = 0,
+        buf_group: u16 = 0
     }
 
     pub const CODE = sys::IORING_OP_RECVMSG;
 
     pub fn build(self) -> Entry {
-        let RecvMsg { fd, msg, ioprio, flags } = self;
+        let RecvMsg { fd, msg, ioprio, flags, buf_group } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -458,6 +504,59 @@ opcode!(
         sqe.__bindgen_anon_2.addr = msg as _;
         sqe.len = 1;
         sqe.__bindgen_anon_3.msg_flags = flags;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        Entry(sqe)
+    }
+);
+
+opcode!(
+    /// Receive multiple messages on a socket, equivalent to `recvmsg(2)`.
+    ///
+    /// Parameters:
+    ///     msg:       For this multishot variant of ResvMsg, only the msg_namelen and msg_controllen
+    ///                fields are relevant.
+    ///     buf_group: The id of the provided buffer pool to use for each received message.
+    ///
+    /// See also the description of [`SendMsg`] and [`types::RecvMsgOut`].
+    ///
+    /// The multishot version allows the application to issue a single receive request, which
+    /// repeatedly posts a CQE when data is available. It requires the MSG_WAITALL flag is not set.
+    /// Each CQE will take a buffer out of a provided buffer pool for receiving. The application
+    /// should check the flags of each CQE, regardless of its result. If a posted CQE does not have
+    /// the IORING_CQE_F_MORE flag set then the multishot receive will be done and the application
+    /// should issue a new request.
+    ///
+    /// Unlike [`RecvMsg`], this multishot recvmsg will prepend a struct which describes the layout
+    /// of the rest of the buffer in combination with the initial msghdr structure submitted with
+    /// the request. Use [`types::RecvMsgOut`] to parse the data received and access its
+    /// components.
+    ///
+    /// The recvmsg multishot variant is available since kernel 6.0.
+
+    #[derive(Debug)]
+    pub struct RecvMsgMulti {
+        fd: { impl sealed::UseFixed },
+        msg: { *const libc::msghdr },
+        buf_group: { u16 },
+        ;;
+        ioprio: u16 = 0,
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_RECVMSG;
+
+    pub fn build(self) -> Entry {
+        let RecvMsgMulti { fd, msg, buf_group, ioprio, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = msg as _;
+        sqe.len = 1;
+        sqe.__bindgen_anon_3.msg_flags = flags;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.ioprio = ioprio | (sys::IORING_RECV_MULTISHOT as u16);
         Entry(sqe)
     }
 );
@@ -529,13 +628,14 @@ opcode!(
         addr: { *mut libc::sockaddr },
         addrlen: { *mut libc::socklen_t },
         ;;
+        file_index: Option<types::DestinationSlot> = None,
         flags: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_ACCEPT;
 
     pub fn build(self) -> Entry {
-        let Accept { fd, addr, addrlen, flags } = self;
+        let Accept { fd, addr, addrlen, file_index, flags } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -543,6 +643,39 @@ opcode!(
         sqe.__bindgen_anon_2.addr = addr as _;
         sqe.__bindgen_anon_1.addr2 = addrlen as _;
         sqe.__bindgen_anon_3.accept_flags = flags as _;
+        if let Some(dest) = file_index {
+            sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
+        }
+        Entry(sqe)
+    }
+);
+
+opcode!(
+    /// Accept multiple new connections on a socket.
+    ///
+    /// Set the `allocate_file_index` property if fixed file table entries should be used.
+    pub struct AcceptMulti {
+        fd: { impl sealed::UseFixed },
+        ;;
+        allocate_file_index: bool = false,
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_ACCEPT;
+
+    pub fn build(self) -> Entry {
+        let AcceptMulti { fd, allocate_file_index, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = sys::IORING_ACCEPT_MULTISHOT as u16;
+        // No out SockAddr is passed for the multishot accept case.
+        // The user should perform a syscall to get any resulting connection's remote address.
+        sqe.__bindgen_anon_3.accept_flags = flags as _;
+        if allocate_file_index {
+            sqe.__bindgen_anon_5.file_index = sys::IORING_FILE_INDEX_ALLOC as u32;
+        }
         Entry(sqe)
     }
 );
@@ -621,28 +754,69 @@ opcode!(
 
 opcode!(
     /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
+    #[deprecated(note = "use Fallocate64 instead, which always takes a 64-bit length")]
     pub struct Fallocate {
         fd: { impl sealed::UseFixed },
         len: { libc::off_t },
         ;;
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
         mode: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_FALLOCATE;
 
     pub fn build(self) -> Entry {
-        let Fallocate { fd, len, offset, mode } = self;
+        let Fallocate { fd, len, offset64, mode } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_2.addr = len as _;
         sqe.len = mode as _;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         Entry(sqe)
     }
 );
+
+#[allow(deprecated)]
+impl Fallocate {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
+
+opcode!(
+    /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
+    pub struct Fallocate64 {
+        fd: { impl sealed::UseFixed },
+        len: { libc::off64_t },
+        ;;
+        offset64: libc::off64_t = 0,
+        mode: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_FALLOCATE;
+
+    pub fn build(self) -> Entry {
+        let Fallocate64 { fd, len, offset64, mode } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = len as _;
+        sqe.len = mode as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
+        Entry(sqe)
+    }
+);
+
+impl Fallocate64 {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Open a file, equivalent to `openat(2)`.
@@ -650,6 +824,7 @@ opcode!(
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
         ;;
+        file_index: Option<types::DestinationSlot> = None,
         flags: i32 = 0,
         mode: libc::mode_t = 0
     }
@@ -657,7 +832,7 @@ opcode!(
     pub const CODE = sys::IORING_OP_OPENAT;
 
     pub fn build(self) -> Entry {
-        let OpenAt { dirfd, pathname, flags, mode } = self;
+        let OpenAt { dirfd, pathname, file_index, flags, mode } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -665,14 +840,19 @@ opcode!(
         sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mode;
         sqe.__bindgen_anon_3.open_flags = flags as _;
+        if let Some(dest) = file_index {
+            sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
+        }
         Entry(sqe)
     }
 );
 
 opcode!(
     /// Close a file descriptor, equivalent to `close(2)`.
+    ///
+    /// Use a types::Fixed(fd) argument to close an io_uring direct descriptor.
     pub struct Close {
-        fd: { impl sealed::UseFd }
+        fd: { impl sealed::UseFixed },
         ;;
     }
 
@@ -683,7 +863,13 @@ opcode!(
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
-        sqe.fd = fd;
+        match fd {
+            sealed::Target::Fd(i) => sqe.fd = i,
+            sealed::Target::Fixed(i) => {
+                sqe.fd = 0;
+                sqe.__bindgen_anon_5.file_index = i+1;
+            }
+        }
         Entry(sqe)
     }
 );
@@ -745,13 +931,27 @@ opcode!(
 );
 
 opcode!(
-    /// Read from a file descriptor, equivalent to `read(2)`.
+    /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
+    ///
+    /// * `fd` is the file descriptor to be operated on,
+    /// * `addr` contains the buffer in question,
+    /// * `len` contains the length of the IO operation,
+    ///
+    /// These are non-vectored versions of the `IORING_OP_READV` and `IORING_OP_WRITEV` opcodes.
+    /// See also `read(2)` and `write(2)` for the general description of the related system call.
+    ///
+    /// Available since 5.6.
     pub struct Read {
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
         len: { u32 },
         ;;
-        offset: libc::off_t = 0,
+        /// `offset` contains the read or write offset.
+        ///
+        /// If `fd` does not refer to a seekable file, `offset` must be set to zero.
+        /// If `offsett` is set to `-1`, the offset will use (and advance) the file position,
+        /// like the `read(2)` and `write(2)` system calls.
+        offset64: libc::off64_t = 0,
         ioprio: u16 = 0,
         rw_flags: types::RwFlags = 0,
         buf_group: u16 = 0
@@ -762,7 +962,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Read {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             ioprio, rw_flags,
             buf_group
         } = self;
@@ -773,21 +973,42 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 );
 
+impl Read {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
+
 opcode!(
-    /// Write to a file descriptor, equivalent to `write(2)`.
+    /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
+    ///
+    /// * `fd` is the file descriptor to be operated on,
+    /// * `addr` contains the buffer in question,
+    /// * `len` contains the length of the IO operation,
+    ///
+    /// These are non-vectored versions of the `IORING_OP_READV` and `IORING_OP_WRITEV` opcodes.
+    /// See also `read(2)` and `write(2)` for the general description of the related system call.
+    ///
+    /// Available since 5.6.
     pub struct Write {
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
         len: { u32 },
         ;;
-        offset: libc::off_t = 0,
+        /// `offset` contains the read or write offset.
+        ///
+        /// If `fd` does not refer to a seekable file, `offset` must be set to zero.
+        /// If `offsett` is set to `-1`, the offset will use (and advance) the file position,
+        /// like the `read(2)` and `write(2)` system calls.
+        offset64: libc::off64_t = 0,
         ioprio: u16 = 0,
         rw_flags: types::RwFlags = 0
     }
@@ -797,7 +1018,7 @@ opcode!(
     pub fn build(self) -> Entry {
         let Write {
             fd,
-            buf, len, offset,
+            buf, len, offset64,
             ioprio, rw_flags
         } = self;
 
@@ -807,11 +1028,18 @@ opcode!(
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 );
+
+impl Write {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Predeclare an access pattern for file data, equivalent to `posix_fadvise(2)`.
@@ -820,23 +1048,30 @@ opcode!(
         len: { libc::off_t },
         advice: { i32 },
         ;;
-        offset: libc::off_t = 0,
+        offset64: libc::off64_t = 0,
     }
 
     pub const CODE = sys::IORING_OP_FADVISE;
 
     pub fn build(self) -> Entry {
-        let Fadvise { fd, len, advice, offset } = self;
+        let Fadvise { fd, len, advice, offset64 } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.len = len as _;
-        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_1.off = offset64 as _;
         sqe.__bindgen_anon_3.fadvise_advice = advice as _;
         Entry(sqe)
     }
 );
+
+impl Fadvise {
+    #[inline]
+    pub const fn offset(self, offset: libc::off_t) -> Self {
+        self.offset64(offset as libc::off64_t)
+    }
+}
 
 opcode!(
     /// Give advice about use of memory, equivalent to `madvise(2)`.
@@ -915,18 +1150,58 @@ opcode!(
 );
 
 opcode!(
+    /// Receive multiple messages from a socket, equivalent to `recv(2)`.
+    ///
+    /// Parameter:
+    ///     buf_group: The id of the provided buffer pool to use for each received message.
+    ///
+    /// MSG_WAITALL should not be set in flags.
+    ///
+    /// The multishot version allows the application to issue a single receive request, which
+    /// repeatedly posts a CQE when data is available. Each CQE will take a buffer out of a
+    /// provided buffer pool for receiving. The application should check the flags of each CQE,
+    /// regardless of its result. If a posted CQE does not have the IORING_CQE_F_MORE flag set then
+    /// the multishot receive will be done and the application should issue a new request.
+    ///
+    /// Multishot variants are available since kernel 6.0.
+
+    pub struct RecvMulti {
+        fd: { impl sealed::UseFixed },
+        buf_group: { u16 },
+        ;;
+        flags: i32 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_RECV;
+
+    pub fn build(self) -> Entry {
+        let RecvMulti { fd, buf_group, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.ioprio = sys::IORING_RECV_MULTISHOT as _;
+        Entry(sqe)
+    }
+);
+
+opcode!(
     /// Open a file, equivalent to `openat2(2)`.
     pub struct OpenAt2 {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
         how: { *const types::OpenHow }
         ;;
+        file_index: Option<types::DestinationSlot> = None,
     }
 
     pub const CODE = sys::IORING_OP_OPENAT2;
 
     pub fn build(self) -> Entry {
-        let OpenAt2 { dirfd, pathname, how } = self;
+        let OpenAt2 { dirfd, pathname, how, file_index } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -934,6 +1209,9 @@ opcode!(
         sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.len = mem::size_of::<sys::open_how>() as _;
         sqe.__bindgen_anon_1.off = how as _;
+        if let Some(dest) = file_index {
+            sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
+        }
         Entry(sqe)
     }
 );
@@ -992,7 +1270,7 @@ opcode!(
         sqe.len = len;
         sqe.__bindgen_anon_1.off = off_out as _;
 
-        sqe.splice_fd_in = match fd_in {
+        sqe.__bindgen_anon_5.splice_fd_in = match fd_in {
             sealed::Target::Fd(fd) => fd,
             sealed::Target::Fixed(i) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;
@@ -1006,13 +1284,10 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Register `nbufs` buffers that each have the length `len` with ids starting from `big` in the
     /// group `bgid` that can be used for any request. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
-    ///
-    /// Requires the `unstable` feature.
     pub struct ProvideBuffers {
         addr: { *mut u8 },
         len: { i32 },
@@ -1038,12 +1313,9 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Remove some number of buffers from a buffer group. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
-    ///
-    /// Requires the `unstable` feature.
     pub struct RemoveBuffers {
         nbufs: { u16 },
         bgid: { u16 }
@@ -1065,11 +1337,8 @@ opcode!(
 
 // === 5.8 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
     /// Duplicate pipe content, equivalent to `tee(2)`.
-    ///
-    /// Requires the `unstable` feature.
     pub struct Tee {
         fd_in: { impl sealed::UseFixed },
         fd_out: { impl sealed::UseFixed },
@@ -1089,7 +1358,7 @@ opcode!(
         assign_fd!(sqe.fd = fd_out);
         sqe.len = len;
 
-        sqe.splice_fd_in = match fd_in {
+        sqe.__bindgen_anon_5.splice_fd_in = match fd_in {
             sealed::Target::Fd(fd) => fd,
             sealed::Target::Fixed(i) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;
@@ -1105,8 +1374,9 @@ opcode!(
 
 // === 5.11 ===
 
-#[cfg(feature = "unstable")]
 opcode!(
+    /// Shut down all or part of a full duplex connection on a socket, equivalent to `shutdown(2)`.
+    /// Available since kernel 5.11.
     pub struct Shutdown {
         fd: { impl sealed::UseFixed },
         how: { i32 },
@@ -1126,7 +1396,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct RenameAt {
         olddirfd: { impl sealed::UseFd },
@@ -1157,7 +1426,6 @@ opcode!(
     }
 );
 
-#[cfg(feature = "unstable")]
 opcode!(
     pub struct UnlinkAt {
         dirfd: { impl sealed::UseFd },
@@ -1176,6 +1444,311 @@ opcode!(
         sqe.fd = dirfd;
         sqe.__bindgen_anon_2.addr = pathname as _;
         sqe.__bindgen_anon_3.unlink_flags = flags as _;
+        Entry(sqe)
+    }
+);
+
+// === 5.15 ===
+
+opcode!(
+    /// Make a directory, equivalent to `mkdirat2(2)`.
+    pub struct MkDirAt {
+        dirfd: { impl sealed::UseFd },
+        pathname: { *const libc::c_char },
+        ;;
+        mode: libc::mode_t = 0
+    }
+
+    pub const CODE = sys::IORING_OP_MKDIRAT;
+
+    pub fn build(self) -> Entry {
+        let MkDirAt { dirfd, pathname, mode } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = dirfd;
+        sqe.__bindgen_anon_2.addr = pathname as _;
+        sqe.len = mode;
+        Entry(sqe)
+    }
+);
+
+opcode!(
+    /// Create a symlink, equivalent to `symlinkat2(2)`.
+    pub struct SymlinkAt {
+        newdirfd: { impl sealed::UseFd },
+        target: { *const libc::c_char },
+        linkpath: { *const libc::c_char },
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_SYMLINKAT;
+
+    pub fn build(self) -> Entry {
+        let SymlinkAt { newdirfd, target, linkpath } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = newdirfd;
+        sqe.__bindgen_anon_2.addr = target as _;
+        sqe.__bindgen_anon_1.addr2 = linkpath as _;
+        Entry(sqe)
+    }
+);
+
+opcode!(
+    /// Create a hard link, equivalent to `linkat2(2)`.
+    pub struct LinkAt {
+        olddirfd: { impl sealed::UseFd },
+        oldpath: { *const libc::c_char },
+        newdirfd: { impl sealed::UseFd },
+        newpath: { *const libc::c_char },
+        ;;
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_LINKAT;
+
+    pub fn build(self) -> Entry {
+        let LinkAt { olddirfd, oldpath, newdirfd, newpath, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = olddirfd as _;
+        sqe.__bindgen_anon_2.addr = oldpath as _;
+        sqe.len = newdirfd as _;
+        sqe.__bindgen_anon_1.addr2 = newpath as _;
+        sqe.__bindgen_anon_3.hardlink_flags = flags as _;
+        Entry(sqe)
+    }
+);
+
+// === 5.18 ===
+
+opcode!(
+    /// Send a message (with data) to a target ring.
+    pub struct MsgRingData {
+        ring_fd: { impl sealed::UseFd },
+        result: { i32 },
+        user_data: { u64 },
+        user_flags: { Option<u32> },
+        ;;
+        opcode_flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_MSG_RING;
+
+    pub fn build(self) -> Entry {
+        let MsgRingData { ring_fd, result, user_data, user_flags, opcode_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.__bindgen_anon_2.addr = sys::IORING_MSG_DATA.into();
+        sqe.fd = ring_fd;
+        sqe.len = result as u32;
+        sqe.__bindgen_anon_1.off = user_data;
+        sqe.__bindgen_anon_3.msg_ring_flags = opcode_flags;
+        if let Some(_flags) = user_flags {
+            // TODO(lucab): add IORING_MSG_RING_FLAGS_PASS support (in v6.3):
+            // https://lore.kernel.org/all/20230103160507.617416-1-leitao@debian.org/t/#u
+        }
+        Entry(sqe)
+    }
+);
+
+// === 5.19 ===
+
+opcode!(
+    /// A file/device-specific 16-byte command, akin (but not equivalent) to `ioctl(2)`.
+    pub struct UringCmd16 {
+        fd: { impl sealed::UseFixed },
+        cmd_op: { u32 },
+        ;;
+        /// Arbitrary command data.
+        cmd: [u8; 16] = [0u8; 16]
+    }
+
+    pub const CODE = sys::IORING_OP_URING_CMD;
+
+    pub fn build(self) -> Entry {
+        let UringCmd16 { fd, cmd_op, cmd } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.__bindgen_anon_1.cmd_op = cmd_op;
+        unsafe { *sqe.__bindgen_anon_6.cmd.as_mut().as_mut_ptr().cast::<[u8; 16]>() = cmd };
+        Entry(sqe)
+    }
+);
+
+opcode!(
+    /// A file/device-specific 80-byte command, akin (but not equivalent) to `ioctl(2)`.
+    pub struct UringCmd80 {
+        fd: { impl sealed::UseFixed },
+        cmd_op: { u32 },
+        ;;
+        /// Arbitrary command data.
+        cmd: [u8; 80] = [0u8; 80]
+    }
+
+    pub const CODE = sys::IORING_OP_URING_CMD;
+
+    pub fn build(self) -> Entry128 {
+        let UringCmd80 { fd, cmd_op, cmd } = self;
+
+        let cmd1 = cmd[..16].try_into().unwrap();
+        let cmd2 = cmd[16..].try_into().unwrap();
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.__bindgen_anon_1.cmd_op = cmd_op;
+        unsafe { *sqe.__bindgen_anon_6.cmd.as_mut().as_mut_ptr().cast::<[u8; 16]>() = cmd1 };
+        Entry128(Entry(sqe), cmd2)
+    }
+);
+
+// === 5.19 ===
+
+opcode!(
+    /// Create an endpoint for communication, equivalent to `socket(2)`.
+    ///
+    /// If the `file_index` argument is set, the resulting socket is
+    /// directly mapped to the given fixed-file slot instead of being
+    /// returned as a normal file descriptor. The application must first
+    /// have registered a file table, and the target slot should fit into
+    /// it.
+    pub struct Socket {
+        domain: { i32 },
+        socket_type: { i32 },
+        protocol: { i32 },
+        ;;
+        file_index: Option<types::DestinationSlot> = None,
+        flags: types::RwFlags = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_SOCKET;
+
+    pub fn build(self) -> Entry {
+        let Socket { domain, socket_type, protocol, file_index, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = domain as _;
+        sqe.__bindgen_anon_1.off = socket_type as _;
+        sqe.len = protocol as _;
+        sqe.__bindgen_anon_3.rw_flags = flags;
+        if let Some(dest) = file_index {
+            sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
+        }
+        Entry(sqe)
+    }
+);
+
+// === 6.0 ===
+
+opcode!(
+    /// Send a message (with fixed FD) to a target ring.
+    pub struct MsgRingSendFd {
+        ring_fd: { impl sealed::UseFd },
+        fixed_slot_src: { types::Fixed },
+        dest_slot_index: { types::DestinationSlot },
+        result: { i32 },
+        user_data: { u64 },
+        ;;
+        opcode_flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_MSG_RING;
+
+    pub fn build(self) -> Entry {
+        let MsgRingSendFd { ring_fd, fixed_slot_src, dest_slot_index, result, user_data, opcode_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.__bindgen_anon_2.addr = sys::IORING_MSG_SEND_FD.into();
+        sqe.fd = ring_fd;
+        sqe.len = result as u32;
+        sqe.__bindgen_anon_1.off = user_data;
+        unsafe { sqe.__bindgen_anon_6.__bindgen_anon_1.as_mut().addr3 = fixed_slot_src.0 as u64 };
+        sqe.__bindgen_anon_5.file_index = dest_slot_index.kernel_index_arg();
+        sqe.__bindgen_anon_3.msg_ring_flags = opcode_flags;
+        Entry(sqe)
+    }
+);
+
+// === 6.0 ===
+
+opcode!(
+    /// Send a zerocopy message on a socket, equivalent to `send(2)`.
+    ///
+    /// A fixed (pre-mapped) buffer can optionally be used from pre-mapped buffers that have been
+    /// previously registered with [`Submitter::register_buffers`](crate::Submitter::register_buffers).
+    pub struct SendZc {
+        fd: { impl sealed::UseFixed },
+        buf: { *const u8 },
+        len: { u32 },
+        ;;
+        /// The `buf_index` is an index into an array of fixed buffers, and is only valid if fixed
+        /// buffers were registered.
+        ///
+        /// The buf and len arguments must fall within a region specified by buf_index in the
+        /// previously registered buffer. The buffer need not be aligned with the start of the
+        /// registered buffer.
+        buf_index: Option<u16> = None,
+        flags: i32 = 0,
+        zc_flags: u16 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_SEND_ZC;
+
+    pub fn build(self) -> Entry {
+        let SendZc { fd, buf, len, buf_index, flags, zc_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = buf as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.ioprio = zc_flags;
+        if let Some(buf_index) = buf_index {
+            sqe.__bindgen_anon_4.buf_index = buf_index;
+            sqe.ioprio |= sys::IORING_RECVSEND_FIXED_BUF as u16;
+        }
+        Entry(sqe)
+    }
+);
+
+// === 6.1 ===
+
+opcode!(
+    /// Send a zerocopy message on a socket, equivalent to `send(2)`.
+    ///
+    /// fd must be set to the socket file descriptor, addr must contains a pointer to the msghdr
+    /// structure, and flags holds the flags associated with the system call.
+    #[derive(Debug)]
+    pub struct SendMsgZc {
+        fd: { impl sealed::UseFixed },
+        msg: { *const libc::msghdr },
+        ;;
+        ioprio: u16 = 0,
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_SENDMSG_ZC;
+
+    pub fn build(self) -> Entry {
+        let SendMsgZc { fd, msg, ioprio, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = ioprio;
+        sqe.__bindgen_anon_2.addr = msg as _;
+        sqe.len = 1;
+        sqe.__bindgen_anon_3.msg_flags = flags;
         Entry(sqe)
     }
 );

@@ -1,4 +1,4 @@
-use io_uring::{opcode, squeue, types, IoUring};
+use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use std::io::{IoSlice, IoSliceMut};
 
 macro_rules! require {
@@ -34,7 +34,11 @@ pub fn type_name_of<T>(_f: T) -> &'static str {
     std::any::type_name::<T>()
 }
 
-pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> anyhow::Result<()> {
+pub fn write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    fd_in: types::Fd,
+    fd_out: types::Fd,
+) -> anyhow::Result<()> {
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut output = vec![0; text.len()];
 
@@ -46,16 +50,17 @@ pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> an
         let write_e = write_e
             .build()
             .user_data(0x01)
-            .flags(squeue::Flags::IO_LINK);
+            .flags(squeue::Flags::IO_LINK)
+            .into();
         queue.push(&write_e).expect("queue is full");
         queue
-            .push(&read_e.build().user_data(0x02))
+            .push(&read_e.build().user_data(0x02).into())
             .expect("queue is full");
     }
 
     assert_eq!(ring.submit_and_wait(2)?, 2);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
@@ -68,7 +73,11 @@ pub fn write_read(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> an
     Ok(())
 }
 
-pub fn writev_readv(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> anyhow::Result<()> {
+pub fn writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    fd_in: types::Fd,
+    fd_out: types::Fd,
+) -> anyhow::Result<()> {
     let text = b"The quick brown fox jumps over the lazy dog.";
     let text2 = "我能吞下玻璃而不伤身体。".as_bytes();
     let mut output = vec![0; text.len()];
@@ -85,16 +94,17 @@ pub fn writev_readv(ring: &mut IoUring, fd_in: types::Fd, fd_out: types::Fd) -> 
         let write_e = write_e
             .build()
             .user_data(0x01)
-            .flags(squeue::Flags::IO_LINK);
+            .flags(squeue::Flags::IO_LINK)
+            .into();
         queue.push(&write_e).expect("queue is full");
         queue
-            .push(&read_e.build().user_data(0x02))
+            .push(&read_e.build().user_data(0x02).into())
             .expect("queue is full");
     }
 
     ring.submit_and_wait(2)?;
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);

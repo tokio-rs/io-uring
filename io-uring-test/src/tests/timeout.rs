@@ -1,8 +1,11 @@
 use crate::Test;
-use io_uring::{opcode, types, IoUring};
+use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use std::time::Instant;
 
-pub fn test_timeout(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_timeout<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Timeout::CODE);
@@ -18,7 +21,7 @@ pub fn test_timeout(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x09))
+            .push(&timeout_e.build().user_data(0x09).into())
             .expect("queue is full");
     }
 
@@ -27,7 +30,7 @@ pub fn test_timeout(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     assert_eq!(start.elapsed().as_secs(), 1);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x09);
@@ -42,10 +45,10 @@ pub fn test_timeout(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x0a))
+            .push(&timeout_e.build().user_data(0x0a).into())
             .expect("queue is full");
         queue
-            .push(&nop_e.build().user_data(0x0b))
+            .push(&nop_e.build().user_data(0x0b).into())
             .expect("queue is full");
     }
 
@@ -56,7 +59,7 @@ pub fn test_timeout(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     assert_eq!(start.elapsed().as_secs(), 0);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0b);
@@ -68,7 +71,7 @@ pub fn test_timeout(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     assert_eq!(start.elapsed().as_secs(), 1);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0a);
@@ -77,7 +80,10 @@ pub fn test_timeout(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn test_timeout_count(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_timeout_count<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Timeout::CODE);
@@ -92,10 +98,10 @@ pub fn test_timeout_count(ring: &mut IoUring, test: &Test) -> anyhow::Result<()>
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x0c))
+            .push(&timeout_e.build().user_data(0x0c).into())
             .expect("queue is full");
         queue
-            .push(&nop_e.build().user_data(0x0d))
+            .push(&nop_e.build().user_data(0x0d).into())
             .expect("queue is full");
     }
 
@@ -104,7 +110,7 @@ pub fn test_timeout_count(ring: &mut IoUring, test: &Test) -> anyhow::Result<()>
 
     assert_eq!(start.elapsed().as_secs(), 0);
 
-    let mut cqes = ring.completion().collect::<Vec<_>>();
+    let mut cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
     cqes.sort_by_key(|cqe| cqe.user_data());
 
     assert_eq!(cqes.len(), 2);
@@ -116,7 +122,10 @@ pub fn test_timeout_count(ring: &mut IoUring, test: &Test) -> anyhow::Result<()>
     Ok(())
 }
 
-pub fn test_timeout_remove(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_timeout_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Timeout::CODE);
@@ -133,7 +142,7 @@ pub fn test_timeout_remove(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x10))
+            .push(&timeout_e.build().user_data(0x10).into())
             .expect("queue is full");
     }
 
@@ -146,7 +155,7 @@ pub fn test_timeout_remove(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x11))
+            .push(&timeout_e.build().user_data(0x11).into())
             .expect("queue is full");
     }
 
@@ -155,7 +164,7 @@ pub fn test_timeout_remove(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
 
     assert_eq!(start.elapsed().as_secs(), 0);
 
-    let mut cqes = ring.completion().collect::<Vec<_>>();
+    let mut cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
     cqes.sort_by_key(|cqe| cqe.user_data());
 
     assert_eq!(cqes.len(), 2);
@@ -167,7 +176,10 @@ pub fn test_timeout_remove(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
     Ok(())
 }
 
-pub fn test_timeout_cancel(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_timeout_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Timeout::CODE);
@@ -184,7 +196,7 @@ pub fn test_timeout_cancel(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x10))
+            .push(&timeout_e.build().user_data(0x10).into())
             .expect("queue is full");
     }
 
@@ -197,7 +209,7 @@ pub fn test_timeout_cancel(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x11))
+            .push(&timeout_e.build().user_data(0x11).into())
             .expect("queue is full");
     }
 
@@ -206,7 +218,7 @@ pub fn test_timeout_cancel(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
 
     assert_eq!(start.elapsed().as_secs(), 0);
 
-    let mut cqes = ring.completion().collect::<Vec<_>>();
+    let mut cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
     cqes.sort_by_key(|cqe| cqe.user_data());
 
     assert_eq!(cqes.len(), 2);
@@ -218,7 +230,10 @@ pub fn test_timeout_cancel(ring: &mut IoUring, test: &Test) -> anyhow::Result<()
     Ok(())
 }
 
-pub fn test_timeout_abs(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_timeout_abs<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require!(
         test;
         test.probe.is_supported(opcode::Timeout::CODE);
@@ -244,7 +259,7 @@ pub fn test_timeout_abs(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x19))
+            .push(&timeout_e.build().user_data(0x19).into())
             .expect("queue is full");
     }
 
@@ -253,7 +268,7 @@ pub fn test_timeout_abs(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
 
     assert!(start.elapsed().as_secs() >= 1);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x19);
@@ -262,8 +277,10 @@ pub fn test_timeout_abs(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "unstable")]
-pub fn test_timeout_submit_args(ring: &mut IoUring, test: &Test) -> anyhow::Result<()> {
+pub fn test_timeout_submit_args<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
     require! {
         test;
         ring.params().is_feature_ext_arg();
@@ -284,9 +301,7 @@ pub fn test_timeout_submit_args(ring: &mut IoUring, test: &Test) -> anyhow::Resu
     }
     assert_eq!(start.elapsed().as_secs(), 1);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
-
-    assert!(cqes.is_empty());
+    assert!(ring.completion().next().is_none());
 
     // no timeout
 
@@ -294,7 +309,7 @@ pub fn test_timeout_submit_args(ring: &mut IoUring, test: &Test) -> anyhow::Resu
 
     unsafe {
         ring.submission()
-            .push(&nop_e.build().user_data(0x1c))
+            .push(&nop_e.build().user_data(0x1c).into())
             .expect("queue is full");
     }
 
@@ -302,7 +317,7 @@ pub fn test_timeout_submit_args(ring: &mut IoUring, test: &Test) -> anyhow::Resu
     ring.submitter().submit_with_args(1, &args)?;
     assert_eq!(start.elapsed().as_secs(), 0);
 
-    let cqes = ring.completion().collect::<Vec<_>>();
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x1c);

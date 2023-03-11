@@ -4,13 +4,11 @@ use std::{io, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
-use crate::util::{cast_ptr, Fd};
+use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 
-#[cfg(feature = "unstable")]
 use crate::register::Restriction;
 
-#[cfg(feature = "unstable")]
 use crate::types;
 
 /// Interface for submitting submission queue events in an io_uring instance to the kernel for
@@ -19,7 +17,7 @@ use crate::types;
 /// io_uring supports both directly performing I/O on buffers and file descriptors and registering
 /// them beforehand. Registering is slow, but it makes performing the actual I/O much faster.
 pub struct Submitter<'a> {
-    fd: &'a Fd,
+    fd: &'a OwnedFd,
     params: &'a Parameters,
 
     sq_head: *const atomic::AtomicU32,
@@ -30,7 +28,7 @@ pub struct Submitter<'a> {
 impl<'a> Submitter<'a> {
     #[inline]
     pub(crate) const fn new(
-        fd: &'a Fd,
+        fd: &'a OwnedFd,
         params: &'a Parameters,
         sq_head: *const atomic::AtomicU32,
         sq_tail: *const atomic::AtomicU32,
@@ -64,6 +62,13 @@ impl<'a> Submitter<'a> {
         }
     }
 
+    /// CQ ring is overflown
+    fn sq_cq_overflow(&self) -> bool {
+        unsafe {
+            (*self.sq_flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0
+        }
+    }
+
     /// Initiate and/or complete asynchronous I/O. This is a low-level wrapper around
     /// `io_uring_enter` - see `man io_uring_enter` (or [its online
     /// version](https://manpages.debian.org/unstable/liburing-dev/io_uring_enter.2.en.html) for
@@ -86,21 +91,15 @@ impl<'a> Submitter<'a> {
             .map(|arg| cast_ptr(arg) as *const _)
             .unwrap_or_else(ptr::null);
         let size = std::mem::size_of::<T>();
-        let result = sys::io_uring_enter(
+        sys::io_uring_enter(
             self.fd.as_raw_fd(),
             to_submit,
             min_complete,
             flag,
             arg,
             size,
-        );
-        if result >= 0 {
-            Ok(result as _)
-        } else if result == -1 {
-            Err(io::Error::last_os_error())
-        } else {
-            Err(io::Error::from_raw_os_error(-result))
-        }
+        )
+        .map(|res| res as _)
     }
 
     /// Submit all queued submission queue events to the kernel.
@@ -115,7 +114,12 @@ impl<'a> Submitter<'a> {
         let len = self.sq_len();
         let mut flags = 0;
 
-        if want > 0 || self.params.is_setup_iopoll() {
+        // This logic suffers from the fact the sq_cq_overflow and sq_need_wakeup
+        // each cause an atomic load of the same variable, self.sq_flags.
+        // In the hottest paths, when a server is running with sqpoll,
+        // this is going to be hit twice, when once would be sufficient.
+
+        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow() {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
@@ -132,7 +136,6 @@ impl<'a> Submitter<'a> {
         unsafe { self.enter::<libc::sigset_t>(len as _, want as _, flags, None) }
     }
 
-    #[cfg(feature = "unstable")]
     pub fn submit_with_args(
         &self,
         want: usize,
@@ -141,7 +144,7 @@ impl<'a> Submitter<'a> {
         let len = self.sq_len();
         let mut flags = sys::IORING_ENTER_EXT_ARG;
 
-        if want > 0 {
+        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow() {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
@@ -159,9 +162,6 @@ impl<'a> Submitter<'a> {
     }
 
     /// Wait for the submission queue to have free entries.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn squeue_wait(&self) -> io::Result<usize> {
         unsafe { self.enter::<libc::sigset_t>(0, 0, sys::IORING_ENTER_SQ_WAIT, None) }
     }
@@ -175,6 +175,30 @@ impl<'a> Submitter<'a> {
             sys::IORING_REGISTER_BUFFERS,
             bufs.as_ptr() as *const _,
             bufs.len() as _,
+        )
+        .map(drop)
+    }
+
+    /// Registers an empty file table of nr_files number of file descriptors. The sparse variant is
+    /// available in kernels 5.19 and later.
+    ///
+    /// Registering a file table is a prerequisite for using any request that
+    /// uses direct descriptors.
+    pub fn register_files_sparse(&self, nr: u32) -> io::Result<()> {
+        use std::mem;
+        let rr = sys::io_uring_rsrc_register {
+            nr,
+            flags: sys::IORING_RSRC_REGISTER_SPARSE,
+            resv2: 0,
+            data: 0,
+            tags: 0,
+        };
+        let rr = cast_ptr::<sys::io_uring_rsrc_register>(&rr);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_FILES2,
+            rr as *const _,
+            mem::size_of::<sys::io_uring_rsrc_register>() as _,
         )
         .map(drop)
     }
@@ -346,9 +370,6 @@ impl<'a> Submitter<'a> {
     /// an operation not on the allowlist will fail with `-EACCES`.
     ///
     /// This can only be called once, to prevent untrusted code from removing restrictions.
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn register_restrictions(&self, res: &mut [Restriction]) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -361,15 +382,85 @@ impl<'a> Submitter<'a> {
 
     /// Enable the rings of the io_uring instance if they have been disabled with
     /// [`setup_r_disabled`](crate::Builder::setup_r_disabled).
-    ///
-    /// Requires the `unstable` feature.
-    #[cfg(feature = "unstable")]
     pub fn register_enable_rings(&self) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_ENABLE_RINGS,
             ptr::null(),
             0,
+        )
+        .map(drop)
+    }
+
+    /// Get and/or set the limit for number of io_uring worker threads per NUMA
+    /// node. `max[0]` holds the limit for bounded workers, which process I/O
+    /// operations expected to be bound in time, that is I/O on regular files or
+    /// block devices. While `max[1]` holds the limit for unbounded workers,
+    /// which carry out I/O operations that can never complete, for instance I/O
+    /// on sockets. Passing `0` does not change the current limit. Returns
+    /// previous limits on success.
+    pub fn register_iowq_max_workers(&self, max: &mut [u32; 2]) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_IOWQ_MAX_WORKERS,
+            max.as_mut_ptr().cast(),
+            max.len() as _,
+        )
+        .map(drop)
+    }
+
+    /// Register buffer ring for provided buffers.
+    ///
+    /// Details can be found in the io_uring_register_buf_ring.3 man page.
+    ///
+    /// If the register command is not supported, or the ring_entries value exceeds
+    /// 32768, the InvalidInput error is returned.
+    ///
+    /// Available since 5.19.
+    pub fn register_buf_ring(
+        &self,
+        ring_addr: u64,
+        ring_entries: u16,
+        bgid: u16,
+    ) -> io::Result<()> {
+        // The interface type for ring_entries is u32 but the same interface only allows a u16 for
+        // the tail to be specified, so to try and avoid further confusion, we limit the
+        // ring_entries to u16 here too. The value is actually limited to 2^15 (32768) but we can
+        // let the kernel enforce that.
+        let arg = sys::io_uring_buf_reg {
+            ring_addr,
+            ring_entries: ring_entries as _,
+            bgid,
+            pad: 0,
+            resv: Default::default(),
+        };
+        let arg = cast_ptr::<sys::io_uring_buf_reg>(&arg);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_PBUF_RING,
+            arg as *const _,
+            1,
+        )
+        .map(drop)
+    }
+
+    /// Unregister a previously registered buffer ring.
+    ///
+    /// Available since 5.19.
+    pub fn unregister_buf_ring(&self, bgid: u16) -> io::Result<()> {
+        let arg = sys::io_uring_buf_reg {
+            ring_addr: 0,
+            ring_entries: 0,
+            bgid,
+            pad: 0,
+            resv: Default::default(),
+        };
+        let arg = cast_ptr::<sys::io_uring_buf_reg>(&arg);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_UNREGISTER_PBUF_RING,
+            arg as *const _,
+            1,
         )
         .map(drop)
     }
