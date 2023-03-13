@@ -1160,6 +1160,57 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_shutdown<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Write::CODE);
+        test.probe.is_supported(opcode::Shutdown::CODE);
+    );
+
+    println!("test shutdown");
+
+    const SHUT_WR: i32 = 1;
+
+    let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("127.0.0.1:0"))?;
+    let sock_fd = types::Fd(listener.as_raw_fd());
+
+    let shutdown_e = opcode::Shutdown::new(sock_fd, SHUT_WR);
+
+    unsafe {
+        ring.submission()
+            .push(&shutdown_e.build().into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].result(), 0);
+
+    let text = b"C'est la vie";
+    let write_e = opcode::Write::new(sock_fd, text.as_ptr(), text.len() as _);
+
+    unsafe {
+        ring.submission()
+            .push(&write_e.build().into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].result(), -32); // EPIPE
+
+    Ok(())
+}
+
 pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
