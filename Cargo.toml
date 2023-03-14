@@ -18,13 +18,15 @@ members = [ "io-uring-test", "io-uring-bench" ]
 
 [features]
 unstable = []
-overwrite = [ "bindgen" ]
-direct-syscall = [ "sc" ]
+overwrite = ["bindgen"]
+direct-syscall = ["sc"]
 io_safety = []
 
 [dependencies]
 bitflags = "1.3"
+bytes = "1.4.0"
 libc = { version = "0.2.98", default-features = false }
+nix = "0.26.2"
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]

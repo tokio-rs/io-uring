@@ -46,6 +46,7 @@ use std::num::NonZeroU32;
 use std::os::unix::io::RawFd;
 
 use std::marker::PhantomData;
+use std::sync::atomic::AtomicU16;
 
 use crate::util::cast_ptr;
 
@@ -215,11 +216,102 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     }
 }
 
+pub struct BufRing {
+    base: *mut BufRingEntry,
+    entries: u32,
+    mask: u32,
+    bgid: u16,
+}
+
+impl BufRing {
+    pub unsafe fn new(entries: u16, bgid: u16) -> Result<Self, i32> {
+        let mask = entries - 1;
+
+        let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
+        let buf_size = entries as usize * std::mem::size_of::<BufRingEntry>();
+
+        let mut ptr: *mut libc::c_void = std::ptr::null_mut();
+        let memptr = &mut ptr as *mut *mut libc::c_void;
+
+        // Allocate mem for sharing buffer ring
+        // This needs to be mapped by the kernal so must be page aligned
+        let ret = libc::posix_memalign(memptr, page_size, buf_size);
+
+        if ret != 0 {
+            return Err(ret);
+        }
+
+        Ok(Self {
+            base: ptr as *mut _,
+            entries: entries as u32,
+            mask: mask as u32,
+            bgid,
+        })
+    }
+
+    pub unsafe fn init(&mut self) {
+        (*self.base).0.resv = 0;
+    }
+
+    pub unsafe fn advance(&mut self, count: u16) {
+        unsafe {
+            let tail = &(*self.base).0.resv;
+
+            let _ = &(*(tail as *const u16 as *const AtomicU16))
+                .fetch_add(count, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    pub unsafe fn add(&mut self, entry: BufRingEntry, buf_offset: u32) {
+        unsafe {
+            let offset = (self.tail() + buf_offset) & self.mask;
+
+            self.base.offset(offset as isize).write(entry);
+        };
+    }
+
+    pub unsafe fn entry(&self, offset: u16) -> *const BufRingEntry {
+        self.base.offset(offset as isize)
+    }
+
+    pub fn buffer_id_from_cqe_flags(&self, flags: u32) -> u16 {
+        (flags >> sys::IORING_CQE_BUFFER_SHIFT) as u16
+    }
+
+    pub fn ring_addr(&self) -> u64 {
+        self.base as u64
+    }
+
+    pub fn entries(&self) -> u16 {
+        self.entries as u16
+    }
+
+    pub fn bgid(&self) -> u16 {
+        self.bgid
+    }
+
+    #[inline]
+    unsafe fn tail(&self) -> u32 {
+        (*self.base).0.resv as u32
+    }
+}
+
 #[repr(transparent)]
 pub struct BufRingEntry(sys::io_uring_buf);
 
 /// An entry in a buf_ring that allows setting the address, length and buffer id.
 impl BufRingEntry {
+    pub fn new(addr: u64, len: u32, bid: u16) -> Self {
+        let inner = sys::io_uring_buf {
+            addr,
+            len,
+            bid,
+            resv: 0,
+        };
+
+        Self(inner)
+    }
+
     /// Sets the entry addr.
     pub fn set_addr(&mut self, addr: u64) {
         self.0.addr = addr;
