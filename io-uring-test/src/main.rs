@@ -76,6 +76,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // register
     tests::register::test_register_files_sparse(&mut ring, &test)?;
+    tests::register::test_register_buffers(&mut ring, &test)?;
     tests::register_buf_ring::test_register_buf_ring(&mut ring, &test)?;
 
     // fs
