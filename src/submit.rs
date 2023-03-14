@@ -193,6 +193,106 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
+    /// Update a range of fixed buffers starting at `off`.
+    ///
+    /// This is required to use buffers registered using
+    /// [`register_buffers_sparse`](Self::register_buffers_sparse),
+    /// although it can be also be used with [`register_buffers`](Self::register_buffers).
+    ///
+    /// See [`register_buffers_tags`](Self::register_buffers_tags)
+    /// for more information about resource tagging.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because improper use may lead to memory problems.
+    /// For example, a use-after-free may occur if `iov_base` contains a pointer freed
+    /// before unregistering the buffer through [`unregister_buffers`](Self::unregister_buffers)
+    /// or [`register_buffers_update_tag`](Self::register_buffers_update_tag).
+    pub unsafe fn register_buffers_update_tag(
+        &self,
+        off: u32,
+        bufs: &[libc::iovec],
+        tags: &[u64],
+    ) -> io::Result<()> {
+        let rr = sys::io_uring_rsrc_update2 {
+            nr: bufs.len().min(tags.len()) as _,
+            data: bufs.as_ptr() as _,
+            tags: tags.as_ptr() as _,
+            offset: off,
+            ..Default::default()
+        };
+        let rr = cast_ptr::<sys::io_uring_rsrc_update2>(&rr);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_BUFFERS_UPDATE,
+            rr as *const _,
+            std::mem::size_of::<sys::io_uring_rsrc_update2>() as _,
+        )
+        .map(drop)
+    }
+
+    /// Variant of [`register_buffers`](Self::register_buffers)
+    /// with resource tagging.
+    ///
+    /// `tags` should be the same length as `bufs` and contain the
+    /// tag value corresponding to the buffer at the same index.
+    ///
+    /// If a tag is zero, then tagging for this particular resource
+    /// (a buffer in this case) is disabled. Otherwise, after the
+    /// resource had been unregistered and it's not used anymore,
+    /// a CQE will be posted with `user_data` set to the specified
+    /// tag and all other fields zeroed.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because improper use may lead to memory problems.
+    /// For example, a use-after-free may occur if `iov_base` contains a pointer freed
+    /// before unregistering the buffer through [`unregister_buffers`](Self::unregister_buffers)
+    /// or [`register_buffers_update_tag`](Self::register_buffers_update_tag).
+    pub unsafe fn register_buffers_tags(
+        &self,
+        bufs: &[libc::iovec],
+        tags: &[u64],
+    ) -> io::Result<()> {
+        let rr = sys::io_uring_rsrc_register {
+            nr: bufs.len().min(tags.len()) as _,
+            data: bufs.as_ptr() as _,
+            tags: tags.as_ptr() as _,
+            ..Default::default()
+        };
+        let rr = cast_ptr::<sys::io_uring_rsrc_register>(&rr);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_BUFFERS2,
+            rr as *const _,
+            std::mem::size_of::<sys::io_uring_rsrc_register>() as _,
+        )
+        .map(drop)
+    }
+
+    /// Registers an empty table of nr fixed buffers buffers.
+    ///
+    /// These must be updated before use, using eg.
+    /// [`register_buffers_update_tag`](Self::register_buffers_update_tag).
+    ///
+    /// See [`register_buffers`](Self::register_buffers)
+    /// for more information about fixed buffers.
+    pub fn register_buffers_sparse(&self, nr: u32) -> io::Result<()> {
+        let rr = sys::io_uring_rsrc_register {
+            nr,
+            flags: sys::IORING_RSRC_REGISTER_SPARSE,
+            ..Default::default()
+        };
+        let rr = cast_ptr::<sys::io_uring_rsrc_register>(&rr);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_BUFFERS2,
+            rr as *const _,
+            std::mem::size_of::<sys::io_uring_rsrc_register>() as _,
+        )
+        .map(drop)
+    }
+
     /// Registers an empty file table of nr_files number of file descriptors. The sparse variant is
     /// available in kernels 5.19 and later.
     ///
