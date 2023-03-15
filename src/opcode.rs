@@ -1397,6 +1397,8 @@ opcode!(
 );
 
 opcode!(
+    // Change the name or location of a file, equivalent to `renameat2(2)`.
+    // Available since kernel 5.11.
     pub struct RenameAt {
         olddirfd: { impl sealed::UseFd },
         oldpath: { *const libc::c_char },
@@ -1427,6 +1429,8 @@ opcode!(
 );
 
 opcode!(
+    // Delete a name and possible the file it refers to, equivalent to `unlinkat(2)`.
+    // Available since kernel 5.11.
     pub struct UnlinkAt {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
