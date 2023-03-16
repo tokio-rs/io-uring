@@ -1182,7 +1182,6 @@ opcode!(
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
-        sqe.len = 0;
         sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
         sqe.ioprio = sys::IORING_RECV_MULTISHOT as _;
         Entry(sqe)
