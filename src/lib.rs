@@ -11,7 +11,7 @@ pub mod opcode;
 pub mod register;
 pub mod squeue;
 mod submit;
-pub mod sys;
+mod sys;
 pub mod types;
 
 use std::marker::PhantomData;

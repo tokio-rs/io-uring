@@ -327,8 +327,9 @@ impl BufRing {
     }
 
     #[inline]
-    pub fn buffer_id_from_cqe_flags(&self, flags: u32) -> u16 {
-        (flags >> sys::IORING_CQE_BUFFER_SHIFT) as u16
+    pub fn buffer_id_from_cqe_flags(&self, flags: u32) -> Option<u16> {
+        (flags & sys::IORING_CQE_F_BUFFER != 0)
+            .then_some((flags >> sys::IORING_CQE_BUFFER_SHIFT) as u16)
     }
 
     #[inline]

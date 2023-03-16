@@ -159,30 +159,28 @@ fn main() -> anyhow::Result<()> {
                             libc::close(fd);
                         }
                     } else {
-                        if cqe_flags & io_uring::sys::IORING_CQE_F_BUFFER == 0 {
-                            eprintln!("token {:?} error: buffer not selected", token);
-                        }
+                        if let Some(buffer_id) = buf_ring.buffer_id_from_cqe_flags(cqe_flags) {
+                            let len = ret as usize;
+                            let buf = unsafe { buf_ring.read_buffer(buffer_id) };
 
-                        let buffer_id = buf_ring.buffer_id_from_cqe_flags(cqe_flags);
+                            let write_token = token_alloc.insert(Token::Write {
+                                fd,
+                                buffer_id: buffer_id as usize,
+                                len,
+                                offset: 0,
+                            });
 
-                        let len = ret as usize;
-                        let buf = unsafe { buf_ring.read_buffer(buffer_id) };
+                            let write_e = opcode::Send::new(types::Fd(fd), buf.as_ptr(), len as _)
+                                .build()
+                                .user_data(write_token as _);
 
-                        let write_token = token_alloc.insert(Token::Write {
-                            fd,
-                            buffer_id: buffer_id as usize,
-                            len,
-                            offset: 0,
-                        });
-
-                        let write_e = opcode::Send::new(types::Fd(fd), buf.as_ptr(), len as _)
-                            .build()
-                            .user_data(write_token as _);
-
-                        unsafe {
-                            if sq.push(&write_e).is_err() {
-                                backlog.push_back(write_e);
+                            unsafe {
+                                if sq.push(&write_e).is_err() {
+                                    backlog.push_back(write_e);
+                                }
                             }
+                        } else {
+                            eprintln!("token {:?} error: buffer not selected", token);
                         }
                     }
                 }
