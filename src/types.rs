@@ -42,6 +42,7 @@ pub(crate) mod sealed {
 
 use crate::sys;
 use bitflags::bitflags;
+use core::slice;
 use std::num::NonZeroU32;
 use std::os::unix::io::RawFd;
 
@@ -219,40 +220,74 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
 pub struct BufRing {
     base: *mut BufRingEntry,
     entries: u32,
+    buf_size: u32,
     mask: u32,
     bgid: u16,
+    buffer_base: *const u8,
 }
 
 impl BufRing {
-    pub unsafe fn new(entries: u16, bgid: u16) -> Result<Self, i32> {
+    #[inline]
+    pub fn new(entries: u16, buf_size: u32, bgid: u16) -> Result<Self, i32> {
         let mask = entries - 1;
 
-        let page_size = libc::sysconf(libc::_SC_PAGESIZE) as usize;
-        let buf_size = entries as usize * std::mem::size_of::<BufRingEntry>();
+        let buf_ring_size =
+            entries as usize * (buf_size as usize + std::mem::size_of::<BufRingEntry>());
 
-        let mut ptr: *mut libc::c_void = std::ptr::null_mut();
-        let memptr = &mut ptr as *mut *mut libc::c_void;
+        let base = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                buf_ring_size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
+                0,
+                0,
+            )
+        };
 
-        // Allocate mem for sharing buffer ring
-        // This needs to be mapped by the kernal so must be page aligned
-        let ret = libc::posix_memalign(memptr, page_size, buf_size);
-
-        if ret != 0 {
-            return Err(ret);
-        }
+        let buf_base: *const u8 = unsafe {
+            base.offset(entries as isize * std::mem::size_of::<BufRingEntry>() as isize)
+                as *const u8
+        };
 
         Ok(Self {
-            base: ptr as *mut _,
+            base: base as *mut _,
             entries: entries as u32,
+            buf_size,
             mask: mask as u32,
             bgid,
+            buffer_base: buf_base,
         })
     }
 
-    pub unsafe fn init(&mut self) {
-        (*self.base).0.resv = 0;
+    #[inline]
+    pub fn init(&mut self) {
+        unsafe {
+            (*self.base).0.resv = 0;
+        }
     }
 
+    /// # Safety
+    ///
+    /// The caller must ensure `buf_id` < `self.entries()`
+    #[inline]
+    unsafe fn get_buffer(&self, buf_id: u16) -> *const u8 {
+        self.buffer_base
+            .offset((buf_id as u32 * self.buf_size) as isize)
+    }
+
+    /// # Safety
+    ///
+    /// The caller must ensure `buf_id` < `self.entries()`
+    #[inline]
+    pub unsafe fn read_buffer(&self, buf_id: u16) -> &[u8] {
+        slice::from_raw_parts(self.get_buffer(buf_id), self.buf_size as usize)
+    }
+
+    /// # Safety
+    ///
+    /// This function should not be called before the horsemen are ready.
+    #[inline]
     pub unsafe fn advance(&mut self, count: u16) {
         unsafe {
             let tail = &(*self.base).0.resv;
@@ -262,36 +297,55 @@ impl BufRing {
         }
     }
 
-    pub unsafe fn add(&mut self, entry: BufRingEntry, buf_offset: u32) {
+    /// # Safety
+    ///
+    /// The caller must ensure that `buf_id` and `buf_offset` is < `self.entries()`
+    #[inline]
+    pub unsafe fn add(&mut self, buf_id: u16, buf_offset: u16) {
         unsafe {
-            let offset = (self.tail() + buf_offset) & self.mask;
+            let offset = (self.tail() + buf_offset as u32) & self.mask;
 
-            self.base.offset(offset as isize).write(entry);
+            let entry = self.base.offset(offset as isize);
+
+            (*entry).0.addr = self.get_buffer(buf_id) as u64;
+            (*entry).0.len = self.buf_size;
+            (*entry).0.bid = buf_id;
         };
     }
 
-    pub unsafe fn entry(&self, offset: u16) -> *const BufRingEntry {
-        self.base.offset(offset as isize)
-    }
-
-    pub fn buffer_id_from_cqe_flags(&self, flags: u32) -> u16 {
-        (flags >> sys::IORING_CQE_BUFFER_SHIFT) as u16
-    }
-
-    pub fn ring_addr(&self) -> u64 {
-        self.base as u64
-    }
-
+    #[inline]
     pub fn entries(&self) -> u16 {
         self.entries as u16
     }
 
+    /// # Safety
+    ///
+    /// The caller must ensure that `offset` is < `self.entries()`
+    #[inline]
+    pub unsafe fn entry(&self, offset: u16) -> *const BufRingEntry {
+        self.base.offset(offset as isize)
+    }
+
+    #[inline]
+    pub fn buffer_id_from_cqe_flags(&self, flags: u32) -> u16 {
+        (flags >> sys::IORING_CQE_BUFFER_SHIFT) as u16
+    }
+
+    #[inline]
+    pub fn ring_addr(&self) -> u64 {
+        self.base as u64
+    }
+
+    #[inline]
     pub fn bgid(&self) -> u16 {
         self.bgid
     }
 
+    /// # Safety
+    ///
+    /// The caller must ensure that this `BufRing` is already initialized
     #[inline]
-    unsafe fn tail(&self) -> u32 {
+    pub unsafe fn tail(&self) -> u32 {
         (*self.base).0.resv as u32
     }
 }
