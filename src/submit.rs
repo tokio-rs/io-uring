@@ -172,10 +172,9 @@ impl<'a> Submitter<'a> {
     ///
     /// # Safety
     ///
-    /// This function is unsafe because improper use may lead to memory problems.
-    /// For example, a use-after-free may occur if `iov_base` contains a pointer freed
-    /// before unregistering the buffer through [`unregister_buffers`](Self::unregister_buffers)
-    /// or [`register_buffers_update_tag`](Self::register_buffers_update_tag).
+    /// Developers must ensure that the `iov_base` and `iov_len` values are valid and will
+    /// be valid until buffers are unregistered or the ring destroyed, otherwise undefined
+    /// behaviour may occur.
     pub unsafe fn register_buffers(&self, bufs: &[libc::iovec]) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
