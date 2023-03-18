@@ -206,7 +206,7 @@ pub fn test_tcp_zero_copy_send_fixed<S: squeue::EntryMarker, C: cqueue::EntryMar
         iov_len: buf0.len() as _,
     };
     let iovecs = [iovec];
-    ring.submitter().register_buffers(&iovecs).unwrap();
+    unsafe { ring.submitter().register_buffers(&iovecs).unwrap() };
 
     let text_len = text.len();
 
