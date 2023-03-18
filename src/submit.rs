@@ -194,6 +194,8 @@ impl<'a> Submitter<'a> {
     /// See [`register_buffers_tags`](Self::register_buffers_tags)
     /// for more information about resource tagging.
     ///
+    /// Available since Linux 5.13.
+    ///
     /// # Safety
     ///
     /// This function is unsafe because improper use may lead to memory problems.
@@ -235,6 +237,8 @@ impl<'a> Submitter<'a> {
     /// a CQE will be posted with `user_data` set to the specified
     /// tag and all other fields zeroed.
     ///
+    /// Available since Linux 5.13.
+    ///
     /// # Safety
     ///
     /// This function is unsafe because improper use may lead to memory problems.
@@ -269,6 +273,8 @@ impl<'a> Submitter<'a> {
     ///
     /// See [`register_buffers`](Self::register_buffers)
     /// for more information about fixed buffers.
+    ///
+    /// Available since Linux 5.13.
     pub fn register_buffers_sparse(&self, nr: u32) -> io::Result<()> {
         let rr = sys::io_uring_rsrc_register {
             nr,
@@ -426,6 +432,8 @@ impl<'a> Submitter<'a> {
     ///
     /// You do not need to explicitly call this before dropping the [`IoUring`](crate::IoUring), as
     /// it will be cleaned up by the kernel automatically.
+    ///
+    /// Available since Linux 5.1.
     pub fn unregister_buffers(&self) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
