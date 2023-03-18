@@ -206,10 +206,9 @@ impl<'a> Submitter<'a> {
     ///
     /// # Safety
     ///
-    /// This function is unsafe because improper use may lead to memory problems.
-    /// For example, a use-after-free may occur if `iov_base` contains a pointer freed
-    /// before unregistering the buffer through [`unregister_buffers`](Self::unregister_buffers)
-    /// or [`register_buffers_update`](Self::register_buffers_update).
+    /// Developers must ensure that the `iov_base` and `iov_len` values are valid and will
+    /// be valid until buffers are unregistered or the ring destroyed, otherwise undefined
+    /// behaviour may occur.
     pub unsafe fn register_buffers_update(
         &self,
         offset: u32,
@@ -253,10 +252,9 @@ impl<'a> Submitter<'a> {
     ///
     /// # Safety
     ///
-    /// This function is unsafe because improper use may lead to memory problems.
-    /// For example, a use-after-free may occur if `iov_base` contains a pointer freed
-    /// before unregistering the buffer through [`unregister_buffers`](Self::unregister_buffers)
-    /// or [`register_buffers_update`](Self::register_buffers_update).
+    /// Developers must ensure that the `iov_base` and `iov_len` values are valid and will
+    /// be valid until buffers are unregistered or the ring destroyed, otherwise undefined
+    /// behaviour may occur.
     pub unsafe fn register_buffers2(&self, bufs: &[libc::iovec], tags: &[u64]) -> io::Result<()> {
         let rr = sys::io_uring_rsrc_register {
             nr: bufs.len().min(tags.len()) as _,
