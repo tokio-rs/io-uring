@@ -193,39 +193,45 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// Update a range of fixed buffers starting at `off`.
+    /// Update a range of fixed buffers starting at `offset`.
     ///
     /// This is required to use buffers registered using
     /// [`register_buffers_sparse`](Self::register_buffers_sparse),
     /// although it can be also be used with [`register_buffers`](Self::register_buffers).
     ///
-    /// See [`register_buffers_tags`](Self::register_buffers_tags)
+    /// See [`register_buffers2`](Self::register_buffers2)
     /// for more information about resource tagging.
+    ///
+    /// Available since Linux 5.13.
     ///
     /// # Safety
     ///
     /// This function is unsafe because improper use may lead to memory problems.
     /// For example, a use-after-free may occur if `iov_base` contains a pointer freed
     /// before unregistering the buffer through [`unregister_buffers`](Self::unregister_buffers)
-    /// or [`register_buffers_update_tag`](Self::register_buffers_update_tag).
-    pub unsafe fn register_buffers_update_tag(
+    /// or [`register_buffers_update`](Self::register_buffers_update).
+    pub unsafe fn register_buffers_update(
         &self,
-        off: u32,
+        offset: u32,
         bufs: &[libc::iovec],
-        tags: &[u64],
+        tags: Option<&[u64]>,
     ) -> io::Result<()> {
+        let nr = tags
+            .as_ref()
+            .map_or(bufs.len(), |tags| bufs.len().min(tags.len()));
+
         let rr = sys::io_uring_rsrc_update2 {
-            nr: bufs.len().min(tags.len()) as _,
+            nr: nr as _,
             data: bufs.as_ptr() as _,
-            tags: tags.as_ptr() as _,
-            offset: off,
+            tags: tags.map(|tags| tags.as_ptr() as _).unwrap_or(0),
+            offset,
             ..Default::default()
         };
-        let rr = cast_ptr::<sys::io_uring_rsrc_update2>(&rr);
+
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_BUFFERS_UPDATE,
-            rr as *const _,
+            cast_ptr::<sys::io_uring_rsrc_update2>(&rr).cast(),
             std::mem::size_of::<sys::io_uring_rsrc_update2>() as _,
         )
         .map(drop)
@@ -243,28 +249,25 @@ impl<'a> Submitter<'a> {
     /// a CQE will be posted with `user_data` set to the specified
     /// tag and all other fields zeroed.
     ///
+    /// Available since Linux 5.13.
+    ///
     /// # Safety
     ///
     /// This function is unsafe because improper use may lead to memory problems.
     /// For example, a use-after-free may occur if `iov_base` contains a pointer freed
     /// before unregistering the buffer through [`unregister_buffers`](Self::unregister_buffers)
-    /// or [`register_buffers_update_tag`](Self::register_buffers_update_tag).
-    pub unsafe fn register_buffers_tags(
-        &self,
-        bufs: &[libc::iovec],
-        tags: &[u64],
-    ) -> io::Result<()> {
+    /// or [`register_buffers_update`](Self::register_buffers_update).
+    pub unsafe fn register_buffers2(&self, bufs: &[libc::iovec], tags: &[u64]) -> io::Result<()> {
         let rr = sys::io_uring_rsrc_register {
             nr: bufs.len().min(tags.len()) as _,
             data: bufs.as_ptr() as _,
             tags: tags.as_ptr() as _,
             ..Default::default()
         };
-        let rr = cast_ptr::<sys::io_uring_rsrc_register>(&rr);
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_BUFFERS2,
-            rr as *const _,
+            cast_ptr::<sys::io_uring_rsrc_register>(&rr).cast(),
             std::mem::size_of::<sys::io_uring_rsrc_register>() as _,
         )
         .map(drop)
@@ -273,21 +276,22 @@ impl<'a> Submitter<'a> {
     /// Registers an empty table of nr fixed buffers buffers.
     ///
     /// These must be updated before use, using eg.
-    /// [`register_buffers_update_tag`](Self::register_buffers_update_tag).
+    /// [`register_buffers_update`](Self::register_buffers_update).
     ///
     /// See [`register_buffers`](Self::register_buffers)
     /// for more information about fixed buffers.
+    ///
+    /// Available since Linux 5.13.
     pub fn register_buffers_sparse(&self, nr: u32) -> io::Result<()> {
         let rr = sys::io_uring_rsrc_register {
             nr,
             flags: sys::IORING_RSRC_REGISTER_SPARSE,
             ..Default::default()
         };
-        let rr = cast_ptr::<sys::io_uring_rsrc_register>(&rr);
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_BUFFERS2,
-            rr as *const _,
+            cast_ptr::<sys::io_uring_rsrc_register>(&rr).cast(),
             std::mem::size_of::<sys::io_uring_rsrc_register>() as _,
         )
         .map(drop)
@@ -431,6 +435,8 @@ impl<'a> Submitter<'a> {
     ///
     /// You do not need to explicitly call this before dropping the [`IoUring`](crate::IoUring), as
     /// it will be cleaned up by the kernel automatically.
+    ///
+    /// Available since Linux 5.1.
     pub fn unregister_buffers(&self) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
