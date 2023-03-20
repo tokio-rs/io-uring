@@ -166,10 +166,16 @@ impl<'a> Submitter<'a> {
         unsafe { self.enter::<libc::sigset_t>(0, 0, sys::IORING_ENTER_SQ_WAIT, None) }
     }
 
-    /// Register in-memory user buffers for I/O with the kernel. You can use these buffers with the
+    /// Register in-memory fixed buffers for I/O with the kernel. You can use these buffers with the
     /// [`ReadFixed`](crate::opcode::ReadFixed) and [`WriteFixed`](crate::opcode::WriteFixed)
     /// operations.
-    pub fn register_buffers(&self, bufs: &[libc::iovec]) -> io::Result<()> {
+    ///
+    /// # Safety
+    ///
+    /// Developers must ensure that the `iov_base` and `iov_len` values are valid and will
+    /// be valid until buffers are unregistered or the ring destroyed, otherwise undefined
+    /// behaviour may occur.
+    pub unsafe fn register_buffers(&self, bufs: &[libc::iovec]) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_BUFFERS,
