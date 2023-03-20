@@ -19,7 +19,7 @@ pub fn test_register_buffers<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         iov_base: buf.as_mut_ptr() as _,
     }];
 
-    test_register(ring, test, "register_buffers", None, |ring| {
+    test_register(ring, test, "register_buffers", None, |ring| unsafe {
         ring.submitter().register_buffers(&iovecs)
     })?;
     test_register(
