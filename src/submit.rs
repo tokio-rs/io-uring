@@ -423,7 +423,13 @@ impl<'a> Submitter<'a> {
     /// 32768, the InvalidInput error is returned.
     ///
     /// Available since 5.19.
-    pub fn register_buf_ring(
+    ///
+    /// # Safety
+    ///
+    /// Developers must ensure that the `ring_addr` and its length represented by `ring_entries`
+    /// are valid and will be valid until the bgid is unregistered or the ring destroyed,
+    /// otherwise undefined behaviour may occur.
+    pub unsafe fn register_buf_ring(
         &self,
         ring_addr: u64,
         ring_entries: u16,
