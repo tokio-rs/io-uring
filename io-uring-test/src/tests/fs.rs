@@ -561,7 +561,7 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let mut output = vec![0; text.len()];
 
     let write_e = opcode::Write::new(fd, text.as_ptr(), 22)
-        .offset(-1)
+        .offset(u64::MAX)
         .build()
         .user_data(0x01)
         .into();
@@ -573,7 +573,7 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring.submit_and_wait(1)?;
 
     let write_e = opcode::Write::new(fd, unsafe { text.as_ptr().add(22) }, 22)
-        .offset(-1)
+        .offset(u64::MAX)
         .build()
         .user_data(0x02)
         .into();
