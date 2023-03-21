@@ -134,7 +134,7 @@ impl InnerBufRing {
         }
 
         // entry_size is 16 bytes.
-        let entry_size = std::mem::size_of::<BufRingEntry>() as usize;
+        let entry_size = std::mem::size_of::<BufRingEntry>();
         assert_eq!(entry_size, 16);
         let ring_size = entry_size * (ring_entries as usize);
 
@@ -185,11 +185,16 @@ impl InnerBufRing {
     {
         let bgid = self.bgid;
 
-        let res = ring.submitter().register_buf_ring(
-            self.ring_start.as_ptr() as _,
-            self.ring_entries(),
-            bgid,
-        );
+        // Safety: The ring, represented by the ring_start and the ring_entries remains valid until
+        // it is unregistered. The backing store is an AnonymousMmap which remains valid until it
+        // is dropped which in this case, is when Self is dropped.
+        let res = unsafe {
+            ring.submitter().register_buf_ring(
+                self.ring_start.as_ptr() as _,
+                self.ring_entries(),
+                bgid,
+            )
+        };
 
         if let Err(e) = res {
             match e.raw_os_error() {
