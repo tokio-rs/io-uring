@@ -81,6 +81,14 @@ bitflags! {
         const ABS = sys::IORING_TIMEOUT_ABS;
 
         const UPDATE = sys::IORING_TIMEOUT_UPDATE;
+
+        const BOOTTIME = sys::IORING_TIMEOUT_BOOTTIME;
+
+        const REALTIME = sys::IORING_TIMEOUT_REALTIME;
+
+        const LINK_TIMEOUT_UPDATE = sys::IORING_LINK_TIMEOUT_UPDATE;
+
+        const ETIME_SUCCESS = sys::IORING_TIMEOUT_ETIME_SUCCESS;
     }
 }
 
