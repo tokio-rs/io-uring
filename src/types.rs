@@ -42,8 +42,10 @@ pub(crate) mod sealed {
 
 use crate::sys;
 use bitflags::bitflags;
+use std::convert::From;
 use std::num::NonZeroU32;
 use std::os::unix::io::RawFd;
+use std::time::Duration;
 
 use std::marker::PhantomData;
 
@@ -145,6 +147,30 @@ impl Timespec {
     pub const fn nsec(mut self, nsec: u32) -> Self {
         self.0.tv_nsec = nsec as _;
         self
+    }
+
+    #[inline]
+    pub const fn from_duration(duration: Duration) -> Self {
+        #[cfg_attr(target_env = "musl", allow(deprecated))]
+        // https://github.com/rust-lang/libc/issues/1848
+        Timespec(sys::__kernel_timespec {
+            tv_sec: duration.as_secs() as _,
+            tv_nsec: duration.subsec_nanos() as _,
+        })
+    }
+}
+
+impl From<Duration> for Timespec {
+    #[inline]
+    fn from(duration: Duration) -> Self {
+        Self::from_duration(duration)
+    }
+}
+
+impl From<Timespec> for Duration {
+    #[inline]
+    fn from(timespec: Timespec) -> Self {
+        Duration::new(timespec.0.tv_sec as u64, timespec.0.tv_nsec as u32)
     }
 }
 

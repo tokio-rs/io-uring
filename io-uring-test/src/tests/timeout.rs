@@ -1,6 +1,6 @@
 use crate::Test;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub fn test_timeout<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
@@ -322,6 +322,26 @@ pub fn test_timeout_submit_args<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x1c);
     assert_eq!(cqes[0].result(), 0);
+
+    Ok(())
+}
+
+pub fn test_timeout_from_duration() -> anyhow::Result<()> {
+    println!("test timeout_from_duration");
+
+    let ts = types::Timespec::new().sec(7);
+    let dur: Duration = ts.into();
+    let ts2: types::Timespec = dur.into();
+    let dur2: Duration = ts2.into();
+    assert_eq!(dur, Duration::from_secs(7));
+    assert_eq!(dur, dur2); // tests the conversion from Duration to Timespec.
+
+    let ts = types::Timespec::new().nsec(8_000);
+    let dur: Duration = ts.into();
+    let ts2: types::Timespec = dur.into();
+    let dur2: Duration = ts2.into();
+    assert_eq!(dur, Duration::from_nanos(8_000));
+    assert_eq!(dur, dur2);
 
     Ok(())
 }
