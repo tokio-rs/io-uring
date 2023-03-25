@@ -576,9 +576,6 @@ opcode!(
     pub struct TimeoutRemove {
         user_data: { u64 },
         ;;
-        /// N.B. While the compiler will allow it, it is a mistake to include the
-        /// [types::TimeoutFlags::TIMEOUT_UPDATE] flag with this command because no new timespec
-        /// has been given but the kernel would treat this operation as an update, not a removal.
         flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
 
