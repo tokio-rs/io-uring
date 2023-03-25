@@ -91,6 +91,37 @@ bitflags! {
     }
 }
 
+bitflags! {
+    /// Options for [`AsyncCancel`](super::AsyncCancel) and
+    /// [`Submitter::register_sync_cancel`](super::Submitter::register_sync_cancel).
+    pub struct AsyncCancelFlags: u32 {
+        /// Cancel all requests that match the given criteria, rather
+        /// than just canceling the first one found.
+        ///
+        /// Available since 5.19.
+        const ALL = sys::IORING_ASYNC_CANCEL_ALL;
+
+        /// Match based on the file descriptor used in the original
+        /// request rather than the user_data.
+        ///
+        /// Available since 5.19.
+        const FD = sys::IORING_ASYNC_CANCEL_FD;
+
+        /// Match any request in the ring, regardless of user_data or
+        /// file descriptor.  Can be used to cancel any pending
+        /// request in the ring.
+        ///
+        /// Available since 5.19.
+        const ANY = sys::IORING_ASYNC_CANCEL_ANY;
+
+        /// Match based on the fixed file descriptor used in the original
+        /// request rather than the user_data.
+        ///
+        /// Available since 6.0
+        const FD_FIXED = sys::IORING_ASYNC_CANCEL_FD_FIXED;
+    }
+}
+
 /// Wrapper around `open_how` as used in [the `openat2(2)` system
 /// call](https://man7.org/linux/man-pages/man2/openat2.2.html).
 #[derive(Default, Debug, Clone, Copy)]

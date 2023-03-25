@@ -1,5 +1,6 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
+use std::time::Duration;
 use std::{io, ptr};
 
 use crate::register::{execute, Probe};
@@ -471,6 +472,46 @@ impl<'a> Submitter<'a> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_UNREGISTER_PBUF_RING,
+            arg as *const _,
+            1,
+        )
+        .map(drop)
+    }
+
+    /// Performs a synchronous cancellation request, similiar to [AsyncCancel](crate::opcode::AsyncCancel),
+    /// except that it completes synchronously.
+    ///
+    /// [`AsyncCancelFlags`](types::AsyncCancelFlags) may be supplied to indicate the strategy for
+    /// matching operations to cancel.
+    ///
+    /// Available since 6.0.
+    pub fn register_sync_cancel(
+        &self,
+        user_data: u64,
+        fd: RawFd,
+        timeout: Option<Duration>,
+        flags: types::AsyncCancelFlags,
+    ) -> io::Result<()> {
+        // Default to infinite timeout if a timeout is not provided.
+        let mut timespec = sys::__kernel_timespec {
+            tv_sec: -1,
+            tv_nsec: -1,
+        };
+        if let Some(timeout) = timeout {
+            timespec.tv_sec = timeout.as_secs() as _;
+            timespec.tv_nsec = timeout.subsec_nanos() as _;
+        }
+        let mut arg = sys::io_uring_sync_cancel_reg {
+            addr: user_data,
+            fd: fd,
+            flags: flags.bits(),
+            timeout: timespec,
+            pad: [0u64; 4],
+        };
+        let arg = cast_ptr::<sys::io_uring_sync_cancel_reg>(&arg);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_SYNC_CANCEL,
             arg as *const _,
             1,
         )
