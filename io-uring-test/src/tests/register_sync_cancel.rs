@@ -1,10 +1,9 @@
 use std::io;
-use std::time::{Duration, Instant};
 
 use io_uring::cqueue;
 use io_uring::opcode;
-use io_uring::squeue::{self, Flags};
-use io_uring::types::{self, AsyncCancelFlags, Timespec};
+use io_uring::squeue;
+use io_uring::types::{self, AsyncCancelFlags};
 use io_uring::IoUring;
 
 use crate::Test;
@@ -90,7 +89,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     const USER_DATA: u64 = 42u64;
 
     let mut buf = [0u8; 32];
-    let mut entry = opcode::Read::new(types::Fd(0), buf.as_mut_ptr(), 32).build();
+    let entry = opcode::Read::new(types::Fd(0), buf.as_mut_ptr(), 32).build();
     unsafe { ring.submission().push(&entry.into()).unwrap() };
 
     // Cancel the operation by user_data, we haven't submitted anything yet.

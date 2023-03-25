@@ -501,7 +501,7 @@ impl<'a> Submitter<'a> {
             timespec.tv_sec = timeout.as_secs() as _;
             timespec.tv_nsec = timeout.subsec_nanos() as _;
         }
-        let mut arg = sys::io_uring_sync_cancel_reg {
+        let arg = sys::io_uring_sync_cancel_reg {
             addr: user_data,
             fd: fd,
             flags: flags.bits(),
