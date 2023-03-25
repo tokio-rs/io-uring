@@ -576,19 +576,17 @@ opcode!(
     pub struct TimeoutRemove {
         user_data: { u64 },
         ;;
-        flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
 
     pub const CODE = sys::IORING_OP_TIMEOUT_REMOVE;
 
     pub fn build(self) -> Entry {
-        let TimeoutRemove { user_data, flags } = self;
+        let TimeoutRemove { user_data } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
         sqe.__bindgen_anon_2.addr = user_data as _;
-        sqe.__bindgen_anon_3.timeout_flags = flags.bits();
         Entry(sqe)
     }
 );
