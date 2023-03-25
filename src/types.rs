@@ -90,8 +90,6 @@ bitflags! {
     pub struct TimeoutFlags: u32 {
         const ABS = sys::IORING_TIMEOUT_ABS;
 
-        const UPDATE = sys::IORING_TIMEOUT_UPDATE;
-
         const BOOTTIME = sys::IORING_TIMEOUT_BOOTTIME;
 
         const REALTIME = sys::IORING_TIMEOUT_REALTIME;
