@@ -611,7 +611,6 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.len = 0;
         sqe.__bindgen_anon_1.off = timespec as _;
         sqe.__bindgen_anon_2.addr = user_data as _;
         sqe.__bindgen_anon_3.timeout_flags = flags.bits() | sys::IORING_TIMEOUT_UPDATE;
