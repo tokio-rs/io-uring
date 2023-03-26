@@ -100,6 +100,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::timeout::test_timeout(&mut ring, &test)?;
     tests::timeout::test_timeout_count(&mut ring, &test)?;
     tests::timeout::test_timeout_remove(&mut ring, &test)?;
+    tests::timeout::test_timeout_update(&mut ring, &test)?;
     tests::timeout::test_timeout_cancel(&mut ring, &test)?;
     tests::timeout::test_timeout_abs(&mut ring, &test)?;
     tests::timeout::test_timeout_submit_args(&mut ring, &test)?;
