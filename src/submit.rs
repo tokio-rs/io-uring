@@ -481,8 +481,8 @@ impl<'a> Submitter<'a> {
     /// Performs a synchronous cancellation request, similiar to [AsyncCancel](crate::opcode::AsyncCancel),
     /// except that it completes synchronously.
     ///
-    /// Cancelation can target a specific request, or all requests matching a specific criteria. The
-    /// [MatchOn](types::MatchOn) builder supports describing the match criteria for cancelation.
+    /// Cancellation can target a specific request, or all requests matching a specific criteria. The
+    /// [MatchOn](types::MatchOn) builder supports describing the match criteria for cancellation.
     ///
     /// An optional `timeout` can be provided to specify how long to wait for matched requests to be
     /// canceled. If no timeout is provided, the default is to wait indefinitely.
@@ -494,7 +494,7 @@ impl<'a> Submitter<'a> {
     ///
     /// ### Notes
     ///
-    /// Only requests which have been submitted to the ring will be considered for cancelation. Requests
+    /// Only requests which have been submitted to the ring will be considered for cancellation. Requests
     /// which have been written to the SQ, but not submitted, will not be canceled.
     ///
     /// Available since 6.0.

@@ -507,7 +507,7 @@ impl<'buf> RecvMsgOut<'buf> {
     }
 }
 
-/// [MatchOn] is a builder for constructing match criteria for request cancelation.
+/// [MatchOn] is a builder for constructing match criteria for request cancellation.
 ///
 /// Requests can be canceled by matching on the user_data field and/or the file descriptor.
 ///
