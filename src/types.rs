@@ -506,3 +506,209 @@ impl<'buf> RecvMsgOut<'buf> {
         self.header.flags
     }
 }
+
+/// [MatchOn] is a builder for constructing match criteria for request cancelation.
+///
+/// Requests can be canceled by matching on the user_data field and/or the file descriptor.
+///
+/// ```
+/// use io_uring::types;
+///
+/// // Match any request referencing file descriptor 42.
+/// types::MatchOn::fd(types::Fd(42)).match_any();
+/// ```
+#[derive(Debug)]
+pub struct MatchOn {
+    pub(crate) user_data: Option<u64>,
+    pub(crate) fd: Option<sealed::Target>,
+    multiple: MatchMultiple,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MatchMultiple {
+    /// Match all requests. This indiscriminately cancels all requests,
+    /// regardless of user_data or fd.
+    All,
+    /// Match any request which matches the user_data or fd.
+    Any,
+    /// Match only a single request. This is the default behavior.
+    Single,
+}
+
+impl MatchOn {
+    /// Match a single request with the given user_data field.
+    ///
+    /// ### Example
+    ///
+    /// ```
+    /// use io_uring::types;
+    ///
+    /// // Match a single request with user_data 42
+    /// types::MatchOn::user_data(42);
+    /// ```
+    pub fn user_data(user_data: u64) -> Self {
+        Self {
+            user_data: Some(user_data),
+            fd: None,
+            multiple: MatchMultiple::Single,
+        }
+    }
+
+    /// Match a single request using the given file descriptor.
+    ///
+    /// ### Availability
+    ///
+    /// - Matching on [`Fd`](types::Fd) is available since 5.19.
+    /// - Matching on [`Fixed`](types::Fixed) is available since 6.0.
+    ///
+    /// ### Example
+    ///
+    /// ```
+    /// use io_uring::types;
+    /// // Match a single request using file descriptor 4
+    /// types::MatchOn::fd(types::Fd(4));
+    ///
+    /// // Match a single request using the fixed file descriptor 8
+    /// types::MatchOn::fd(types::Fixed(8));
+    /// ```
+    pub fn fd(fd: impl sealed::UseFixed) -> Self {
+        Self {
+            user_data: None,
+            fd: Some(fd.into()),
+            multiple: MatchMultiple::Single,
+        }
+    }
+
+    /// Match all requests, regardless of user_data or fd.
+    ///
+    /// If matching all requests, other match criteria are ignored.
+    ///
+    /// ### Example
+    ///
+    /// ```
+    /// use io_uring::types;
+    /// /// Match all in-fliht requests
+    /// types::MatchOn::all();
+    /// ```
+    pub fn all() -> Self {
+        Self {
+            user_data: None,
+            fd: None,
+            multiple: MatchMultiple::All,
+        }
+    }
+
+    /// Apply the match criteria to *any* request.
+    ///
+    /// This will match multiple in-flight requests.
+    ///
+    /// ### Example
+    ///
+    /// ```
+    /// use io_uring::types;
+    /// // Match any request where the user_data or fd is 42.
+    /// types::MatchOn::user_data(42).and_fd(types::Fixed(42)).match_any();
+    /// ```
+    pub fn match_any(mut self) -> Self {
+        self.multiple = MatchMultiple::Any;
+        self
+    }
+
+    /// Additionally, match a request with the given user_data field.
+    ///
+    /// ### Example
+    ///
+    /// ```
+    /// use io_uring::types;
+    /// // Match a single request where the user_data is
+    /// // 42 or the fd is 4.
+    /// types::MatchOn::user_data(42).and_fd(types::Fixed(4));
+    /// ```
+    ///
+    /// Note: This will overwrite any previous user_data match criteria.
+    pub fn and_fd(mut self, fd: impl sealed::UseFixed) -> Self {
+        if matches!(self.multiple, MatchMultiple::All) {
+            return self;
+        }
+        self.fd = Some(fd.into());
+        self
+    }
+
+    /// Additionally, match a request with the given user_data field.
+    ///
+    /// ### Example
+    ///
+    /// ```
+    /// use io_uring::types;
+    /// // Match a single request where the user_data is
+    /// // fd 4 or the user_data is 42.
+    /// types::MatchOn::fd(types::Fd(4)).and_user_data(42);
+    /// ```
+    pub fn and_user_data(mut self, user_data: u64) -> Self {
+        if matches!(self.multiple, MatchMultiple::All) {
+            return self;
+        }
+        self.user_data = Some(user_data);
+        self
+    }
+
+    pub(crate) fn flags(&self) -> AsyncCancelFlags {
+        let mut flags = AsyncCancelFlags::empty();
+
+        match self.multiple {
+            MatchMultiple::All => {
+                flags.set(AsyncCancelFlags::ALL, true);
+                return flags;
+            }
+            MatchMultiple::Any => {
+                flags.set(AsyncCancelFlags::ANY, true);
+            }
+            MatchMultiple::Single => {}
+        }
+        match self.fd {
+            Some(sealed::Target::Fd(_)) => {
+                flags.set(AsyncCancelFlags::FD, true);
+            }
+            Some(sealed::Target::Fixed(_)) => {
+                flags.set(AsyncCancelFlags::FD_FIXED, true);
+            }
+            None => {}
+        }
+        flags
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_match_on_flags() {
+        // Matching all matches every request, we should only see the ALL flag
+        // regardless of what else is set.
+        let flags = MatchOn::all().flags();
+        assert_eq!(AsyncCancelFlags::ALL, flags);
+        let flags = MatchOn::all().and_fd(Fd(0)).and_user_data(0).flags();
+        assert_eq!(AsyncCancelFlags::ALL, flags);
+        let flags = MatchOn::all().and_fd(Fixed(0)).and_user_data(0).flags();
+        assert_eq!(AsyncCancelFlags::ALL, flags);
+
+        // Test matching on fd and user_data.
+        let flags = MatchOn::fd(Fd(0)).flags();
+        assert_eq!(AsyncCancelFlags::FD, flags);
+        let flags = MatchOn::fd(Fixed(0)).flags();
+        assert_eq!(AsyncCancelFlags::FD_FIXED, flags);
+        let flags = MatchOn::user_data(0).flags();
+        assert_eq!(AsyncCancelFlags::empty(), flags);
+
+        // Test matching on fd and user_data with the ANY flag.
+        let flags = MatchOn::fd(Fd(0)).and_user_data(0).match_any().flags();
+        assert_eq!(AsyncCancelFlags::FD | AsyncCancelFlags::ANY, flags);
+        let flags = MatchOn::fd(Fixed(0)).and_user_data(0).match_any().flags();
+        assert_eq!(AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::ANY, flags);
+        let flags = MatchOn::user_data(0).and_fd(Fd(0)).match_any().flags();
+        assert_eq!(AsyncCancelFlags::FD | AsyncCancelFlags::ANY, flags);
+        let flags = MatchOn::user_data(0).and_fd(Fixed(0)).match_any().flags();
+        assert_eq!(AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::ANY, flags);
+    }
+}

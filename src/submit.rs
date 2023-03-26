@@ -1,10 +1,10 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
-use std::time::Duration;
 use std::{io, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
+use crate::types::Timespec;
 use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 
@@ -481,29 +481,55 @@ impl<'a> Submitter<'a> {
     /// Performs a synchronous cancellation request, similiar to [AsyncCancel](crate::opcode::AsyncCancel),
     /// except that it completes synchronously.
     ///
-    /// [`AsyncCancelFlags`](types::AsyncCancelFlags) may be supplied to indicate the strategy for
-    /// matching operations to cancel.
+    /// Cancelation can target a specific request, or all requests matching a specific criteria. The
+    /// [MatchOn](types::MatchOn) builder supports describing the match criteria for cancelation.
+    ///
+    /// An optional `timeout` can be provided to specify how long to wait for matched requests to be
+    /// canceled. If no timeout is provided, the default is to wait indefinitely.
+    ///
+    /// ### Errors
+    ///
+    /// An error is returned if no requests match the provided match criteria. If a timeout is supplied,
+    /// and the timeout expires before all requests have been canceled, then an error will be returned.
+    ///
+    /// ### Notes
+    ///
+    /// Only requests which have been submitted to the ring will be considered for cancelation. Requests
+    /// which have been written to the SQ, but not submitted, will not be canceled.
     ///
     /// Available since 6.0.
     pub fn register_sync_cancel(
         &self,
-        user_data: u64,
-        fd: RawFd,
-        timeout: Option<Duration>,
-        flags: types::AsyncCancelFlags,
+        match_on: types::MatchOn,
+        timeout: Option<Timespec>,
     ) -> io::Result<()> {
-        // Default to infinite timeout if a timeout is not provided.
-        let mut timespec = sys::__kernel_timespec {
-            tv_sec: -1,
-            tv_nsec: -1,
+        let timespec = match timeout {
+            Some(ref ts) => {
+                // Safety: Timespec is repr(transparent) over __kernel_timespec, so the cast is safe.
+                unsafe { *(ts as *const Timespec as *const sys::__kernel_timespec) }
+            }
+            None => {
+                // Default to an infinite timeout if a timeout is not provided.
+                sys::__kernel_timespec {
+                    tv_sec: -1,
+                    tv_nsec: -1,
+                }
+            }
         };
-        if let Some(timeout) = timeout {
-            timespec.tv_sec = timeout.as_secs() as _;
-            timespec.tv_nsec = timeout.subsec_nanos() as _;
-        }
+
+        let flags = match_on.flags();
+        let user_data = match_on.user_data.unwrap_or(0);
+        let fd = match_on
+            .fd
+            .map(|fd| match fd {
+                types::sealed::Target::Fd(fd) => fd,
+                types::sealed::Target::Fixed(fd) => fd as i32,
+            })
+            .unwrap_or(0);
+
         let arg = sys::io_uring_sync_cancel_reg {
             addr: user_data,
-            fd: fd,
+            fd,
             flags: flags.bits(),
             timeout: timespec,
             pad: [0u64; 4],

@@ -3,7 +3,8 @@ use std::io;
 use io_uring::cqueue;
 use io_uring::opcode;
 use io_uring::squeue;
-use io_uring::types::{self, AsyncCancelFlags};
+use io_uring::types;
+use io_uring::types::MatchOn;
 use io_uring::IoUring;
 
 use crate::Test;
@@ -42,7 +43,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
 
     // Cancel the first operation by user_data
     ring.submitter()
-        .register_sync_cancel(USER_DATA_0, -1, None, AsyncCancelFlags::empty())?;
+        .register_sync_cancel(MatchOn::user_data(USER_DATA_0), None)?;
     ring.submitter().submit_and_wait(1)?;
     let cqe: cqueue::Entry = ring.completion().next().unwrap().into();
     assert_eq!(
@@ -54,7 +55,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
 
     // Cancel the second two operations by their user data flags.
     ring.submitter()
-        .register_sync_cancel(USER_DATA_1, -1, None, AsyncCancelFlags::ALL)?;
+        .register_sync_cancel(MatchOn::user_data(USER_DATA_0).match_any(), None)?;
     ring.submitter().submit_and_wait(2)?;
     let cqe1: cqueue::Entry = ring.completion().next().unwrap().into();
     let cqe2: cqueue::Entry = ring.completion().next().unwrap().into();
@@ -62,12 +63,8 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     assert_eq!(cqe1.result(), -libc::ECANCELED);
 
     // Cancel the last two operations by their fd.
-    ring.submitter().register_sync_cancel(
-        USER_DATA_2,
-        0,
-        None,
-        AsyncCancelFlags::FD | AsyncCancelFlags::ALL,
-    )?;
+    ring.submitter()
+        .register_sync_cancel(MatchOn::fd(types::Fd(0)).match_any(), None)?;
     ring.submitter().submit_and_wait(2)?;
     let cqe1: cqueue::Entry = ring.completion().next().unwrap().into();
     let cqe2: cqueue::Entry = ring.completion().next().unwrap().into();
@@ -89,12 +86,24 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     const USER_DATA: u64 = 42u64;
 
     let mut buf = [0u8; 32];
-    let entry = opcode::Read::new(types::Fd(0), buf.as_mut_ptr(), 32).build();
+    let entry = opcode::Read::new(types::Fd(0), buf.as_mut_ptr(), 32)
+        .build()
+        .user_data(USER_DATA);
     unsafe { ring.submission().push(&entry.into()).unwrap() };
 
     // Cancel the operation by user_data, we haven't submitted anything yet.
+    let result = ring
+        .submitter()
+        .register_sync_cancel(MatchOn::user_data(USER_DATA), None);
+    assert!(
+        matches!(result.err().unwrap().kind(), io::ErrorKind::NotFound),
+        "the operation should not complete because the entry has not been submitted"
+    );
+
+    // Submit the operation, and retry the cancel operation. It should succeed.
+    assert_eq!(1, ring.submitter().submit()?);
     ring.submitter()
-        .register_sync_cancel(USER_DATA, -1, None, AsyncCancelFlags::empty())?;
+        .register_sync_cancel(MatchOn::user_data(USER_DATA), None)?;
 
     ring.submitter().submit_and_wait(1)?;
     let cqe1: cqueue::Entry = ring.completion().next().unwrap().into();
