@@ -83,7 +83,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
         test.probe.is_supported(opcode::SendZc::CODE);
     );
     // Test that we can cancel operations which have not yet been submitted.
-    const USER_DATA: u64 = 42u64;
+    const USER_DATA: u64 = 45u64;
 
     let mut buf = [0u8; 32];
     let entry = opcode::Read::new(types::Fd(0), buf.as_mut_ptr(), 32)
