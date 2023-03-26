@@ -14,8 +14,8 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     test: &Test,
 ) -> io::Result<()> {
     require!(
-        test; // We need at least 5.19 for these tests, UringCmd16 is a proxy for that.
-        test.probe.is_supported(opcode::UringCmd16::CODE);
+        test; // We need at least 6.0 to use `IORING_REGISTER_SYNC_CANCEL`. opcode::SendZc is a proxy for that requirement.
+        test.probe.is_supported(opcode::SendZc::CODE);
     );
     // Single op, canceled by the user_data
     const USER_DATA_0: u64 = 42u64;
@@ -79,7 +79,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     test: &Test,
 ) -> io::Result<()> {
     require!(
-        test; // We need at least 6.0 to use `IORING_REGISTER_SYNC_CANCEL`. opcode::SendZc is a proxy for that requirement.
+        test;
         test.probe.is_supported(opcode::SendZc::CODE);
     );
     // Test that we can cancel operations which have not yet been submitted.
