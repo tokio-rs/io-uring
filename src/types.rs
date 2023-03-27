@@ -555,6 +555,8 @@ impl CancelBuilder {
 
     /// Refine the match criteria to match only requests which contain the
     /// provided `user_data`.
+    ///
+    /// This is mutually exclusive with [CancelBuilder::fd](#method.fd).
     pub fn user_data(mut self, user_data: u64) -> Self {
         // Unset the ANY flag because we want to refine the match criteria to a subset of requests.
         self.flags.set(AsyncCancelFlags::ANY, false);
@@ -569,6 +571,8 @@ impl CancelBuilder {
 
     /// Refine the match criteria to match only requests which reference the
     /// provided `fd`.
+    ///
+    /// This is mutually exclusive with [CancelBuilder::user_data](#method.user_data).
     ///
     /// Note: Support for fixed file descriptors is only available on Linux 6.0+.
     pub fn fd(mut self, fd: impl sealed::UseFixed) -> Self {
@@ -590,8 +594,8 @@ impl CancelBuilder {
 
     /// Match all in-flight requests rather than just the first match.
     ///
-    /// This will cancel all in-flight requests unless [CancelBuilder::user_data] or [CancelBuilder::fd]
-    /// has been called to refine the match criteria.
+    /// This will cancel all in-flight requests unless [CancelBuilder::user_data](#method.user_data) or
+    /// [CancelBuilder::fd](#method.fd) has been called to refine the match criteria.
     pub fn all(mut self) -> Self {
         self.flags.set(AsyncCancelFlags::ALL, true);
         self
