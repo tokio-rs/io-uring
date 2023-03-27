@@ -94,7 +94,7 @@ bitflags! {
 bitflags! {
     /// Options for [`AsyncCancel`](super::AsyncCancel) and
     /// [`Submitter::register_sync_cancel`](super::Submitter::register_sync_cancel).
-    pub struct AsyncCancelFlags: u32 {
+    pub(crate) struct AsyncCancelFlags: u32 {
         /// Cancel all requests that match the given criteria, rather
         /// than just canceling the first one found.
         ///
@@ -513,7 +513,8 @@ impl<'buf> RecvMsgOut<'buf> {
 /// however this can be refined to cancel only requests which reference a file descriptor
 /// or have a specific `user_data` value.
 ///
-/// Additionally, [CancelBuilder::all] can be set to match multiple requests.
+/// Additionally, [CancelBuilder::all] can be set to match all requests matching the given
+/// criteria, rather than just the first one that would have matched.
 ///
 /// ### Examples
 ///
@@ -547,7 +548,7 @@ impl CancelBuilder {
     ///
     /// The default behavior of the [CancelBuilder] is cancel all in-flight requests.
     /// This behavior can be further refined by calling the builder methods on the [CancelBuilder].
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             flags: AsyncCancelFlags::ANY,
             user_data: None,
@@ -587,7 +588,8 @@ impl CancelBuilder {
                 self.flags.set(AsyncCancelFlags::FD, true);
             }
             sealed::Target::Fixed(_) => {
-                self.flags.set(AsyncCancelFlags::FD_FIXED, true);
+                self.flags
+                    .set(AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::FD, true);
             }
         };
         self.fd = Some(target);

@@ -1,4 +1,5 @@
 use std::io;
+use std::mem;
 use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
@@ -22,6 +23,11 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     );
     let fd_1 = get_eventfd();
     let fd_2 = get_eventfd();
+    let fixed_fd_3 = get_eventfd();
+
+    let mut registered_files = [0; 1];
+    registered_files[0] = fixed_fd_3.as_raw_fd();
+    ring.submitter().register_files(&registered_files)?;
 
     // Single op, canceled by the user_data. Reads from fd_1
     const USER_DATA_0: u64 = 42u64;
@@ -29,11 +35,14 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     const USER_DATA_1: u64 = 43u64;
     // 2 operations, canceled by the fd. Reads from fd_1
     const USER_DATA_2: u64 = 44u64;
-    // 3 operations, canceled by ANY. Reads from fd_2.
+    // 3 operations, reading from fixed_fd_3.
     const USER_DATA_3: u64 = 45u64;
+    // 3 operations, canceled by ANY. Reads from fd_2.
+    const USER_DATA_4: u64 = 46u64;
 
     let mut buf = [0u8; 32];
-    for i in 0..8 {
+    let mut nr_submitted = 0;
+    for i in 0..11 {
         let entry;
         if i == 0 {
             entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
@@ -47,15 +56,20 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
             entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
                 .build()
                 .user_data(USER_DATA_2);
+        } else if (5..8).contains(&i) {
+            entry = opcode::Read::new(types::Fixed(0), buf.as_mut_ptr(), 32)
+                .build()
+                .user_data(USER_DATA_3);
         } else {
             entry = opcode::Read::new(types::Fd(fd_2.as_raw_fd()), buf.as_mut_ptr(), 32)
                 .build()
-                .user_data(USER_DATA_3);
+                .user_data(USER_DATA_4);
         }
         unsafe { ring.submission().push(&entry.into()).unwrap() };
+        nr_submitted += ring.submit()?;
     }
-    // Submit all 8 operations.
-    assert_eq!(8, ring.submit()?);
+    // 11 operations should have been submitted.
+    assert_eq!(11, nr_submitted);
 
     // Cancel the first operation by user_data.
     ring.submitter()
@@ -87,16 +101,34 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         assert_eq!(completion.result(), -libc::ECANCELED);
     }
 
+    // Cancel one of the fixed_fd operations by the fixed_fd.
+    ring.submitter()
+        .register_sync_cancel(None, CancelBuilder::new().fd(types::Fixed(0)))?;
+    let completions = wait_get_completions(ring, 1).unwrap();
+    assert_eq!(completions.len(), 1);
+    assert_eq!(completions[0].user_data(), USER_DATA_3);
+    assert_eq!(completions[0].result(), -libc::ECANCELED);
+
+    // Cancel the two remaining fixed_fd operations by the fixed_fd.
+    ring.submitter()
+        .register_sync_cancel(None, CancelBuilder::new().fd(types::Fixed(0)).all())?;
+    let completions = wait_get_completions(ring, 2).unwrap();
+    for completion in completions {
+        assert_eq!(completion.user_data(), USER_DATA_3);
+        assert_eq!(completion.result(), -libc::ECANCELED);
+    }
+
     // Cancel all of the remaining requests, should be 3 outstanding.
     ring.submitter()
         .register_sync_cancel(None, CancelBuilder::new())?;
     let completions = wait_get_completions(ring, 1).unwrap();
     assert_eq!(completions.len(), 3);
     for completion in completions {
-        assert_eq!(completion.user_data(), USER_DATA_3);
+        assert_eq!(completion.user_data(), USER_DATA_4);
         assert_eq!(completion.result(), -libc::ECANCELED);
     }
 
+    ring.submitter().unregister_files()?;
     Ok(())
 }
 
@@ -160,7 +192,8 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
 
     let fd_1 = get_eventfd();
 
-    // Test that we see an error when attempting to cancel operations which have not yet been submitted.
+    // Try to cancel an operation which has not yet been submitted, but has been pushed to the SQ.
+    // This should result in an error from register_sync_cancel and the operation should not be cancelled.
     const USER_DATA: u64 = 47u64;
 
     let mut buf = [0u8; 32];
