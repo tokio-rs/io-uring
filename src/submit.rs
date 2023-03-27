@@ -489,8 +489,13 @@ impl<'a> Submitter<'a> {
     ///
     /// ### Errors
     ///
-    /// An error is returned if no requests match the provided match criteria. If a timeout is supplied,
-    /// and the timeout expires before all requests have been canceled, then an error will be returned.
+    /// If no requests are matched, returns:
+    ///
+    /// [io::ErrorKind::NotFound]: `No such file or directory (os error 2)`
+    ///
+    /// If a timeout is supplied, and the timeout elapses prior to all requests being canceled, returns:
+    ///
+    /// [io::ErrorKind::Uncategorized]: `Timer expired (os error 62)`
     ///
     /// ### Notes
     ///
