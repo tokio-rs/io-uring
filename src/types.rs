@@ -507,208 +507,145 @@ impl<'buf> RecvMsgOut<'buf> {
     }
 }
 
-/// [MatchOn] is a builder for constructing match criteria for request cancellation.
+/// [CancelBuilder] constructs match criteria for request cancellation.
 ///
-/// Requests can be canceled by matching on the user_data field and/or the file descriptor.
+/// The default behavior of the [CancelBuilder] is cancel all in-flight requests,
+/// however this can be refined to cancel only requests which reference a file descriptor
+/// or have a specific `user_data` value.
+///
+/// Additionally, [CancelBuilder::all] can be set to match multiple requests.
 ///
 /// ```
-/// use io_uring::types;
+/// use io_uring::types::{CancelBuilder, Fd, Fixed};
 ///
-/// // Match any request referencing file descriptor 42.
-/// types::MatchOn::fd(types::Fd(42)).match_any();
+/// // Match all in-flight requests.
+/// CancelBuilder::new();
+///
+/// // Match a single request with user_data = 42.
+/// CancelBuilder::new().user_data(42);
+///
+/// // Match a single request with fd = 42.
+/// CancelBuilder::new().fd(Fd(42));
+///
+/// // Match a single request with fixed fd = 42.
+/// CancelBuilder::new().fd(Fixed(42));
+///
+/// // Match all in-flight requests with user_data = 42.
+/// CancelBuilder::new().user_data(42).all();
 /// ```
 #[derive(Debug)]
-pub struct MatchOn {
+pub struct CancelBuilder {
+    pub(crate) flags: AsyncCancelFlags,
     pub(crate) user_data: Option<u64>,
     pub(crate) fd: Option<sealed::Target>,
-    multiple: MatchMultiple,
 }
 
-#[derive(Debug, Clone, Copy)]
-enum MatchMultiple {
-    /// Match all requests. This indiscriminately cancels all requests,
-    /// regardless of user_data or fd.
-    All,
-    /// Match any request which matches the user_data or fd.
-    Any,
-    /// Match only a single request. This is the default behavior.
-    Single,
-}
-
-impl MatchOn {
-    /// Match a single request with the given user_data field.
+impl CancelBuilder {
+    /// Create a new [CancelBuilder].
     ///
-    /// ### Example
-    ///
-    /// ```
-    /// use io_uring::types;
-    ///
-    /// // Match a single request with user_data 42
-    /// types::MatchOn::user_data(42);
-    /// ```
-    pub fn user_data(user_data: u64) -> Self {
+    /// The default behavior of the [CancelBuilder] is cancel all in-flight requests.
+    /// This behavior can be further refined by calling the builder methods on the [CancelBuilder].
+    pub fn new() -> Self {
         Self {
-            user_data: Some(user_data),
-            fd: None,
-            multiple: MatchMultiple::Single,
-        }
-    }
-
-    /// Match a single request using the given file descriptor.
-    ///
-    /// ### Availability
-    ///
-    /// - Matching on [`Fd`](types::Fd) is available since 5.19.
-    /// - Matching on [`Fixed`](types::Fixed) is available since 6.0.
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// use io_uring::types;
-    /// // Match a single request using file descriptor 4
-    /// types::MatchOn::fd(types::Fd(4));
-    ///
-    /// // Match a single request using the fixed file descriptor 8
-    /// types::MatchOn::fd(types::Fixed(8));
-    /// ```
-    pub fn fd(fd: impl sealed::UseFixed) -> Self {
-        Self {
-            user_data: None,
-            fd: Some(fd.into()),
-            multiple: MatchMultiple::Single,
-        }
-    }
-
-    /// Match all requests, regardless of user_data or fd.
-    ///
-    /// If matching all requests, other match criteria are ignored.
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// use io_uring::types;
-    /// /// Match all in-fliht requests
-    /// types::MatchOn::all();
-    /// ```
-    pub fn all() -> Self {
-        Self {
+            flags: AsyncCancelFlags::ANY,
             user_data: None,
             fd: None,
-            multiple: MatchMultiple::All,
         }
     }
 
-    /// Apply the match criteria to *any* request.
-    ///
-    /// This will match multiple in-flight requests.
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// use io_uring::types;
-    /// // Match any request where the user_data or fd is 42.
-    /// types::MatchOn::user_data(42).and_fd(types::Fixed(42)).match_any();
-    /// ```
-    pub fn match_any(mut self) -> Self {
-        self.multiple = MatchMultiple::Any;
-        self
-    }
+    /// Refine the match criteria to match only requests which contain the
+    /// provided `user_data`.
+    pub fn user_data(mut self, user_data: u64) -> Self {
+        // Unset the ANY flag because we want to refine the match criteria to a subset of requests.
+        self.flags.set(AsyncCancelFlags::ANY, false);
+        // Unset the FD flags, as they are mutually exclusive with user_data.
+        self.flags.set(AsyncCancelFlags::FD, false);
+        self.flags.set(AsyncCancelFlags::FD_FIXED, false);
+        self.fd = None;
 
-    /// Additionally, match a request with the given user_data field.
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// use io_uring::types;
-    /// // Match a single request where the user_data is
-    /// // 42 or the fd is 4.
-    /// types::MatchOn::user_data(42).and_fd(types::Fixed(4));
-    /// ```
-    ///
-    /// Note: This will overwrite any previous user_data match criteria.
-    pub fn and_fd(mut self, fd: impl sealed::UseFixed) -> Self {
-        if matches!(self.multiple, MatchMultiple::All) {
-            return self;
-        }
-        self.fd = Some(fd.into());
-        self
-    }
-
-    /// Additionally, match a request with the given user_data field.
-    ///
-    /// ### Example
-    ///
-    /// ```
-    /// use io_uring::types;
-    /// // Match a single request where the user_data is
-    /// // fd 4 or the user_data is 42.
-    /// types::MatchOn::fd(types::Fd(4)).and_user_data(42);
-    /// ```
-    pub fn and_user_data(mut self, user_data: u64) -> Self {
-        if matches!(self.multiple, MatchMultiple::All) {
-            return self;
-        }
         self.user_data = Some(user_data);
         self
     }
 
-    pub(crate) fn flags(&self) -> AsyncCancelFlags {
-        let mut flags = AsyncCancelFlags::empty();
+    /// Refine the match criteria to match only requests which reference the
+    /// provided `fd`.
+    ///
+    /// Note: Support for fixed file descriptors is only available on Linux 6.0+.
+    pub fn fd(mut self, fd: impl sealed::UseFixed) -> Self {
+        // Unset the ANY flag because we want to refine the match criteria to a subset of requests.
+        self.flags.set(AsyncCancelFlags::ANY, false);
+        let target = fd.into();
+        self.user_data = None;
+        match target {
+            sealed::Target::Fd(_) => {
+                self.flags.set(AsyncCancelFlags::FD, true);
+            }
+            sealed::Target::Fixed(_) => {
+                self.flags.set(AsyncCancelFlags::FD_FIXED, true);
+            }
+        };
+        self.fd = Some(target);
+        self
+    }
 
-        match self.multiple {
-            MatchMultiple::All => {
-                flags.set(AsyncCancelFlags::ALL, true);
-                return flags;
-            }
-            MatchMultiple::Any => {
-                flags.set(AsyncCancelFlags::ANY, true);
-            }
-            MatchMultiple::Single => {}
-        }
-        match self.fd {
-            Some(sealed::Target::Fd(_)) => {
-                flags.set(AsyncCancelFlags::FD, true);
-            }
-            Some(sealed::Target::Fixed(_)) => {
-                flags.set(AsyncCancelFlags::FD_FIXED, true);
-            }
-            None => {}
-        }
-        flags
+    /// Match all in-flight requests rather than just the first match.
+    ///
+    /// This will cancel all in-flight requests unless [CancelBuilder::user_data] or [CancelBuilder::fd]
+    /// has been called to refine the match criteria.
+    pub fn all(mut self) -> Self {
+        self.flags.set(AsyncCancelFlags::ALL, true);
+        self
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::types::sealed::Target;
+
     use super::*;
 
     #[test]
-    fn test_match_on_flags() {
-        // Matching all matches every request, we should only see the ALL flag
-        // regardless of what else is set.
-        let flags = MatchOn::all().flags();
-        assert_eq!(AsyncCancelFlags::ALL, flags);
-        let flags = MatchOn::all().and_fd(Fd(0)).and_user_data(0).flags();
-        assert_eq!(AsyncCancelFlags::ALL, flags);
-        let flags = MatchOn::all().and_fd(Fixed(0)).and_user_data(0).flags();
-        assert_eq!(AsyncCancelFlags::ALL, flags);
+    fn test_cancel_builder_flags() {
+        // By default, the CancelBuilder should cancel all in-flight requests.
+        let cb = CancelBuilder::new();
+        assert_eq!(cb.flags, AsyncCancelFlags::ANY);
 
-        // Test matching on fd and user_data.
-        let flags = MatchOn::fd(Fd(0)).flags();
-        assert_eq!(AsyncCancelFlags::FD, flags);
-        let flags = MatchOn::fd(Fixed(0)).flags();
-        assert_eq!(AsyncCancelFlags::FD_FIXED, flags);
-        let flags = MatchOn::user_data(0).flags();
-        assert_eq!(AsyncCancelFlags::empty(), flags);
+        // Setting the user_data should unset the ANY flag.
+        let cb = CancelBuilder::new().user_data(42);
+        assert_eq!(cb.flags, AsyncCancelFlags::empty());
+        assert_eq!(cb.user_data, Some(42));
 
-        // Test matching on fd and user_data with the ANY flag.
-        let flags = MatchOn::fd(Fd(0)).and_user_data(0).match_any().flags();
-        assert_eq!(AsyncCancelFlags::FD | AsyncCancelFlags::ANY, flags);
-        let flags = MatchOn::fd(Fixed(0)).and_user_data(0).match_any().flags();
-        assert_eq!(AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::ANY, flags);
-        let flags = MatchOn::user_data(0).and_fd(Fd(0)).match_any().flags();
-        assert_eq!(AsyncCancelFlags::FD | AsyncCancelFlags::ANY, flags);
-        let flags = MatchOn::user_data(0).and_fd(Fixed(0)).match_any().flags();
-        assert_eq!(AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::ANY, flags);
+        // Setting the fd should unset the ANY flag.
+        let cb = CancelBuilder::new().fd(Fd(1));
+        assert_eq!(cb.flags, AsyncCancelFlags::FD);
+        assert!(matches!(cb.fd.unwrap(), Target::Fd(1)));
+        let cb = CancelBuilder::new().fd(Fixed(1));
+        assert_eq!(cb.flags, AsyncCancelFlags::FD_FIXED);
+        assert!(matches!(cb.fd.unwrap(), Target::Fixed(1)));
+
+        // Setting the ALL flag should union with the existing flags.
+        let cb = CancelBuilder::new().user_data(42).all();
+        assert_eq!(cb.flags, AsyncCancelFlags::ALL);
+        assert_eq!(cb.user_data, Some(42));
+        let cb = CancelBuilder::new().fd(Fd(1)).all();
+        assert_eq!(cb.flags, AsyncCancelFlags::FD | AsyncCancelFlags::ALL);
+        assert!(matches!(cb.fd.unwrap(), Target::Fd(1)));
+        let cb = CancelBuilder::new().fd(Fixed(1)).all();
+        assert_eq!(cb.flags, AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::ALL);
+        assert!(matches!(cb.fd.unwrap(), Target::Fixed(1)));
+
+        // The FD and user_data builders are mutually exclusive.
+        let cb = CancelBuilder::new().fd(Fd(1)).user_data(42);
+        assert_eq!(cb.flags, AsyncCancelFlags::empty());
+        assert_eq!(cb.user_data, Some(42));
+        assert!(cb.fd.is_none());
+        let cb = CancelBuilder::new().user_data(42).fd(Fd(1));
+        assert_eq!(cb.flags, AsyncCancelFlags::FD);
+        assert_eq!(cb.user_data, None);
+        assert!(matches!(cb.fd.unwrap(), Target::Fd(1)));
+
+        // Calling all() without calling user_data() or fd() should match ANY | ALL.
+        let cb = CancelBuilder::new().all();
+        assert_eq!(cb.flags, AsyncCancelFlags::ANY | AsyncCancelFlags::ALL);
     }
 }

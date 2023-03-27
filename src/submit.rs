@@ -4,7 +4,7 @@ use std::{io, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
-use crate::types::Timespec;
+use crate::types::{CancelBuilder, Timespec};
 use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 
@@ -482,7 +482,7 @@ impl<'a> Submitter<'a> {
     /// except that it completes synchronously.
     ///
     /// Cancellation can target a specific request, or all requests matching a specific criteria. The
-    /// [MatchOn](types::MatchOn) builder supports describing the match criteria for cancellation.
+    /// [CancelBuilder](types::CancelBuilder) builder supports describing the match criteria for cancellation.
     ///
     /// An optional `timeout` can be provided to specify how long to wait for matched requests to be
     /// canceled. If no timeout is provided, the default is to wait indefinitely.
@@ -500,8 +500,8 @@ impl<'a> Submitter<'a> {
     /// Available since 6.0.
     pub fn register_sync_cancel(
         &self,
-        match_on: types::MatchOn,
         timeout: Option<Timespec>,
+        builder: CancelBuilder,
     ) -> io::Result<()> {
         let timespec = match timeout {
             Some(ref ts) => {
@@ -516,21 +516,20 @@ impl<'a> Submitter<'a> {
                 }
             }
         };
-
-        let flags = match_on.flags();
-        let user_data = match_on.user_data.unwrap_or(0);
-        let fd = match_on
+        let user_data = builder.user_data.unwrap_or(0);
+        let fd = builder
             .fd
-            .map(|fd| match fd {
+            .map(|target| match target {
                 types::sealed::Target::Fd(fd) => fd,
                 types::sealed::Target::Fixed(fd) => fd as i32,
             })
-            .unwrap_or(0);
+            .unwrap_or(-1);
+        let flags = builder.flags.bits();
 
         let arg = sys::io_uring_sync_cancel_reg {
             addr: user_data,
             fd,
-            flags: flags.bits(),
+            flags,
             timeout: timespec,
             pad: [0u64; 4],
         };

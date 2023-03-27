@@ -79,6 +79,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::register_buf_ring::test_register_buf_ring(&mut ring, &test)?;
     tests::register_sync_cancel::test_register_sync_cancel(&mut ring, &test)?;
     tests::register_sync_cancel::test_register_sync_cancel_unsubmitted(&mut ring, &test)?;
+    tests::register_sync_cancel::test_register_sync_cancel_any(&mut ring, &test)?;
     // fs
     tests::fs::test_file_write_read(&mut ring, &test)?;
     tests::fs::test_file_writev_readv(&mut ring, &test)?;

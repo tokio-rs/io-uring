@@ -1,10 +1,13 @@
 use std::io;
+use std::os::fd::AsRawFd;
+use std::os::fd::FromRawFd;
+use std::os::fd::OwnedFd;
 
 use io_uring::cqueue;
 use io_uring::opcode;
 use io_uring::squeue;
 use io_uring::types;
-use io_uring::types::MatchOn;
+use io_uring::types::CancelBuilder;
 use io_uring::IoUring;
 
 use crate::Test;
@@ -17,59 +20,128 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         test; // We need at least 6.0 to use `IORING_REGISTER_SYNC_CANCEL`. opcode::SendZc is a proxy for that requirement.
         test.probe.is_supported(opcode::SendZc::CODE);
     );
-    // Single op, canceled by the user_data
+    let fd_1 = get_eventfd();
+    let fd_2 = get_eventfd();
+
+    // Single op, canceled by the user_data. Reads from fd_1
     const USER_DATA_0: u64 = 42u64;
-    // 2 operations, canceled by the user_data
+    // 2 operations, canceled by the user_data. Reads from fd_1
     const USER_DATA_1: u64 = 43u64;
-    // 2 operations, canceled by the fd.
+    // 2 operations, canceled by the fd. Reads from fd_1
     const USER_DATA_2: u64 = 44u64;
+    // 3 operations, canceled by ANY. Reads from fd_2.
+    const USER_DATA_3: u64 = 45u64;
 
     // Start reads for user_data_0
     let mut buf = [0u8; 32];
-    for i in 0..5 {
-        let mut entry = opcode::Read::new(types::Fd(0), buf.as_mut_ptr(), 32).build();
-
+    for i in 0..8 {
+        let entry;
         if i == 0 {
-            entry = entry.user_data(USER_DATA_0);
+            entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
+                .build()
+                .user_data(USER_DATA_0);
         } else if (1..3).contains(&i) {
-            entry = entry.user_data(USER_DATA_1);
+            entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
+                .build()
+                .user_data(USER_DATA_1);
         } else if (3..5).contains(&i) {
-            entry = entry.user_data(USER_DATA_2);
+            entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
+                .build()
+                .user_data(USER_DATA_2);
+        } else {
+            entry = opcode::Read::new(types::Fd(fd_2.as_raw_fd()), buf.as_mut_ptr(), 32)
+                .build()
+                .user_data(USER_DATA_3);
         }
         unsafe { ring.submission().push(&entry.into()).unwrap() };
     }
-    // Submit all 5 operations.
-    assert_eq!(5, ring.submit()?);
+    // Submit all 7 operations.
+    assert_eq!(8, ring.submit()?);
 
-    // Cancel the first operation by user_data
+    // Cancel the first operation by user_data.
+
     ring.submitter()
-        .register_sync_cancel(MatchOn::user_data(USER_DATA_0), None)?;
-    ring.submitter().submit_and_wait(1)?;
-    let cqe: cqueue::Entry = ring.completion().next().unwrap().into();
-    assert_eq!(
-        cqe.result(),
-        -libc::ECANCELED,
-        "operation should have been canceled"
+        .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA_0))?;
+    let completions = wait_get_completions(ring, 1).unwrap();
+    assert_eq!(completions.len(), 1);
+    assert_eq!(completions[0].user_data(), USER_DATA_0);
+    assert_eq!(completions[0].result(), -libc::ECANCELED);
+
+    // Cancel the second and third operation by user_data.
+    ring.submitter()
+        .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA_1).all())?;
+    let completions = wait_get_completions(ring, 2).unwrap();
+    assert_eq!(completions.len(), 2);
+    for completion in completions {
+        assert_eq!(completion.user_data(), USER_DATA_1);
+        assert_eq!(completion.result(), -libc::ECANCELED);
+    }
+
+    // Cancel the fourth and fifth operation by fd.
+    ring.submitter().register_sync_cancel(
+        None,
+        CancelBuilder::new().fd(types::Fd(fd_1.as_raw_fd())).all(),
+    )?;
+    let completions = wait_get_completions(ring, 2).unwrap();
+    assert_eq!(completions.len(), 2);
+    for completion in completions {
+        assert_eq!(completion.user_data(), USER_DATA_2);
+        assert_eq!(completion.result(), -libc::ECANCELED);
+    }
+
+    // Cancel all of the remaining requests.
+    ring.submitter()
+        .register_sync_cancel(None, CancelBuilder::new())?;
+    let completions = wait_get_completions(ring, 1).unwrap();
+    assert_eq!(completions.len(), 3);
+    for completion in completions {
+        assert_eq!(completion.user_data(), USER_DATA_3);
+        assert_eq!(completion.result(), -libc::ECANCELED);
+    }
+
+    Ok(())
+}
+
+pub fn test_register_sync_cancel_any<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> io::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::SendZc::CODE);
     );
-    assert_eq!(cqe.user_data(), USER_DATA_0);
+    // Test that CancelBuilder::new().all() cancels all requests in the ring.
+    let fd_1 = get_eventfd();
+    const START_USER_DATA: u64 = 47u64;
+    let mut buf = [0u8; 32];
 
-    // Cancel the second two operations by their user data flags.
-    ring.submitter()
-        .register_sync_cancel(MatchOn::user_data(USER_DATA_0).match_any(), None)?;
-    ring.submitter().submit_and_wait(2)?;
-    let cqe1: cqueue::Entry = ring.completion().next().unwrap().into();
-    let cqe2: cqueue::Entry = ring.completion().next().unwrap().into();
-    assert_eq!(cqe1.result(), cqe2.result());
-    assert_eq!(cqe1.result(), -libc::ECANCELED);
+    for i in 0..3 {
+        let entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
+            .build()
+            .user_data(START_USER_DATA + i);
+        unsafe { ring.submission().push(&entry.into()).unwrap() };
+    }
+    // Submit all 3 operations.
+    assert_eq!(3, ring.submit()?);
 
-    // Cancel the last two operations by their fd.
+    // Cancel all of the requests.
     ring.submitter()
-        .register_sync_cancel(MatchOn::fd(types::Fd(0)).match_any(), None)?;
-    ring.submitter().submit_and_wait(2)?;
-    let cqe1: cqueue::Entry = ring.completion().next().unwrap().into();
-    let cqe2: cqueue::Entry = ring.completion().next().unwrap().into();
-    assert_eq!(cqe1.result(), cqe2.result());
-    assert_eq!(cqe1.result(), -libc::ECANCELED);
+        .register_sync_cancel(None, CancelBuilder::new().all())?;
+
+    let completions = wait_get_completions(ring, 5).unwrap();
+    assert_eq!(completions.len(), 3);
+    for completion in completions.iter() {
+        assert_eq!(completion.result(), -libc::ECANCELED);
+    }
+    let mut user_data_entries = completions
+        .into_iter()
+        .map(|c| c.user_data())
+        .collect::<Vec<u64>>();
+    user_data_entries.sort();
+    assert_eq!(
+        user_data_entries,
+        vec![START_USER_DATA, START_USER_DATA + 1, START_USER_DATA + 2,]
+    );
 
     Ok(())
 }
@@ -82,11 +154,14 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
         test;
         test.probe.is_supported(opcode::SendZc::CODE);
     );
+
+    let fd_1 = get_eventfd();
+
     // Test that we can cancel operations which have not yet been submitted.
-    const USER_DATA: u64 = 45u64;
+    const USER_DATA: u64 = 47u64;
 
     let mut buf = [0u8; 32];
-    let entry = opcode::Read::new(types::Fd(0), buf.as_mut_ptr(), 32)
+    let entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
         .build()
         .user_data(USER_DATA);
     unsafe { ring.submission().push(&entry.into()).unwrap() };
@@ -94,7 +169,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     // Cancel the operation by user_data, we haven't submitted anything yet.
     let result = ring
         .submitter()
-        .register_sync_cancel(MatchOn::user_data(USER_DATA), None);
+        .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA));
     assert!(
         matches!(result.err().unwrap().kind(), io::ErrorKind::NotFound),
         "the operation should not complete because the entry has not been submitted"
@@ -103,12 +178,36 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     // Submit the operation, and retry the cancel operation. It should succeed.
     assert_eq!(1, ring.submitter().submit()?);
     ring.submitter()
-        .register_sync_cancel(MatchOn::user_data(USER_DATA), None)?;
+        .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA))?;
 
-    ring.submitter().submit_and_wait(1)?;
-    let cqe1: cqueue::Entry = ring.completion().next().unwrap().into();
-    assert_eq!(cqe1.result(), -libc::ECANCELED);
-    assert_eq!(cqe1.user_data(), USER_DATA);
+    let completions = wait_get_completions(ring, 1)?;
+    assert_eq!(completions.len(), 1);
+    assert_eq!(completions[0].user_data(), USER_DATA);
+    assert_eq!(completions[0].result(), -libc::ECANCELED);
 
     Ok(())
+}
+
+/// Blocks for a short amount of time, waiting for completions to arrive.
+///
+/// Returns all completions that have arrived.
+fn wait_get_completions<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    want: usize,
+) -> io::Result<Vec<cqueue::Entry>> {
+    let ts = types::Timespec::new().nsec(1_000_000).sec(0);
+    let args = types::SubmitArgs::new().timespec(&ts);
+
+    ring.submitter().submit_with_args(want, &args)?;
+    Ok(ring
+        .completion()
+        .map(Into::into)
+        .collect::<Vec<cqueue::Entry>>())
+}
+
+/// Setup an eventfd which we can use for a blocking read.
+fn get_eventfd() -> OwnedFd {
+    let fd = unsafe { libc::eventfd(0, 0) };
+    assert!(fd >= 0);
+    unsafe { OwnedFd::from_raw_fd(fd) }
 }
