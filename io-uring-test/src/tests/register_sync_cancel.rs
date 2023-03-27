@@ -32,7 +32,6 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     // 3 operations, canceled by ANY. Reads from fd_2.
     const USER_DATA_3: u64 = 45u64;
 
-    // Start reads for user_data_0
     let mut buf = [0u8; 32];
     for i in 0..8 {
         let entry;
@@ -55,11 +54,10 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         }
         unsafe { ring.submission().push(&entry.into()).unwrap() };
     }
-    // Submit all 7 operations.
+    // Submit all 8 operations.
     assert_eq!(8, ring.submit()?);
 
     // Cancel the first operation by user_data.
-
     ring.submitter()
         .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA_0))?;
     let completions = wait_get_completions(ring, 1).unwrap();
@@ -89,7 +87,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         assert_eq!(completion.result(), -libc::ECANCELED);
     }
 
-    // Cancel all of the remaining requests.
+    // Cancel all of the remaining requests, should be 3 outstanding.
     ring.submitter()
         .register_sync_cancel(None, CancelBuilder::new())?;
     let completions = wait_get_completions(ring, 1).unwrap();
@@ -110,6 +108,7 @@ pub fn test_register_sync_cancel_any<S: squeue::EntryMarker, C: cqueue::EntryMar
         test;
         test.probe.is_supported(opcode::SendZc::CODE);
     );
+
     // Test that CancelBuilder::new().all() cancels all requests in the ring.
     let fd_1 = get_eventfd();
     const START_USER_DATA: u64 = 47u64;
@@ -124,7 +123,11 @@ pub fn test_register_sync_cancel_any<S: squeue::EntryMarker, C: cqueue::EntryMar
     // Submit all 3 operations.
     assert_eq!(3, ring.submit()?);
 
-    // Cancel all of the requests.
+    // Cancel all of the requests by supplying CancelBuilder::new().all(). This should result in
+    // flags IORING_ASYNC_CANCEL_ALL | IORING_ASYNC_CANCEL_ANY, which match all in-flight requsts.
+    //
+    // Note: IORING_ASYNC_CANCEL_ALL makes no difference here, IORING_ASYNC_CANCEL_ANY will behave
+    //       the same without it. This test just verifies that the builder works as expected.
     ring.submitter()
         .register_sync_cancel(None, CancelBuilder::new().all())?;
 
@@ -157,7 +160,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
 
     let fd_1 = get_eventfd();
 
-    // Test that we can cancel operations which have not yet been submitted.
+    // Test that we see an error when attempting to cancel operations which have not yet been submitted.
     const USER_DATA: u64 = 47u64;
 
     let mut buf = [0u8; 32];
@@ -166,7 +169,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
         .user_data(USER_DATA);
     unsafe { ring.submission().push(&entry.into()).unwrap() };
 
-    // Cancel the operation by user_data, we haven't submitted anything yet.
+    // Cancel the operation by user_data, we haven't submitted anything yet. We should get an error.
     let result = ring
         .submitter()
         .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA));

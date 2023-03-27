@@ -478,10 +478,10 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// Performs a synchronous cancellation request, similiar to [AsyncCancel](crate::opcode::AsyncCancel),
+    /// Performs a synchronous cancellation request, similar to [AsyncCancel](crate::opcode::AsyncCancel),
     /// except that it completes synchronously.
     ///
-    /// Cancellation can target a specific request, or all requests matching a specific criteria. The
+    /// Cancellation can target a specific request, or all requests matching some criteria. The
     /// [CancelBuilder](types::CancelBuilder) builder supports describing the match criteria for cancellation.
     ///
     /// An optional `timeout` can be provided to specify how long to wait for matched requests to be

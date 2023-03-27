@@ -515,6 +515,8 @@ impl<'buf> RecvMsgOut<'buf> {
 ///
 /// Additionally, [CancelBuilder::all] can be set to match multiple requests.
 ///
+/// ### Examples
+///
 /// ```
 /// use io_uring::types::{CancelBuilder, Fd, Fixed};
 ///
