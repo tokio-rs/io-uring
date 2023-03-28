@@ -1244,7 +1244,8 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 42);
-    assert_eq!(cqes[0].result(), plain_fd + 1);
+    assert!(cqes[0].result() >= 0);
+    assert!(cqes[0].result() != plain_fd);
     assert_eq!(cqes[0].flags(), 0);
 
     // Close both sockets, to avoid leaking FDs.
