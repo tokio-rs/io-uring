@@ -562,10 +562,10 @@ impl CancelBuilder {
     /// This is mutually exclusive with [CancelBuilder::fd](#method.fd).
     pub fn user_data(mut self, user_data: u64) -> Self {
         // Unset the ANY flag because we want to refine the match criteria to a subset of requests.
-        self.flags.set(AsyncCancelFlags::ANY, false);
+        self.flags.remove(AsyncCancelFlags::ANY);
         // Unset the FD flags, as they are mutually exclusive with user_data.
-        self.flags.set(AsyncCancelFlags::FD, false);
-        self.flags.set(AsyncCancelFlags::FD_FIXED, false);
+        self.flags
+            .remove(AsyncCancelFlags::FD | AsyncCancelFlags::FD_FIXED);
         self.fd = None;
 
         self.user_data = Some(user_data);
@@ -580,16 +580,16 @@ impl CancelBuilder {
     /// Note: Support for fixed file descriptors is only available on Linux 6.0+.
     pub fn fd(mut self, fd: impl sealed::UseFixed) -> Self {
         // Unset the ANY flag because we want to refine the match criteria to a subset of requests.
-        self.flags.set(AsyncCancelFlags::ANY, false);
+        self.flags.remove(AsyncCancelFlags::ANY);
         let target = fd.into();
         self.user_data = None;
         match target {
             sealed::Target::Fd(_) => {
-                self.flags.set(AsyncCancelFlags::FD, true);
+                self.flags.insert(AsyncCancelFlags::FD);
             }
             sealed::Target::Fixed(_) => {
                 self.flags
-                    .set(AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::FD, true);
+                    .insert(AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::FD);
             }
         };
         self.fd = Some(target);
@@ -601,7 +601,7 @@ impl CancelBuilder {
     /// This will cancel all in-flight requests unless [CancelBuilder::user_data](#method.user_data) or
     /// [CancelBuilder::fd](#method.fd) has been called to refine the match criteria.
     pub fn all(mut self) -> Self {
-        self.flags.set(AsyncCancelFlags::ALL, true);
+        self.flags.insert(AsyncCancelFlags::ALL);
         self
     }
 }

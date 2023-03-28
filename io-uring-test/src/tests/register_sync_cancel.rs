@@ -1,5 +1,4 @@
 use std::io;
-use std::mem;
 use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
