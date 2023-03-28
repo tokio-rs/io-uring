@@ -628,7 +628,7 @@ mod tests {
         assert_eq!(cb.flags, AsyncCancelFlags::FD);
         assert!(matches!(cb.fd.unwrap(), Target::Fd(1)));
         let cb = CancelBuilder::new().fd(Fixed(1));
-        assert_eq!(cb.flags, AsyncCancelFlags::FD_FIXED);
+        assert_eq!(cb.flags, AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::FD);
         assert!(matches!(cb.fd.unwrap(), Target::Fixed(1)));
 
         // Setting the ALL flag should union with the existing flags.
@@ -639,7 +639,10 @@ mod tests {
         assert_eq!(cb.flags, AsyncCancelFlags::FD | AsyncCancelFlags::ALL);
         assert!(matches!(cb.fd.unwrap(), Target::Fd(1)));
         let cb = CancelBuilder::new().fd(Fixed(1)).all();
-        assert_eq!(cb.flags, AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::ALL);
+        assert_eq!(
+            cb.flags,
+            AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::FD | AsyncCancelFlags::ALL
+        );
         assert!(matches!(cb.fd.unwrap(), Target::Fixed(1)));
 
         // The FD and user_data builders are mutually exclusive.
