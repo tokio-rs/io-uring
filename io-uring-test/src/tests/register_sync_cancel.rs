@@ -72,7 +72,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
 
     // Cancel the first operation by user_data.
     ring.submitter()
-        .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA_0))?;
+        .register_sync_cancel(None, CancelBuilder::user_data(USER_DATA_0))?;
     let completions = wait_get_completions(ring, 1).unwrap();
     assert_eq!(completions.len(), 1);
     assert_eq!(completions[0].user_data(), USER_DATA_0);
@@ -80,7 +80,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
 
     // Cancel the second and third operation by user_data.
     ring.submitter()
-        .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA_1).all())?;
+        .register_sync_cancel(None, CancelBuilder::user_data(USER_DATA_1).all())?;
     let completions = wait_get_completions(ring, 2).unwrap();
     assert_eq!(completions.len(), 2);
     for completion in completions {
@@ -89,10 +89,8 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     }
 
     // Cancel the fourth and fifth operation by fd.
-    ring.submitter().register_sync_cancel(
-        None,
-        CancelBuilder::new().fd(types::Fd(fd_1.as_raw_fd())).all(),
-    )?;
+    ring.submitter()
+        .register_sync_cancel(None, CancelBuilder::fd(types::Fd(fd_1.as_raw_fd())).all())?;
     let completions = wait_get_completions(ring, 2).unwrap();
     assert_eq!(completions.len(), 2);
     for completion in completions {
@@ -102,7 +100,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
 
     // Cancel one of the fixed_fd operations by the fixed_fd.
     ring.submitter()
-        .register_sync_cancel(None, CancelBuilder::new().fd(types::Fixed(0)))?;
+        .register_sync_cancel(None, CancelBuilder::fd(types::Fixed(0)))?;
     let completions = wait_get_completions(ring, 1).unwrap();
     assert_eq!(completions.len(), 1);
     assert_eq!(completions[0].user_data(), USER_DATA_3);
@@ -110,7 +108,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
 
     // Cancel the two remaining fixed_fd operations by the fixed_fd.
     ring.submitter()
-        .register_sync_cancel(None, CancelBuilder::new().fd(types::Fixed(0)).all())?;
+        .register_sync_cancel(None, CancelBuilder::fd(types::Fixed(0)).all())?;
     let completions = wait_get_completions(ring, 2).unwrap();
     for completion in completions {
         assert_eq!(completion.user_data(), USER_DATA_3);
@@ -119,7 +117,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
 
     // Cancel all of the remaining requests, should be 3 outstanding.
     ring.submitter()
-        .register_sync_cancel(None, CancelBuilder::new())?;
+        .register_sync_cancel(None, CancelBuilder::any())?;
     let completions = wait_get_completions(ring, 1).unwrap();
     assert_eq!(completions.len(), 3);
     for completion in completions {
@@ -140,7 +138,7 @@ pub fn test_register_sync_cancel_any<S: squeue::EntryMarker, C: cqueue::EntryMar
         test.probe.is_supported(opcode::SendZc::CODE);
     );
 
-    // Test that CancelBuilder::new().all() cancels all requests in the ring.
+    // Test that CancelBuilder::any().all() cancels all requests in the ring.
     let fd_1 = get_eventfd();
     const START_USER_DATA: u64 = 47u64;
     let mut buf = [0u8; 32];
@@ -154,13 +152,13 @@ pub fn test_register_sync_cancel_any<S: squeue::EntryMarker, C: cqueue::EntryMar
     // Submit all 3 operations.
     assert_eq!(3, ring.submit()?);
 
-    // Cancel all of the requests by supplying CancelBuilder::new().all(). This should result in
+    // Cancel all of the requests by supplying CancelBuilder::any().all(). This should result in
     // flags IORING_ASYNC_CANCEL_ALL | IORING_ASYNC_CANCEL_ANY, which match all in-flight requsts.
     //
     // Note: IORING_ASYNC_CANCEL_ALL makes no difference here, IORING_ASYNC_CANCEL_ANY will behave
     //       the same without it. This test just verifies that the builder works as expected.
     ring.submitter()
-        .register_sync_cancel(None, CancelBuilder::new().all())?;
+        .register_sync_cancel(None, CancelBuilder::any().all())?;
 
     let completions = wait_get_completions(ring, 5).unwrap();
     assert_eq!(completions.len(), 3);
@@ -204,7 +202,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     // Cancel the operation by user_data, we haven't submitted anything yet. We should get an error.
     let result = ring
         .submitter()
-        .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA));
+        .register_sync_cancel(None, CancelBuilder::user_data(USER_DATA));
     assert!(
         matches!(result.err().unwrap().kind(), io::ErrorKind::NotFound),
         "the operation should not complete because the entry has not been submitted"
@@ -213,7 +211,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     // Submit the operation, and retry the cancel operation. It should succeed.
     assert_eq!(1, ring.submitter().submit()?);
     ring.submitter()
-        .register_sync_cancel(None, CancelBuilder::new().user_data(USER_DATA))?;
+        .register_sync_cancel(None, CancelBuilder::user_data(USER_DATA))?;
 
     let completions = wait_get_completions(ring, 1)?;
     assert_eq!(completions.len(), 1);
