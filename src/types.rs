@@ -155,7 +155,7 @@ impl OpenHow {
 
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(transparent)]
-pub struct Timespec(sys::__kernel_timespec);
+pub struct Timespec(pub(crate) sys::__kernel_timespec);
 
 impl Timespec {
     #[inline]

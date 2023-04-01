@@ -508,19 +508,10 @@ impl<'a> Submitter<'a> {
         timeout: Option<Timespec>,
         builder: CancelBuilder,
     ) -> io::Result<()> {
-        let timespec = match timeout {
-            Some(ref ts) => {
-                // Safety: Timespec is repr(transparent) over __kernel_timespec, so the cast is safe.
-                unsafe { *(ts as *const Timespec as *const sys::__kernel_timespec) }
-            }
-            None => {
-                // Default to an infinite timeout if a timeout is not provided.
-                sys::__kernel_timespec {
-                    tv_sec: -1,
-                    tv_nsec: -1,
-                }
-            }
-        };
+        let timespec = timeout.map(|ts| ts.0).unwrap_or(sys::__kernel_timespec {
+            tv_sec: -1,
+            tv_nsec: -1,
+        });
         let user_data = builder.user_data.unwrap_or(0);
         let fd = builder
             .fd
