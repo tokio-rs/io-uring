@@ -4,7 +4,7 @@ pub(crate) mod sealed {
     use super::{Fd, Fixed};
     use std::os::unix::io::RawFd;
 
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Debug)]
     pub enum Target {
         Fd(RawFd),
         Fixed(u32),
@@ -613,14 +613,14 @@ mod tests {
 
         let mut cb = CancelBuilder::fd(Fd(42));
         assert_eq!(cb.flags, AsyncCancelFlags::FD);
-        assert_eq!(cb.fd, Some(Target::Fd(42)));
+        assert!(matches!(cb.fd, Some(Target::Fd(42))));
         assert!(cb.user_data.is_none());
         cb = cb.all();
         assert_eq!(cb.flags, AsyncCancelFlags::FD | AsyncCancelFlags::ALL);
 
         let mut cb = CancelBuilder::fd(Fixed(42));
         assert_eq!(cb.flags, AsyncCancelFlags::FD | AsyncCancelFlags::FD_FIXED);
-        assert_eq!(cb.fd, Some(Target::Fixed(42)));
+        assert!(matches!(cb.fd, Some(Target::Fixed(42))));
         assert!(cb.user_data.is_none());
         cb = cb.all();
         assert_eq!(
