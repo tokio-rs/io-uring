@@ -107,6 +107,37 @@ bitflags! {
     }
 }
 
+bitflags! {
+    /// Options for [`AsyncCancel`](super::AsyncCancel) and
+    /// [`Submitter::register_sync_cancel`](super::Submitter::register_sync_cancel).
+    pub(crate) struct AsyncCancelFlags: u32 {
+        /// Cancel all requests that match the given criteria, rather
+        /// than just canceling the first one found.
+        ///
+        /// Available since 5.19.
+        const ALL = sys::IORING_ASYNC_CANCEL_ALL;
+
+        /// Match based on the file descriptor used in the original
+        /// request rather than the user_data.
+        ///
+        /// Available since 5.19.
+        const FD = sys::IORING_ASYNC_CANCEL_FD;
+
+        /// Match any request in the ring, regardless of user_data or
+        /// file descriptor.  Can be used to cancel any pending
+        /// request in the ring.
+        ///
+        /// Available since 5.19.
+        const ANY = sys::IORING_ASYNC_CANCEL_ANY;
+
+        /// Match based on the fixed file descriptor used in the original
+        /// request rather than the user_data.
+        ///
+        /// Available since 6.0
+        const FD_FIXED = sys::IORING_ASYNC_CANCEL_FD_FIXED;
+    }
+}
+
 /// Wrapper around `open_how` as used in [the `openat2(2)` system
 /// call](https://man7.org/linux/man-pages/man2/openat2.2.html).
 #[derive(Default, Debug, Clone, Copy)]
@@ -140,7 +171,7 @@ impl OpenHow {
 
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(transparent)]
-pub struct Timespec(sys::__kernel_timespec);
+pub struct Timespec(pub(crate) sys::__kernel_timespec);
 
 impl Timespec {
     #[inline]
@@ -489,5 +520,128 @@ impl<'buf> RecvMsgOut<'buf> {
     /// Message flags, with the same semantics as `msghdr.msg_flags`.
     pub fn flags(&self) -> u32 {
         self.header.flags
+    }
+}
+
+/// [CancelBuilder] constructs match criteria for request cancellation.
+///
+/// The [CancelBuilder] can be used to selectively cancel one or more requests
+/// by user_data, fd, fixed fd, or unconditionally.
+///
+/// ### Examples
+///
+/// ```
+/// use io_uring::types::{CancelBuilder, Fd, Fixed};
+///
+/// // Match all in-flight requests.
+/// CancelBuilder::any();
+///
+/// // Match a single request with user_data = 42.
+/// CancelBuilder::user_data(42);
+///
+/// // Match a single request with fd = 42.
+/// CancelBuilder::fd(Fd(42));
+///
+/// // Match a single request with fixed fd = 42.
+/// CancelBuilder::fd(Fixed(42));
+///
+/// // Match all in-flight requests with user_data = 42.
+/// CancelBuilder::user_data(42).all();
+/// ```
+#[derive(Debug)]
+pub struct CancelBuilder {
+    pub(crate) flags: AsyncCancelFlags,
+    pub(crate) user_data: Option<u64>,
+    pub(crate) fd: Option<sealed::Target>,
+}
+
+impl CancelBuilder {
+    /// Create a new [CancelBuilder] which will match any in-flight request.
+    ///
+    /// This will cancel every in-flight request in the ring.
+    pub const fn any() -> Self {
+        Self {
+            flags: AsyncCancelFlags::ANY,
+            user_data: None,
+            fd: None,
+        }
+    }
+
+    /// Create a new [CancelBuilder] which will match in-flight requests
+    /// with the given `user_data` value.
+    ///
+    /// The first request with the given `user_data` value will be canceled.
+    /// [CancelBuilder::all](#method.all) can be called to instead match every
+    /// request with the provided `user_data` value.
+    pub const fn user_data(user_data: u64) -> Self {
+        Self {
+            flags: AsyncCancelFlags::empty(),
+            user_data: Some(user_data),
+            fd: None,
+        }
+    }
+
+    /// Create a new [CancelBuilder] which will match in-flight requests with
+    /// the given `fd` value.
+    ///
+    /// The first request with the given `fd` value will be canceled. [CancelBuilder::all](#method.all)
+    /// can be called to instead match every request with the provided `fd` value.
+    pub fn fd(fd: impl sealed::UseFixed) -> Self {
+        let mut flags = AsyncCancelFlags::FD;
+        let target = fd.into();
+        if matches!(target, sealed::Target::Fixed(_)) {
+            flags.insert(AsyncCancelFlags::FD_FIXED);
+        }
+        Self {
+            flags,
+            user_data: None,
+            fd: Some(target),
+        }
+    }
+
+    /// Modify the [CancelBuilder] match criteria to match all in-flight requests
+    /// rather than just the first one.
+    ///
+    /// This has no effect when combined with [CancelBuilder::any](#method.any).
+    pub fn all(mut self) -> Self {
+        self.flags.insert(AsyncCancelFlags::ALL);
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::types::sealed::Target;
+
+    use super::*;
+
+    #[test]
+    fn test_cancel_builder_flags() {
+        let cb = CancelBuilder::any();
+        assert_eq!(cb.flags, AsyncCancelFlags::ANY);
+
+        let mut cb = CancelBuilder::user_data(42);
+        assert_eq!(cb.flags, AsyncCancelFlags::empty());
+        assert_eq!(cb.user_data, Some(42));
+        assert!(cb.fd.is_none());
+        cb = cb.all();
+        assert_eq!(cb.flags, AsyncCancelFlags::ALL);
+
+        let mut cb = CancelBuilder::fd(Fd(42));
+        assert_eq!(cb.flags, AsyncCancelFlags::FD);
+        assert!(matches!(cb.fd, Some(Target::Fd(42))));
+        assert!(cb.user_data.is_none());
+        cb = cb.all();
+        assert_eq!(cb.flags, AsyncCancelFlags::FD | AsyncCancelFlags::ALL);
+
+        let mut cb = CancelBuilder::fd(Fixed(42));
+        assert_eq!(cb.flags, AsyncCancelFlags::FD | AsyncCancelFlags::FD_FIXED);
+        assert!(matches!(cb.fd, Some(Target::Fixed(42))));
+        assert!(cb.user_data.is_none());
+        cb = cb.all();
+        assert_eq!(
+            cb.flags,
+            AsyncCancelFlags::FD | AsyncCancelFlags::FD_FIXED | AsyncCancelFlags::ALL
+        );
     }
 }

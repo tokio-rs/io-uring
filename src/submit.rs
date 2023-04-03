@@ -4,6 +4,7 @@ use std::{io, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
+use crate::types::{CancelBuilder, Timespec};
 use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 
@@ -471,6 +472,67 @@ impl<'a> Submitter<'a> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_UNREGISTER_PBUF_RING,
+            arg as *const _,
+            1,
+        )
+        .map(drop)
+    }
+
+    /// Performs a synchronous cancellation request, similar to [AsyncCancel](crate::opcode::AsyncCancel),
+    /// except that it completes synchronously.
+    ///
+    /// Cancellation can target a specific request, or all requests matching some criteria. The
+    /// [CancelBuilder](types::CancelBuilder) builder supports describing the match criteria for cancellation.
+    ///
+    /// An optional `timeout` can be provided to specify how long to wait for matched requests to be
+    /// canceled. If no timeout is provided, the default is to wait indefinitely.
+    ///
+    /// ### Errors
+    ///
+    /// If no requests are matched, returns:
+    ///
+    /// [io::ErrorKind::NotFound]: `No such file or directory (os error 2)`
+    ///
+    /// If a timeout is supplied, and the timeout elapses prior to all requests being canceled, returns:
+    ///
+    /// [io::ErrorKind::Uncategorized]: `Timer expired (os error 62)`
+    ///
+    /// ### Notes
+    ///
+    /// Only requests which have been submitted to the ring will be considered for cancellation. Requests
+    /// which have been written to the SQ, but not submitted, will not be canceled.
+    ///
+    /// Available since 6.0.
+    pub fn register_sync_cancel(
+        &self,
+        timeout: Option<Timespec>,
+        builder: CancelBuilder,
+    ) -> io::Result<()> {
+        let timespec = timeout.map(|ts| ts.0).unwrap_or(sys::__kernel_timespec {
+            tv_sec: -1,
+            tv_nsec: -1,
+        });
+        let user_data = builder.user_data.unwrap_or(0);
+        let fd = builder
+            .fd
+            .map(|target| match target {
+                types::sealed::Target::Fd(fd) => fd,
+                types::sealed::Target::Fixed(fd) => fd as i32,
+            })
+            .unwrap_or(-1);
+        let flags = builder.flags.bits();
+
+        let arg = sys::io_uring_sync_cancel_reg {
+            addr: user_data,
+            fd,
+            flags,
+            timeout: timespec,
+            pad: [0u64; 4],
+        };
+        let arg = cast_ptr::<sys::io_uring_sync_cancel_reg>(&arg);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_SYNC_CANCEL,
             arg as *const _,
             1,
         )
