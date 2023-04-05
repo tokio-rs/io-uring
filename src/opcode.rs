@@ -1660,6 +1660,8 @@ opcode!(
         /// previously registered buffer. The buffer need not be aligned with the start of the
         /// registered buffer.
         buf_index: Option<u16> = None,
+        dest_addr: *const libc::sockaddr = core::ptr::null(),
+        dest_addr_len: libc::socklen_t = 0,
         flags: i32 = 0,
         zc_flags: u16 = 0,
     }
@@ -1667,7 +1669,7 @@ opcode!(
     pub const CODE = sys::IORING_OP_SEND_ZC;
 
     pub fn build(self) -> Entry {
-        let SendZc { fd, buf, len, buf_index, flags, zc_flags } = self;
+        let SendZc { fd, buf, len, buf_index, dest_addr, dest_addr_len, flags, zc_flags } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -1680,6 +1682,8 @@ opcode!(
             sqe.__bindgen_anon_4.buf_index = buf_index;
             sqe.ioprio |= sys::IORING_RECVSEND_FIXED_BUF as u16;
         }
+        sqe.__bindgen_anon_1.addr2 = dest_addr as _;
+        sqe.__bindgen_anon_5.__bindgen_anon_1.addr_len = dest_addr_len as _;
         Entry(sqe)
     }
 );
