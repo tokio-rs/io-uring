@@ -2,11 +2,13 @@
 mod utils;
 mod tests;
 
+use std::cell::Cell;
 use io_uring::{cqueue, squeue, IoUring, Probe};
 
 pub struct Test {
     probe: Probe,
     target: Option<String>,
+    count: Cell<usize>
 }
 
 fn main() -> anyhow::Result<()> {
@@ -60,6 +62,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let test = Test {
         probe,
         target: std::env::args().nth(1),
+        count: Cell::new(0)
     };
 
     tests::queue::test_nop(&mut ring, &test)?;
@@ -139,6 +142,8 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // regression test
     tests::regression::test_issue154(&mut ring, &test)?;
+
+    println!("Test count: {}", test.count.get());
 
     Ok(())
 }

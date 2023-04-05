@@ -19,6 +19,8 @@ macro_rules! require {
         if !cond {
             return Ok(());
         }
+
+        $test.count.set($test.count.get() + 1);
     }
 }
 
