@@ -4,11 +4,11 @@ use io_uring::squeue::Flags;
 use io_uring::types::Fd;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
+use std::convert::TryInto;
 use std::net::{TcpListener, TcpStream};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::{io, mem};
-use std::convert::TryInto;
 
 static TCP_LISTENER: OnceCell<TcpListener> = OnceCell::new();
 
@@ -1396,7 +1396,11 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     assert_eq!(msg0.control_data(), &[]);
     assert!(!msg0.is_name_data_truncated());
     let addr = unsafe {
-        let storage = msg0.name_data().as_ptr().cast::<libc::sockaddr_storage>().read();
+        let storage = msg0
+            .name_data()
+            .as_ptr()
+            .cast::<libc::sockaddr_storage>()
+            .read();
         let len = msg0.name_data().len().try_into().unwrap();
         socket2::SockAddr::new(storage, len)
     };
@@ -1411,7 +1415,11 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     assert_eq!(msg1.control_data(), &[]);
     assert!(!msg1.is_name_data_truncated());
     let addr = unsafe {
-        let storage = msg1.name_data().as_ptr().cast::<libc::sockaddr_storage>().read();
+        let storage = msg1
+            .name_data()
+            .as_ptr()
+            .cast::<libc::sockaddr_storage>()
+            .read();
         let len = msg1.name_data().len().try_into().unwrap();
         socket2::SockAddr::new(storage, len)
     };
