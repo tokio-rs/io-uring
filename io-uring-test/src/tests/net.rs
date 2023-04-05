@@ -6,6 +6,7 @@ use std::net::{TcpListener, TcpStream};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::{io, mem};
+use io_uring::types::Fd;
 
 static TCP_LISTENER: OnceCell<TcpListener> = OnceCell::new();
 
@@ -1423,6 +1424,130 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     assert_eq!(addr.port(), client_addr.port());
 
     ring.submitter().unregister_files().unwrap();
+
+    Ok(())
+}
+pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    // Multishot recvmsg was introduced in 6.0, like `SendZc`.
+    // We cannot probe for the former, so we check for the latter as a proxy instead.
+    require!(
+        test;
+        test.probe.is_supported(opcode::RecvMsg::CODE);
+        test.probe.is_supported(opcode::ProvideBuffers::CODE);
+        test.probe.is_supported(opcode::SendZc::CODE);
+    );
+
+    println!("test udp_sendzc_with_dest");
+
+    let server_socket: socket2::Socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into();
+    let dest_addr = server_socket.local_addr()?;
+
+    // Provide 2 buffers in buffer group `33`, at index 0 and 1.
+    // Each one is 512 bytes large.
+    const BUF_GROUP: u16 = 77;
+    const SIZE: usize = 512;
+    let mut buffers = [[0u8; SIZE]; 2];
+    for (index, buf) in buffers.iter_mut().enumerate() {
+        let provide_bufs_e = io_uring::opcode::ProvideBuffers::new(
+            buf.as_mut_ptr(),
+            SIZE as i32,
+            1,
+            BUF_GROUP,
+            index as u16,
+        )
+        .build()
+        .user_data(11)
+        .into();
+        unsafe { ring.submission().push(&provide_bufs_e)? };
+        ring.submitter().submit_and_wait(1)?;
+        let cqes: Vec<io_uring::cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 11);
+        assert_eq!(cqes[0].result(), 0);
+        assert_eq!(cqes[0].flags(), 0);
+    }
+
+    let recvmsg_e = opcode::RecvMulti::new(Fd(server_socket.as_raw_fd()), BUF_GROUP)
+            .build()
+            .user_data(3)
+            .into();
+    unsafe { ring.submission().push(&recvmsg_e)? };
+    ring.submitter().submit()?;
+
+    let client_socket: socket2::Socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into();
+    let fd = client_socket.as_raw_fd();
+
+    let buf1 = b"lorep ipsum";
+    let buf2 = b"next dgram";
+
+    // 2 self events + 1 recv
+    let entry1 = opcode::SendZc::new(Fd(fd), buf1.as_ptr(), buf1.len() as _)
+        .dest_addr(dest_addr.as_ptr())
+        .dest_addr_len(dest_addr.len())
+        .build()
+        .user_data(33)
+        .into();
+    // 2 self events + 1recv
+    let entry2 = opcode::SendZc::new(Fd(fd), buf2.as_ptr(), buf2.len() as _)
+        .dest_addr(dest_addr.as_ptr())
+        .dest_addr_len(dest_addr.len())
+        .build()
+        .user_data(44)
+        .into();
+
+    unsafe {
+        ring.submission()
+            .push_multiple(&[entry1, entry2])?;
+    }
+
+    // Check the completion events for the two UDP messages, plus a trailing
+    // CQE signaling that we ran out of buffers.
+    ring.submitter().submit_and_wait(3)?;
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 7);
+
+    // first ZeroCopy notification for 33
+    assert_eq!(cqes[0].result(), 11);
+    assert_eq!(cqes[0].user_data(), 33);
+    assert_eq!(cqueue::more(cqes[0].flags()), true);
+
+    // first ZeroCopy notification for 44
+    assert_eq!(cqes[1].result(), 10);
+    assert_eq!(cqes[1].user_data(), 44);
+    assert_eq!(cqueue::more(cqes[1].flags()), true);
+
+    // RecvMulti for 3
+    let buf_index_1 = cqueue::buffer_select(cqes[2].flags()).unwrap();
+    assert_eq!(cqes[2].result(), 11);
+    assert_eq!(cqes[2].user_data(), 3);
+    assert_eq!(&buffers[buf_index_1 as usize][..11], buf1);
+
+    // RecvMulti for 3
+    let buf_index_2 = cqueue::buffer_select(cqes[3].flags()).unwrap();
+    assert_eq!(cqes[3].result(), 10);
+    assert_eq!(cqes[3].user_data(), 3);
+    assert_eq!(&buffers[buf_index_2 as usize][..10], buf2);
+
+    // last ZeroCopy notification for 44
+    assert_eq!(cqes[4].result(), 0);
+    assert_eq!(cqes[4].user_data(), 44);
+    // no more notification
+    assert_eq!(cqueue::more(cqes[4].flags()), false);
+
+    // last ZeroCopy notification for 33
+    assert_eq!(cqes[5].result(), 0);
+    assert_eq!(cqes[5].user_data(), 33);
+    // no more notification
+    assert_eq!(cqueue::more(cqes[5].flags()), false);
+
+    // all provided bufs exhausted
+    assert_eq!(cqes[6].result(), -libc::ENOBUFS);
+    assert_eq!(cqes[6].user_data(), 3);
+    assert_eq!(cqes[6].flags(), 0);
 
     Ok(())
 }
