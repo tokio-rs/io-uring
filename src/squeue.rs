@@ -63,7 +63,6 @@ fn test_entry_sizes() {
 
 bitflags! {
     /// Submission flags
-    #[derive(Debug, PartialEq, Eq)]
     pub struct Flags: u8 {
         /// When this flag is specified,
         /// `fd` is an index into the files array registered with the io_uring instance.

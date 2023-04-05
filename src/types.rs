@@ -87,7 +87,6 @@ bitflags! {
     /// The default behavior when the timeout expires is to return a CQE with -libc::ETIME in
     /// the res field. To change this behavior to have zero returned, include
     /// [`types::TimeoutFlags::ETIME_SUCCESS`].
-    #[derive(Debug, PartialEq, Eq)]
     pub struct TimeoutFlags: u32 {
         const ABS = sys::IORING_TIMEOUT_ABS;
 
@@ -103,7 +102,6 @@ bitflags! {
 
 bitflags! {
     /// Options for [`Fsync`](super::Fsync).
-    #[derive(Debug, PartialEq, Eq)]
     pub struct FsyncFlags: u32 {
         const DATASYNC = sys::IORING_FSYNC_DATASYNC;
     }
@@ -112,7 +110,6 @@ bitflags! {
 bitflags! {
     /// Options for [`AsyncCancel`](super::AsyncCancel) and
     /// [`Submitter::register_sync_cancel`](super::Submitter::register_sync_cancel).
-    #[derive(Debug, PartialEq, Eq)]
     pub(crate) struct AsyncCancelFlags: u32 {
         /// Cancel all requests that match the given criteria, rather
         /// than just canceling the first one found.
