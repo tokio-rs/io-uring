@@ -23,9 +23,7 @@ use std::{cmp, io, mem};
 use std::os::unix::io::{AsFd, BorrowedFd};
 
 pub use cqueue::CompletionQueue;
-use cqueue::Sealed as _;
 pub use register::Probe;
-use squeue::Sealed as _;
 pub use squeue::SubmissionQueue;
 pub use submit::Submitter;
 use util::{Mmap, OwnedFd};
@@ -75,44 +73,17 @@ impl IoUring<squeue::Entry, cqueue::Entry> {
     pub fn new(entries: u32) -> io::Result<Self> {
         Self::builder().build(entries)
     }
-
-    /// Create a [`Builder`] for an `IoUring` instance.
-    ///
-    /// This allows for further customization than [`new`](Self::new).
-    #[must_use]
-    pub fn builder() -> Builder<squeue::Entry, cqueue::Entry> {
-        Builder {
-            dontfork: false,
-            params: sys::io_uring_params {
-                flags: squeue::Entry::ADDITIONAL_FLAGS | cqueue::Entry::ADDITIONAL_FLAGS,
-                ..Default::default()
-            },
-            phantom: PhantomData,
-        }
-    }
 }
 
 impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
-    /// Create a new `IoUring` instance with default configuration parameters. See [`Builder`] to
-    /// customize it further.
-    ///
-    /// The `entries` sets the size of queue,
-    /// and its value should be the power of two.
-    ///
-    /// Unlike [`IoUring::new`], this function is available for any combination of submission queue
-    /// entry (SQE) and completion queue entry (CQE) types.
-    pub fn generic_new(entries: u32) -> io::Result<Self> {
-        Self::generic_builder().build(entries)
-    }
-
     /// Create a [`Builder`] for an `IoUring` instance.
     ///
-    /// This allows for further customization than [`generic_new`](Self::generic_new).
+    /// This allows for further customization than [`new`](Self::new).
     ///
-    /// Unlike [`IoUring::builder`], this function is available for any combination of submission
+    /// Unlike [`IoUring::new`], this function is available for any combination of submission
     /// queue entry (SQE) and completion queue entry (CQE) types.
     #[must_use]
-    pub fn generic_builder() -> Builder<S, C> {
+    pub fn builder() -> Builder<S, C> {
         Builder {
             dontfork: false,
             params: sys::io_uring_params {

@@ -16,7 +16,7 @@ fn main() -> anyhow::Result<()> {
 
     #[cfg(not(feature = "ci"))]
     {
-        match IoUring::<squeue::Entry128, cqueue::Entry>::generic_new(entries) {
+        match IoUring::<squeue::Entry128, cqueue::Entry>::builder().build(entries) {
             Ok(r) => test(r)?,
             Err(e) => {
                 println!(
@@ -27,12 +27,8 @@ fn main() -> anyhow::Result<()> {
                 return Ok(());
             }
         };
-        test(IoUring::<squeue::Entry, cqueue::Entry32>::generic_new(
-            entries,
-        )?)?;
-        test(IoUring::<squeue::Entry128, cqueue::Entry32>::generic_new(
-            entries,
-        )?)?;
+        test(IoUring::<squeue::Entry, cqueue::Entry32>::builder().build(entries)?)?;
+        test(IoUring::<squeue::Entry128, cqueue::Entry32>::builder().build(entries)?)?;
     }
 
     Ok(())

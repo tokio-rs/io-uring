@@ -1,6 +1,6 @@
 [package]
 name = "io-uring"
-version = "0.6.0-pre"
+version = "0.6.0"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -17,13 +17,12 @@ exclude = []
 members = [ "io-uring-test", "io-uring-bench" ]
 
 [features]
-unstable = []
 overwrite = [ "bindgen" ]
 direct-syscall = [ "sc" ]
 io_safety = []
 
 [dependencies]
-bitflags = "1"
+bitflags = "2"
 libc = { version = "0.2.98", default-features = false }
 sc = { version = "0.2", optional = true }
 
