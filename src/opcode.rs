@@ -1646,6 +1646,9 @@ opcode!(
 opcode!(
     /// Send a zerocopy message on a socket, equivalent to `send(2)`.
     ///
+    /// When `dest_addr` is non-zero it points to the address of the target with `dest_addr_len`
+    /// specifying its size, turning the request into a `sendto(2)`
+    ///
     /// A fixed (pre-mapped) buffer can optionally be used from pre-mapped buffers that have been
     /// previously registered with [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     pub struct SendZc {
