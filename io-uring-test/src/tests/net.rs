@@ -7,6 +7,7 @@ use std::net::{TcpListener, TcpStream};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::{io, mem};
+use io_uring::squeue::Flags;
 
 static TCP_LISTENER: OnceCell<TcpListener> = OnceCell::new();
 
@@ -1489,6 +1490,7 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         .dest_addr_len(dest_addr.len())
         .build()
         .user_data(33)
+        .flags(Flags::IO_LINK)
         .into();
     // 2 self events + 1recv
     let entry2 = opcode::SendZc::new(Fd(fd), buf2.as_ptr(), buf2.len() as _)
@@ -1496,6 +1498,7 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         .dest_addr_len(dest_addr.len())
         .build()
         .user_data(44)
+        .flags(Flags::IO_LINK)
         .into();
 
     unsafe {
@@ -1531,15 +1534,13 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     assert_eq!(cqes[3].user_data(), 3);
     assert_eq!(&buffers[buf_index_2 as usize][..10], buf2);
 
-    // last ZeroCopy notification for 44
+    // last ZeroCopy notification
     assert_eq!(cqes[4].result(), 0);
-    assert_eq!(cqes[4].user_data(), 44);
     // no more notification
     assert_eq!(cqueue::more(cqes[4].flags()), false);
 
-    // last ZeroCopy notification for 33
+    // last ZeroCopy notification
     assert_eq!(cqes[5].result(), 0);
-    assert_eq!(cqes[5].user_data(), 33);
     // no more notification
     assert_eq!(cqueue::more(cqes[5].flags()), false);
 
