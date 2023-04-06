@@ -110,11 +110,11 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
             let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
             let cq_len = p.cq_off.cqes as usize + p.cq_entries as usize * mem::size_of::<C>();
             let sqe_len = p.sq_entries as usize * mem::size_of::<S>();
-            let sqe_mmap = Mmap::new(fd, sys::IORING_OFF_SQES as _, sqe_len)?;
+            let sqe_mmap = Mmap::new(fd, sys::IORING_OFF_SQES.into(), sqe_len)?;
 
             if p.features & sys::IORING_FEAT_SINGLE_MMAP != 0 {
                 let scq_mmap =
-                    Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, cmp::max(sq_len, cq_len))?;
+                    Mmap::new(fd, sys::IORING_OFF_SQ_RING.into(), cmp::max(sq_len, cq_len))?;
 
                 let sq = squeue::Inner::new(&scq_mmap, &sqe_mmap, p);
                 let cq = cqueue::Inner::new(&scq_mmap, p);
@@ -126,8 +126,8 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
 
                 Ok((mm, sq, cq))
             } else {
-                let sq_mmap = Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, sq_len)?;
-                let cq_mmap = Mmap::new(fd, sys::IORING_OFF_CQ_RING as _, cq_len)?;
+                let sq_mmap = Mmap::new(fd, sys::IORING_OFF_SQ_RING.into(), sq_len)?;
+                let cq_mmap = Mmap::new(fd, sys::IORING_OFF_CQ_RING.into(), cq_len)?;
 
                 let sq = squeue::Inner::new(&sq_mmap, &sqe_mmap, p);
                 let cq = cqueue::Inner::new(&cq_mmap, p);

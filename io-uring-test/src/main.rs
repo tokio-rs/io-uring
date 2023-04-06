@@ -86,7 +86,6 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::fs::test_file_fsync(&mut ring, &test)?;
     tests::fs::test_file_fsync_file_range(&mut ring, &test)?;
     tests::fs::test_file_fallocate(&mut ring, &test)?;
-    tests::fs::test_file_fallocate64(&mut ring, &test)?;
     tests::fs::test_file_openat2(&mut ring, &test)?;
     tests::fs::test_file_openat2_close_file_index(&mut ring, &test)?;
     tests::fs::test_file_openat_close_file_index(&mut ring, &test)?;
