@@ -1,7 +1,7 @@
 //! Some register syscall related types or parameters.
 
 use std::os::unix::io::RawFd;
-use std::{fmt, io, mem, ptr};
+use std::{fmt, io};
 
 use crate::sys;
 
@@ -17,39 +17,31 @@ pub(crate) fn execute(
 /// Information about what `io_uring` features the kernel supports.
 ///
 /// You can fill this in with [`register_probe`](crate::Submitter::register_probe).
-pub struct Probe(ptr::NonNull<sys::io_uring_probe>);
+pub struct Probe(ProbeAndOps);
+
+#[repr(C)]
+struct ProbeAndOps(sys::io_uring_probe, [sys::io_uring_probe_op; 256]);
 
 impl Probe {
     pub(crate) const COUNT: usize = 256;
-    pub(crate) const SIZE: usize = mem::size_of::<sys::io_uring_probe>()
-        + Self::COUNT * mem::size_of::<sys::io_uring_probe_op>();
 
     /// Create a new probe with no features enabled.
-    #[allow(clippy::cast_ptr_alignment)]
     pub fn new() -> Probe {
-        use std::alloc::{alloc_zeroed, Layout};
-
-        let probe_align = Layout::new::<sys::io_uring_probe>().align();
-        let ptr = unsafe {
-            let probe_layout = Layout::from_size_align_unchecked(Probe::SIZE, probe_align);
-            alloc_zeroed(probe_layout)
-        };
-
-        ptr::NonNull::new(ptr)
-            .map(ptr::NonNull::cast)
-            .map(Probe)
-            .expect("Probe alloc failed!")
+        Probe(ProbeAndOps(
+            sys::io_uring_probe::default(),
+            [sys::io_uring_probe_op::default(); 256],
+        ))
     }
 
     #[inline]
     pub(crate) fn as_mut_ptr(&mut self) -> *mut sys::io_uring_probe {
-        self.0.as_ptr()
+        &mut (self.0).0
     }
 
     /// Get whether a specific opcode is supported.
     pub fn is_supported(&self, opcode: u8) -> bool {
         unsafe {
-            let probe = &*self.0.as_ptr();
+            let probe = &(self.0).0;
 
             if opcode <= probe.last_op {
                 let ops = probe.ops.as_slice(Self::COUNT);
@@ -79,7 +71,7 @@ impl fmt::Debug for Probe {
             }
         }
 
-        let probe = unsafe { &*self.0.as_ptr() };
+        let probe = &(self.0).0;
         let list = unsafe { probe.ops.as_slice(probe.last_op as usize + 1) };
         let list = list
             .iter()
@@ -87,18 +79,6 @@ impl fmt::Debug for Probe {
             .map(|&op| Op(op));
 
         f.debug_set().entries(list).finish()
-    }
-}
-
-impl Drop for Probe {
-    fn drop(&mut self) {
-        use std::alloc::{dealloc, Layout};
-
-        let probe_align = Layout::new::<sys::io_uring_probe>().align();
-        unsafe {
-            let probe_layout = Layout::from_size_align_unchecked(Probe::SIZE, probe_align);
-            dealloc(self.0.as_ptr() as *mut _, probe_layout);
-        }
     }
 }
 
@@ -154,3 +134,20 @@ impl Restriction {
 /// File descriptors can be skipped if they are set to `SKIP_FILE`.
 /// Skipping an fd will not touch the file associated with the previous fd at that index.
 pub const SKIP_FILE: RawFd = sys::IORING_REGISTER_FILES_SKIP;
+
+#[test]
+fn test_probe_layout() {
+    use std::alloc::Layout;
+    use std::mem;
+
+    let probe = Probe::new();
+    assert_eq!(
+        Layout::new::<sys::io_uring_probe>().size()
+            + mem::size_of::<sys::io_uring_probe_op>() * 256,
+        Layout::for_value(&probe.0).size()
+    );
+    assert_eq!(
+        Layout::new::<sys::io_uring_probe>().align(),
+        Layout::for_value(&probe.0).align()
+    );
+}
