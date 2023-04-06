@@ -405,6 +405,7 @@ impl<'buf> RecvMsgOut<'buf> {
     /// `buffer` is the whole buffer previously provided to the ring, while `msghdr`
     /// is the same content provided as input to the corresponding SQE
     /// (only `msg_namelen` and `msg_controllen` fields are relevant).
+    #[allow(clippy::result_unit_err)]
     pub fn parse(buffer: &'buf [u8], msghdr: &libc::msghdr) -> Result<Self, ()> {
         if buffer.len() < std::mem::size_of::<sys::io_uring_recvmsg_out>() {
             return Err(());
