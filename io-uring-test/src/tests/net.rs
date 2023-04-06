@@ -1400,7 +1400,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
             .name_data()
             .as_ptr()
             .cast::<libc::sockaddr_storage>()
-            .read();
+            .read_unaligned();
         let len = msg0.name_data().len().try_into().unwrap();
         socket2::SockAddr::new(storage, len)
     };
@@ -1419,7 +1419,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
             .name_data()
             .as_ptr()
             .cast::<libc::sockaddr_storage>()
-            .read();
+            .read_unaligned();
         let len = msg1.name_data().len().try_into().unwrap();
         socket2::SockAddr::new(storage, len)
     };
