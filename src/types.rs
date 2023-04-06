@@ -410,8 +410,12 @@ impl<'buf> RecvMsgOut<'buf> {
             return Err(());
         }
         // SAFETY: buffer (minimum) length is checked here above.
-        let header: sys::io_uring_recvmsg_out =
-            unsafe { std::ptr::read_unaligned(buffer.as_ptr() as _) };
+        let header = unsafe {
+            buffer
+                .as_ptr()
+                .cast::<sys::io_uring_recvmsg_out>()
+                .read_unaligned()
+        };
 
         let msghdr_name_len = msghdr.msg_namelen as _;
         let msghdr_control_len = msghdr.msg_controllen as _;

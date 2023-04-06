@@ -100,7 +100,7 @@ fn sqe_zeroed() -> sys::io_uring_sqe {
     unsafe { std::mem::zeroed() }
 }
 
-opcode!{
+opcode! {
     /// Do not perform any I/O.
     ///
     /// This is useful for testing the performance of the io_uring implementation itself.
@@ -119,7 +119,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Vectored read, equivalent to `preadv2(2)`.
     #[derive(Debug)]
     pub struct Readv {
@@ -158,7 +158,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Vectored write, equivalent to `pwritev2(2)`.
     #[derive(Debug)]
     pub struct Writev {
@@ -194,7 +194,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// File sync, equivalent to `fsync(2)`.
     ///
     /// Note that, while I/O is initiated in the order in which it appears in the submission queue,
@@ -226,7 +226,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Read from pre-mapped buffers that have been previously registered with
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
@@ -270,7 +270,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Write to pre-mapped buffers that have been previously registered with
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
@@ -314,7 +314,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Poll the specified fd.
     ///
     /// Unlike poll or epoll without `EPOLLONESHOT`, this interface defaults to work in one shot mode.
@@ -363,7 +363,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Remove an existing [poll](PollAdd) request.
     ///
     /// If found, the `result` method of the `cqueue::Entry` will return 0.
@@ -387,7 +387,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Sync a file segment with disk, equivalent to `sync_file_range(2)`.
     #[derive(Debug)]
     pub struct SyncFileRange {
@@ -419,7 +419,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Send a message on a socket, equivalent to `send(2)`.
     ///
     /// fd must be set to the socket file descriptor, addr must contains a pointer to the msghdr
@@ -449,7 +449,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Receive a message on a socket, equivalent to `recvmsg(2)`.
     ///
     /// See also the description of [`SendMsg`].
@@ -480,7 +480,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Receive multiple messages on a socket, equivalent to `recvmsg(2)`.
     ///
     /// Parameters:
@@ -531,7 +531,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Register a timeout operation.
     ///
     /// A timeout will trigger a wakeup event on the completion ring for anyone waiting for events.
@@ -569,7 +569,7 @@ opcode!{
 
 // === 5.5 ===
 
-opcode!{
+opcode! {
     /// Attempt to remove an existing [timeout operation](Timeout).
     pub struct TimeoutRemove {
         user_data: { u64 },
@@ -589,7 +589,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Attempt to update an existing [timeout operation](Timeout) with a new timespec.
     /// The optional `count` value of the original timeout value cannot be updated.
     pub struct TimeoutUpdate {
@@ -614,7 +614,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Accept a new connection on a socket, equivalent to `accept4(2)`.
     pub struct Accept {
         fd: { impl sealed::UseFixed },
@@ -643,7 +643,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Accept multiple new connections on a socket.
     ///
     /// Set the `allocate_file_index` property if fixed file table entries should be used.
@@ -673,7 +673,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Attempt to cancel an already issued request.
     pub struct AsyncCancel {
         user_data: { u64 }
@@ -695,7 +695,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// This request must be linked with another request through
     /// [`Flags::IO_LINK`](crate::squeue::Flags::IO_LINK) which is described below.
     /// Unlike [`Timeout`], [`LinkTimeout`] acts on the linked request, not the completion queue.
@@ -720,7 +720,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Connect a socket, equivalent to `connect(2)`.
     pub struct Connect {
         fd: { impl sealed::UseFixed },
@@ -745,7 +745,7 @@ opcode!{
 
 // === 5.6 ===
 
-opcode!{
+opcode! {
     /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
     pub struct Fallocate {
         fd: { impl sealed::UseFixed },
@@ -770,7 +770,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Open a file, equivalent to `openat(2)`.
     pub struct OpenAt {
         dirfd: { impl sealed::UseFd },
@@ -799,7 +799,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Close a file descriptor, equivalent to `close(2)`.
     ///
     /// Use a types::Fixed(fd) argument to close an io_uring direct descriptor.
@@ -826,7 +826,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// This command is an alternative to using
     /// [`Submitter::register_files_update`](crate::Submitter::register_files_update) which then
     /// works in an async fashion, like the rest of the io_uring commands.
@@ -852,7 +852,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Get file status, equivalent to `statx(2)`.
     pub struct Statx {
         dirfd: { impl sealed::UseFd },
@@ -882,7 +882,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
     ///
     /// * `fd` is the file descriptor to be operated on,
@@ -932,7 +932,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
     ///
     /// * `fd` is the file descriptor to be operated on,
@@ -979,7 +979,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Predeclare an access pattern for file data, equivalent to `posix_fadvise(2)`.
     pub struct Fadvise {
         fd: { impl sealed::UseFixed },
@@ -1004,7 +1004,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Give advice about use of memory, equivalent to `madvise(2)`.
     pub struct Madvise {
         addr: { *const libc::c_void },
@@ -1028,7 +1028,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Send a message on a socket, equivalent to `send(2)`.
     pub struct Send {
         fd: { impl sealed::UseFixed },
@@ -1053,7 +1053,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Receive a message from a socket, equivalent to `recv(2)`.
     pub struct Recv {
         fd: { impl sealed::UseFixed },
@@ -1080,7 +1080,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Receive multiple messages from a socket, equivalent to `recv(2)`.
     ///
     /// Parameter:
@@ -1119,7 +1119,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Open a file, equivalent to `openat2(2)`.
     pub struct OpenAt2 {
         dirfd: { impl sealed::UseFd },
@@ -1147,7 +1147,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Modify an epoll file descriptor, equivalent to `epoll_ctl(2)`.
     pub struct EpollCtl {
         epfd: { impl sealed::UseFixed },
@@ -1174,7 +1174,7 @@ opcode!{
 
 // === 5.7 ===
 
-opcode!{
+opcode! {
     /// Splice data to/from a pipe, equivalent to `splice(2)`.
     ///
     /// if `fd_in` refers to a pipe, `off_in` must be `-1`;
@@ -1215,7 +1215,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Register `nbufs` buffers that each have the length `len` with ids starting from `big` in the
     /// group `bgid` that can be used for any request. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
@@ -1244,7 +1244,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Remove some number of buffers from a buffer group. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     pub struct RemoveBuffers {
@@ -1268,7 +1268,7 @@ opcode!{
 
 // === 5.8 ===
 
-opcode!{
+opcode! {
     /// Duplicate pipe content, equivalent to `tee(2)`.
     pub struct Tee {
         fd_in: { impl sealed::UseFixed },
@@ -1305,7 +1305,7 @@ opcode!{
 
 // === 5.11 ===
 
-opcode!{
+opcode! {
     /// Shut down all or part of a full duplex connection on a socket, equivalent to `shutdown(2)`.
     /// Available since kernel 5.11.
     pub struct Shutdown {
@@ -1327,7 +1327,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     // Change the name or location of a file, equivalent to `renameat2(2)`.
     // Available since kernel 5.11.
     pub struct RenameAt {
@@ -1359,7 +1359,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     // Delete a name and possible the file it refers to, equivalent to `unlinkat(2)`.
     // Available since kernel 5.11.
     pub struct UnlinkAt {
@@ -1385,7 +1385,7 @@ opcode!{
 
 // === 5.15 ===
 
-opcode!{
+opcode! {
     /// Make a directory, equivalent to `mkdirat2(2)`.
     pub struct MkDirAt {
         dirfd: { impl sealed::UseFd },
@@ -1408,7 +1408,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Create a symlink, equivalent to `symlinkat2(2)`.
     pub struct SymlinkAt {
         newdirfd: { impl sealed::UseFd },
@@ -1431,7 +1431,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// Create a hard link, equivalent to `linkat2(2)`.
     pub struct LinkAt {
         olddirfd: { impl sealed::UseFd },
@@ -1460,7 +1460,7 @@ opcode!{
 
 // === 5.18 ===
 
-opcode!{
+opcode! {
     /// Send a message (with data) to a target ring.
     pub struct MsgRingData {
         ring_fd: { impl sealed::UseFd },
@@ -1493,7 +1493,7 @@ opcode!{
 
 // === 5.19 ===
 
-opcode!{
+opcode! {
     /// A file/device-specific 16-byte command, akin (but not equivalent) to `ioctl(2)`.
     pub struct UringCmd16 {
         fd: { impl sealed::UseFixed },
@@ -1517,7 +1517,7 @@ opcode!{
     }
 }
 
-opcode!{
+opcode! {
     /// A file/device-specific 80-byte command, akin (but not equivalent) to `ioctl(2)`.
     pub struct UringCmd80 {
         fd: { impl sealed::UseFixed },
@@ -1546,7 +1546,7 @@ opcode!{
 
 // === 5.19 ===
 
-opcode!{
+opcode! {
     /// Create an endpoint for communication, equivalent to `socket(2)`.
     ///
     /// If the `file_index` argument is set, the resulting socket is
@@ -1583,7 +1583,7 @@ opcode!{
 
 // === 6.0 ===
 
-opcode!{
+opcode! {
     /// Send a message (with fixed FD) to a target ring.
     pub struct MsgRingSendFd {
         ring_fd: { impl sealed::UseFd },
@@ -1615,7 +1615,7 @@ opcode!{
 
 // === 6.0 ===
 
-opcode!{
+opcode! {
     /// Send a zerocopy message on a socket, equivalent to `send(2)`.
     ///
     /// When `dest_addr` is non-zero it points to the address of the target with `dest_addr_len`
@@ -1665,7 +1665,7 @@ opcode!{
 
 // === 6.1 ===
 
-opcode!{
+opcode! {
     /// Send a zerocopy message on a socket, equivalent to `send(2)`.
     ///
     /// fd must be set to the socket file descriptor, addr must contains a pointer to the msghdr
