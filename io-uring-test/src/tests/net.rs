@@ -1,12 +1,12 @@
 use crate::utils;
 use crate::Test;
+use io_uring::types::Fd;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
 use std::net::{TcpListener, TcpStream};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::{io, mem};
-use io_uring::types::Fd;
 
 static TCP_LISTENER: OnceCell<TcpListener> = OnceCell::new();
 
@@ -1471,9 +1471,9 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     }
 
     let recvmsg_e = opcode::RecvMulti::new(Fd(server_socket.as_raw_fd()), BUF_GROUP)
-            .build()
-            .user_data(3)
-            .into();
+        .build()
+        .user_data(3)
+        .into();
     unsafe { ring.submission().push(&recvmsg_e)? };
     ring.submitter().submit()?;
 
@@ -1499,8 +1499,7 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         .into();
 
     unsafe {
-        ring.submission()
-            .push_multiple(&[entry1, entry2])?;
+        ring.submission().push_multiple(&[entry1, entry2])?;
     }
 
     // Check the completion events for the two UDP messages, plus a trailing
