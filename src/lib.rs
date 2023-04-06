@@ -87,7 +87,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
         Builder {
             dontfork: false,
             params: sys::io_uring_params {
-                flags: S::ADDITIONAL_FLAGS | C::ADDITIONAL_FLAGS,
+                flags: S::BUILD_FLAGS | C::BUILD_FLAGS,
                 ..Default::default()
             },
             phantom: PhantomData,

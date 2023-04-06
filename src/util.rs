@@ -2,6 +2,12 @@ use std::os::unix::io::AsRawFd;
 use std::sync::atomic;
 use std::{io, ptr};
 
+pub(crate) mod private {
+    /// Private trait that we use as a supertrait of `EntryMarker` to prevent it from being
+    /// implemented from outside this crate: https://jack.wrenn.fyi/blog/private-trait-methods/
+    pub trait Sealed {}
+}
+
 /// A region of memory mapped using `mmap(2)`.
 pub struct Mmap {
     addr: ptr::NonNull<libc::c_void>,

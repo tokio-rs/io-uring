@@ -6,7 +6,7 @@ use std::mem;
 use std::sync::atomic;
 
 use crate::sys;
-use crate::util::{unsync_load, Mmap};
+use crate::util::{private, unsync_load, Mmap};
 
 use bitflags::bitflags;
 
@@ -28,19 +28,12 @@ pub struct SubmissionQueue<'a, E: EntryMarker = Entry> {
     queue: &'a Inner<E>,
 }
 
-pub(crate) use private::Sealed;
-mod private {
-    /// Private trait that we use as a supertrait of `EntryMarker` to prevent it from being
-    /// implemented from outside this crate: https://jack.wrenn.fyi/blog/private-trait-methods/
-    pub trait Sealed {
-        const ADDITIONAL_FLAGS: u32;
-    }
-}
-
 /// A submission queue entry (SQE), representing a request for an I/O operation.
 ///
 /// This is implemented for [`Entry`] and [`Entry128`].
-pub trait EntryMarker: Clone + Debug + From<Entry> + Sealed {}
+pub trait EntryMarker: Clone + Debug + From<Entry> + private::Sealed {
+    const BUILD_FLAGS: u32;
+}
 
 /// A 64-byte submission queue entry (SQE), representing a request for an I/O operation.
 ///
@@ -321,11 +314,11 @@ impl Entry {
     }
 }
 
-impl Sealed for Entry {
-    const ADDITIONAL_FLAGS: u32 = 0;
-}
+impl private::Sealed for Entry {}
 
-impl EntryMarker for Entry {}
+impl EntryMarker for Entry {
+    const BUILD_FLAGS: u32 = 0;
+}
 
 impl Clone for Entry {
     fn clone(&self) -> Entry {
@@ -368,11 +361,11 @@ impl Entry128 {
     }
 }
 
-impl Sealed for Entry128 {
-    const ADDITIONAL_FLAGS: u32 = sys::IORING_SETUP_SQE128;
-}
+impl private::Sealed for Entry128 {}
 
-impl EntryMarker for Entry128 {}
+impl EntryMarker for Entry128 {
+    const BUILD_FLAGS: u32 = sys::IORING_SETUP_SQE128;
+}
 
 impl From<Entry> for Entry128 {
     fn from(entry: Entry) -> Entry128 {

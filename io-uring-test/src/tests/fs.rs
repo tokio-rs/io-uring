@@ -121,7 +121,6 @@ pub fn test_file_fsync_file_range<S: squeue::EntryMarker, C: cqueue::EntryMarker
     Ok(())
 }
 
-#[allow(deprecated)]
 pub fn test_file_fallocate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,

@@ -6,7 +6,7 @@ use std::mem::MaybeUninit;
 use std::sync::atomic;
 
 use crate::sys;
-use crate::util::{unsync_load, Mmap};
+use crate::util::{private, unsync_load, Mmap};
 
 pub(crate) struct Inner<E: EntryMarker> {
     head: *const atomic::AtomicU32,
@@ -29,19 +29,12 @@ pub struct CompletionQueue<'a, E: EntryMarker = Entry> {
     queue: &'a Inner<E>,
 }
 
-pub(crate) use private::Sealed;
-mod private {
-    /// Private trait that we use as a supertrait of `EntryMarker` to prevent it from being
-    /// implemented from outside this crate: https://jack.wrenn.fyi/blog/private-trait-methods/
-    pub trait Sealed {
-        const ADDITIONAL_FLAGS: u32;
-    }
-}
-
 /// A completion queue entry (CQE), representing a complete I/O operation.
 ///
 /// This is implemented for [`Entry`] and [`Entry32`].
-pub trait EntryMarker: Clone + Debug + Into<Entry> + Sealed {}
+pub trait EntryMarker: Clone + Debug + Into<Entry> + private::Sealed {
+    const BUILD_FLAGS: u32;
+}
 
 /// A 16-byte completion queue entry (CQE), representing a complete I/O operation.
 #[repr(C)]
@@ -224,11 +217,11 @@ impl Entry {
     }
 }
 
-impl Sealed for Entry {
-    const ADDITIONAL_FLAGS: u32 = 0;
-}
+impl private::Sealed for Entry {}
 
-impl EntryMarker for Entry {}
+impl EntryMarker for Entry {
+    const BUILD_FLAGS: u32 = 0;
+}
 
 impl Clone for Entry {
     fn clone(&self) -> Entry {
@@ -279,11 +272,11 @@ impl Entry32 {
     }
 }
 
-impl Sealed for Entry32 {
-    const ADDITIONAL_FLAGS: u32 = sys::IORING_SETUP_CQE32;
-}
+impl private::Sealed for Entry32 {}
 
-impl EntryMarker for Entry32 {}
+impl EntryMarker for Entry32 {
+    const BUILD_FLAGS: u32 = sys::IORING_SETUP_CQE32;
+}
 
 impl From<Entry32> for Entry {
     fn from(entry32: Entry32) -> Self {
