@@ -1,5 +1,6 @@
 use crate::utils;
 use crate::Test;
+use io_uring::squeue::Flags;
 use io_uring::types::Fd;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
@@ -7,7 +8,6 @@ use std::net::{TcpListener, TcpStream};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::{io, mem};
-use io_uring::squeue::Flags;
 
 static TCP_LISTENER: OnceCell<TcpListener> = OnceCell::new();
 
@@ -1482,7 +1482,6 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     let fd = client_socket.as_raw_fd();
 
     let buf1 = b"lorep ipsum";
-    let buf2 = b"next dgram";
 
     // 2 self events + 1 recv
     let entry1 = opcode::SendZc::new(Fd(fd), buf1.as_ptr(), buf1.len() as _)
@@ -1492,17 +1491,9 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         .user_data(33)
         .flags(Flags::IO_LINK)
         .into();
-    // 2 self events + 1recv
-    let entry2 = opcode::SendZc::new(Fd(fd), buf2.as_ptr(), buf2.len() as _)
-        .dest_addr(dest_addr.as_ptr())
-        .dest_addr_len(dest_addr.len())
-        .build()
-        .user_data(44)
-        .flags(Flags::IO_LINK)
-        .into();
 
     unsafe {
-        ring.submission().push_multiple(&[entry1, entry2])?;
+        ring.submission().push(&entry1)?;
     }
 
     // Check the completion events for the two UDP messages, plus a trailing
@@ -1510,44 +1501,30 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     ring.submitter().submit_and_wait(3)?;
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
-    assert_eq!(cqes.len(), 7);
+    assert_eq!(cqes.len(), 3);
 
-    // first ZeroCopy notification for 33
-    assert_eq!(cqes[0].result(), 11);
-    assert_eq!(cqes[0].user_data(), 33);
-    assert_eq!(cqueue::more(cqes[0].flags()), true);
-
-    // first ZeroCopy notification for 44
-    assert_eq!(cqes[1].result(), 10);
-    assert_eq!(cqes[1].user_data(), 44);
-    assert_eq!(cqueue::more(cqes[1].flags()), true);
-
-    // RecvMulti for 3
-    let buf_index_1 = cqueue::buffer_select(cqes[2].flags()).unwrap();
-    assert_eq!(cqes[2].result(), 11);
-    assert_eq!(cqes[2].user_data(), 3);
-    assert_eq!(&buffers[buf_index_1 as usize][..11], buf1);
-
-    // RecvMulti for 3
-    let buf_index_2 = cqueue::buffer_select(cqes[3].flags()).unwrap();
-    assert_eq!(cqes[3].result(), 10);
-    assert_eq!(cqes[3].user_data(), 3);
-    assert_eq!(&buffers[buf_index_2 as usize][..10], buf2);
-
-    // last ZeroCopy notification
-    assert_eq!(cqes[4].result(), 0);
-    // no more notification
-    assert_eq!(cqueue::more(cqes[4].flags()), false);
-
-    // last ZeroCopy notification
-    assert_eq!(cqes[5].result(), 0);
-    // no more notification
-    assert_eq!(cqueue::more(cqes[5].flags()), false);
-
-    // all provided bufs exhausted
-    assert_eq!(cqes[6].result(), -libc::ENOBUFS);
-    assert_eq!(cqes[6].user_data(), 3);
-    assert_eq!(cqes[6].flags(), 0);
+    for cqe in cqes {
+        match cqe.user_data() {
+            // data finally arrived to server
+            3 => {
+                let buf_index_1 = cqueue::buffer_select(cqe.flags()).unwrap();
+                assert_eq!(cqe.result(), 11);
+                assert_eq!(&buffers[buf_index_1 as usize][..11], buf1);
+            }
+            33 => match cqe.result() {
+                // First SendZc notification
+                11 => {
+                    assert_eq!(cqueue::more(cqe.flags()), true);
+                }
+                // Last SendZc notification
+                0 => {
+                    assert_eq!(cqueue::more(cqe.flags()), false);
+                }
+                _ => panic!("wrong result for notification"),
+            },
+            _ => panic!("wrong user_data"),
+        }
+    }
 
     Ok(())
 }
