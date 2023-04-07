@@ -307,6 +307,12 @@ impl Entry {
         self
     }
 
+    /// Get the previously application-supplied user data.
+    #[inline]
+    pub fn get_user_data(&self) -> u64 {
+        self.0.user_data
+    }
+
     /// Set the personality of this event. You can obtain a personality using
     /// [`Submitter::register_personality`](crate::Submitter::register_personality).
     pub fn personality(mut self, personality: u16) -> Entry {
