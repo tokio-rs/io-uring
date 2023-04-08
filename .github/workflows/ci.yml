@@ -25,7 +25,7 @@ jobs:
         with:
           command: run
           use-cross: true
-          # Only run the test package on x86 until we find an ergonomic way 
+          # Only run the test package on x86 until we find an ergonomic way
           # to virtualize aarch64
           args: --package io-uring-test --features io-uring-test/ci --target x86_64-unknown-linux-gnu
 

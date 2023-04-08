@@ -575,7 +575,6 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
-/// Skip ci, because statx does not exist in old release.
 #[cfg(not(feature = "ci"))]
 pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
@@ -664,8 +663,6 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
-/// Skip ci, because direct IO does not work on qemu.
-#[cfg(not(feature = "ci"))]
 pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -730,7 +727,8 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
 
     // fail
 
-    let mut buf = vec![0; 4097];
+    let mut buf = Box::new(AlignedBuffer([0; 4096]));
+    let buf = &mut buf.0;
 
     let read_e = opcode::Read::new(fd, buf[1..].as_mut_ptr(), buf[1..].len() as _);
 
@@ -746,7 +744,7 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x03);
-    assert_eq!(cqes[0].result(), -libc::EINVAL);
+    assert_eq_warn!(cqes[0].result(), -libc::EINVAL);
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
-use std::{io, ptr};
+use std::{io, ptr, mem};
 
 use crate::register::{execute, Probe};
 use crate::sys;
@@ -91,7 +91,7 @@ impl<'a> Submitter<'a> {
         let arg = arg
             .map(|arg| cast_ptr(arg).cast())
             .unwrap_or_else(ptr::null);
-        let size = std::mem::size_of::<T>();
+        let size = mem::size_of::<T>();
         sys::io_uring_enter(
             self.fd.as_raw_fd(),
             to_submit,
@@ -192,7 +192,6 @@ impl<'a> Submitter<'a> {
     /// Registering a file table is a prerequisite for using any request that
     /// uses direct descriptors.
     pub fn register_files_sparse(&self, nr: u32) -> io::Result<()> {
-        use std::mem;
         let rr = sys::io_uring_rsrc_register {
             nr,
             flags: sys::IORING_RSRC_REGISTER_SPARSE,

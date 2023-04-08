@@ -90,7 +90,6 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::fs::test_file_openat2_close_file_index(&mut ring, &test)?;
     tests::fs::test_file_openat_close_file_index(&mut ring, &test)?;
     tests::fs::test_file_close(&mut ring, &test)?;
-    #[cfg(not(feature = "ci"))]
     tests::fs::test_file_direct_write_read(&mut ring, &test)?;
     #[cfg(not(feature = "ci"))]
     tests::fs::test_statx(&mut ring, &test)?;
@@ -115,17 +114,12 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::net::test_tcp_zero_copy_sendmsg_recvmsg(&mut ring, &test)?;
     tests::net::test_tcp_accept(&mut ring, &test)?;
     tests::net::test_tcp_accept_file_index(&mut ring, &test)?;
-    #[cfg(not(feature = "ci"))]
     tests::net::test_tcp_accept_multi(&mut ring, &test)?;
-    #[cfg(not(feature = "ci"))]
     tests::net::test_tcp_accept_multi_file_index(&mut ring, &test)?;
     tests::net::test_tcp_connect(&mut ring, &test)?;
     tests::net::test_tcp_buffer_select(&mut ring, &test)?;
-    #[cfg(not(feature = "ci"))]
     tests::net::test_tcp_buffer_select_recvmsg(&mut ring, &test)?;
-    #[cfg(not(feature = "ci"))]
     tests::net::test_tcp_buffer_select_readv(&mut ring, &test)?;
-    #[cfg(not(feature = "ci"))]
     tests::net::test_tcp_recv_multi(&mut ring, &test)?;
     tests::net::test_shutdown(&mut ring, &test)?;
     tests::net::test_socket(&mut ring, &test)?;
@@ -136,7 +130,6 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::poll::test_eventfd_poll(&mut ring, &test)?;
     tests::poll::test_eventfd_poll_remove(&mut ring, &test)?;
     tests::poll::test_eventfd_poll_remove_failed(&mut ring, &test)?;
-    #[cfg(not(feature = "ci"))]
     tests::poll::test_eventfd_poll_multi(&mut ring, &test)?;
 
     // regression test

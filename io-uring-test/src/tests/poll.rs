@@ -179,8 +179,6 @@ pub fn test_eventfd_poll_remove_failed<S: squeue::EntryMarker, C: cqueue::EntryM
     Ok(())
 }
 
-// Multi-shot only available since 5.13.
-#[cfg(not(feature = "ci"))]
 pub fn test_eventfd_poll_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,

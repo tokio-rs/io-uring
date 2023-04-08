@@ -550,8 +550,6 @@ pub fn test_tcp_accept_file_index<S: squeue::EntryMarker, C: cqueue::EntryMarker
     Ok(())
 }
 
-/// Skip ci, because multi accept does not exist in old release.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -585,12 +583,12 @@ pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
-    #[allow(clippy::needless_range_loop)]
-    for round in 0..=1 {
-        assert_eq!(cqes[round].user_data(), 2002);
-        assert!(cqes[round].result() >= 0);
 
-        let fd = cqes[round].result();
+    for cqe in cqes {
+        assert_eq!(cqe.user_data(), 2002);
+        assert!(cqe.result() >= 0);
+
+        let fd = cqe.result();
 
         unsafe {
             libc::close(fd);
@@ -628,8 +626,6 @@ pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
-/// Skip ci, because multi accept does not exist in old release.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_accept_multi_file_index<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -913,8 +909,6 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
-/// Skip ci, because buf group does not exist in old release.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_buffer_select_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -1005,8 +999,6 @@ pub fn test_tcp_buffer_select_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMa
     Ok(())
 }
 
-/// Skip ci, because buf group does not exist in old release.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_buffer_select_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -1082,8 +1074,6 @@ pub fn test_tcp_buffer_select_readv<S: squeue::EntryMarker, C: cqueue::EntryMark
     Ok(())
 }
 
-/// Skip ci, because recv multi feature does not exist in old release, requires 6.0.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,

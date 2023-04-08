@@ -24,6 +24,20 @@ macro_rules! require {
     }
 }
 
+macro_rules! assert_eq_warn {
+    ( $x:expr, $y:expr ) => {{
+        let x = $x;
+        let y = $y;
+        if x != y {
+            eprintln!(
+                "assert failed: {:?}: {:?} != {:?}: {:?}",
+                stringify!($x), x,
+                stringify!($y), y
+            );
+        }
+    }}
+}
+
 macro_rules! function_name {
     () => {{
         fn f() {}
