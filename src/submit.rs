@@ -1,6 +1,6 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
-use std::{io, ptr, mem};
+use std::{io, mem, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;

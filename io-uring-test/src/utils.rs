@@ -31,11 +31,13 @@ macro_rules! assert_eq_warn {
         if x != y {
             eprintln!(
                 "assert failed: {:?}: {:?} != {:?}: {:?}",
-                stringify!($x), x,
-                stringify!($y), y
+                stringify!($x),
+                x,
+                stringify!($y),
+                y
             );
         }
-    }}
+    }};
 }
 
 macro_rules! function_name {
