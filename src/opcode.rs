@@ -1589,7 +1589,6 @@ opcode! {
         ring_fd: { impl sealed::UseFd },
         fixed_slot_src: { types::Fixed },
         dest_slot_index: { types::DestinationSlot },
-        result: { i32 },
         user_data: { u64 },
         ;;
         opcode_flags: u32 = 0
@@ -1598,13 +1597,12 @@ opcode! {
     pub const CODE = sys::IORING_OP_MSG_RING;
 
     pub fn build(self) -> Entry {
-        let MsgRingSendFd { ring_fd, fixed_slot_src, dest_slot_index, result, user_data, opcode_flags } = self;
+        let MsgRingSendFd { ring_fd, fixed_slot_src, dest_slot_index, user_data, opcode_flags } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.__bindgen_anon_2.addr = sys::IORING_MSG_SEND_FD.into();
         sqe.fd = ring_fd;
-        sqe.len = result as u32;
         sqe.__bindgen_anon_1.off = user_data;
         unsafe { sqe.__bindgen_anon_6.__bindgen_anon_1.as_mut().addr3 = fixed_slot_src.0 as u64 };
         sqe.__bindgen_anon_5.file_index = dest_slot_index.kernel_index_arg();
