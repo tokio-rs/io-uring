@@ -557,6 +557,7 @@ pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     require!(
         test;
         test.probe.is_supported(opcode::Accept::CODE);
+        test.probe.is_supported(opcode::Socket::CODE); // check 5.19 kernel
     );
 
     println!("test tcp_accept_multi");
@@ -633,6 +634,7 @@ pub fn test_tcp_accept_multi_file_index<S: squeue::EntryMarker, C: cqueue::Entry
     require!(
         test;
         test.probe.is_supported(opcode::Accept::CODE);
+        test.probe.is_supported(opcode::Socket::CODE); // check 5.19 kernel
     );
 
     println!("test tcp_accept_multi_file_index");
