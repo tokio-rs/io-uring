@@ -41,13 +41,11 @@ pub(crate) mod sealed {
 }
 
 use crate::sys;
+use crate::util::{cast_ptr, unwrap_nonzero, unwrap_u32};
 use bitflags::bitflags;
+use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::os::unix::io::RawFd;
-
-use std::marker::PhantomData;
-
-use crate::util::cast_ptr;
 
 pub use sys::__kernel_rwf_t as RwFlags;
 
@@ -266,28 +264,33 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
 pub struct BufRingEntry(sys::io_uring_buf);
 
 /// An entry in a buf_ring that allows setting the address, length and buffer id.
+#[allow(clippy::len_without_is_empty)]
 impl BufRingEntry {
     /// Sets the entry addr.
     pub fn set_addr(&mut self, addr: u64) {
         self.0.addr = addr;
     }
+
     /// Returns the entry addr.
     pub fn addr(&self) -> u64 {
         self.0.addr
     }
+
     /// Sets the entry len.
     pub fn set_len(&mut self, len: u32) {
         self.0.len = len;
     }
+
     /// Returns the entry len.
-    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> u32 {
         self.0.len
     }
+
     /// Sets the entry bid.
     pub fn set_bid(&mut self, bid: u16) {
         self.0.bid = bid;
     }
+
     /// Returns the entry bid.
     pub fn bid(&self) -> u16 {
         self.0.bid
@@ -307,30 +310,6 @@ impl BufRingEntry {
     /// The entry must also be properly initialized.
     pub unsafe fn tail(ring_base: *const BufRingEntry) -> *const u16 {
         &(*ring_base).0.resv
-    }
-}
-
-/// Convert a valid `u32` constant.
-///
-/// This is a workaround for the lack of panic-in-const in older
-/// toolchains.
-#[allow(unconditional_panic)]
-const fn unwrap_u32(t: Option<u32>) -> u32 {
-    match t {
-        Some(v) => v,
-        None => [][1],
-    }
-}
-
-/// Convert a valid `NonZeroU32` constant.
-///
-/// This is a workaround for the lack of panic-in-const in older
-/// toolchains.
-#[allow(unconditional_panic)]
-const fn unwrap_nonzero(t: Option<NonZeroU32>) -> NonZeroU32 {
-    match t {
-        Some(v) => v,
-        None => [][1],
     }
 }
 

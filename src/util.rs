@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use std::os::unix::io::AsRawFd;
 use std::sync::atomic;
 use std::{io, ptr};
@@ -9,7 +10,7 @@ pub(crate) mod private {
 }
 
 /// A region of memory mapped using `mmap(2)`.
-pub struct Mmap {
+pub(crate) struct Mmap {
     addr: ptr::NonNull<libc::c_void>,
     len: usize,
 }
@@ -113,11 +114,35 @@ mod fd {
 }
 
 #[inline(always)]
-pub unsafe fn unsync_load(u: *const atomic::AtomicU32) -> u32 {
+pub(crate) unsafe fn unsync_load(u: *const atomic::AtomicU32) -> u32 {
     *u.cast::<u32>()
 }
 
 #[inline]
-pub const fn cast_ptr<T>(n: &T) -> *const T {
+pub(crate) const fn cast_ptr<T>(n: &T) -> *const T {
     n
+}
+
+/// Convert a valid `u32` constant.
+///
+/// This is a workaround for the lack of panic-in-const in older
+/// toolchains.
+#[allow(unconditional_panic)]
+pub(crate) const fn unwrap_u32(t: Option<u32>) -> u32 {
+    match t {
+        Some(v) => v,
+        None => [][1],
+    }
+}
+
+/// Convert a valid `NonZeroU32` constant.
+///
+/// This is a workaround for the lack of panic-in-const in older
+/// toolchains.
+#[allow(unconditional_panic)]
+pub(crate) const fn unwrap_nonzero(t: Option<NonZeroU32>) -> NonZeroU32 {
+    match t {
+        Some(v) => v,
+        None => [][1],
+    }
 }

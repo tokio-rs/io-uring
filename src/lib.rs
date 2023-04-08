@@ -34,7 +34,11 @@ use util::{Mmap, OwnedFd};
 ///   [`squeue::Entry128`];
 /// - `C`: The ring's completion queue entry (CQE) type, either [`cqueue::Entry`] or
 ///   [`cqueue::Entry32`].
-pub struct IoUring<S: squeue::EntryMarker = squeue::Entry, C: cqueue::EntryMarker = cqueue::Entry> {
+pub struct IoUring<S = squeue::Entry, C = cqueue::Entry>
+where
+    S: squeue::EntryMarker,
+    C: cqueue::EntryMarker,
+{
     sq: squeue::Inner<S>,
     cq: cqueue::Inner<C>,
     fd: OwnedFd,
@@ -51,7 +55,11 @@ struct MemoryMap {
 
 /// IoUring build params
 #[derive(Clone, Default)]
-pub struct Builder<S: squeue::EntryMarker = squeue::Entry, C: cqueue::EntryMarker = cqueue::Entry> {
+pub struct Builder<S = squeue::Entry, C = cqueue::Entry>
+where
+    S: squeue::EntryMarker,
+    C: cqueue::EntryMarker,
+{
     dontfork: bool,
     params: sys::io_uring_params,
     phantom: PhantomData<(S, C)>,

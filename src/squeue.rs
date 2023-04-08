@@ -355,6 +355,7 @@ impl Entry128 {
 
     /// Set the personality of this event. You can obtain a personality using
     /// [`Submitter::register_personality`](crate::Submitter::register_personality).
+    #[inline]
     pub fn personality(mut self, personality: u16) -> Entry128 {
         self.0 .0.personality = personality;
         self

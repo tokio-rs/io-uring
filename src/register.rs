@@ -62,9 +62,9 @@ impl Default for Probe {
 
 impl fmt::Debug for Probe {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct Op(sys::io_uring_probe_op);
+        struct Op<'a>(&'a sys::io_uring_probe_op);
 
-        impl fmt::Debug for Op {
+        impl fmt::Debug for Op<'_> {
             #[inline]
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.debug_struct("Op").field("code", &self.0.op).finish()
@@ -76,7 +76,7 @@ impl fmt::Debug for Probe {
         let list = list
             .iter()
             .filter(|op| op.flags & (sys::IO_URING_OP_SUPPORTED as u16) != 0)
-            .map(|&op| Op(op));
+            .map(Op);
 
         f.debug_set().entries(list).finish()
     }
