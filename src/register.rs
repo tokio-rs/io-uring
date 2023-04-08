@@ -20,7 +20,7 @@ pub(crate) fn execute(
 pub struct Probe(ProbeAndOps);
 
 #[repr(C)]
-struct ProbeAndOps(sys::io_uring_probe, [sys::io_uring_probe_op; 256]);
+struct ProbeAndOps(sys::io_uring_probe, [sys::io_uring_probe_op; Probe::COUNT]);
 
 impl Probe {
     pub(crate) const COUNT: usize = 256;
@@ -29,7 +29,7 @@ impl Probe {
     pub fn new() -> Probe {
         Probe(ProbeAndOps(
             sys::io_uring_probe::default(),
-            [sys::io_uring_probe_op::default(); 256],
+            [sys::io_uring_probe_op::default(); Probe::COUNT],
         ))
     }
 
