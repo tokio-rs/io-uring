@@ -1,6 +1,6 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
-use std::{io, ptr};
+use std::{io, mem, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
@@ -89,9 +89,9 @@ impl<'a> Submitter<'a> {
         arg: Option<&T>,
     ) -> io::Result<usize> {
         let arg = arg
-            .map(|arg| cast_ptr(arg) as *const _)
+            .map(|arg| cast_ptr(arg).cast())
             .unwrap_or_else(ptr::null);
-        let size = std::mem::size_of::<T>();
+        let size = mem::size_of::<T>();
         sys::io_uring_enter(
             self.fd.as_raw_fd(),
             to_submit,
@@ -180,7 +180,7 @@ impl<'a> Submitter<'a> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_BUFFERS,
-            bufs.as_ptr() as *const _,
+            bufs.as_ptr().cast(),
             bufs.len() as _,
         )
         .map(drop)
@@ -192,7 +192,6 @@ impl<'a> Submitter<'a> {
     /// Registering a file table is a prerequisite for using any request that
     /// uses direct descriptors.
     pub fn register_files_sparse(&self, nr: u32) -> io::Result<()> {
-        use std::mem;
         let rr = sys::io_uring_rsrc_register {
             nr,
             flags: sys::IORING_RSRC_REGISTER_SPARSE,
@@ -200,11 +199,10 @@ impl<'a> Submitter<'a> {
             data: 0,
             tags: 0,
         };
-        let rr = cast_ptr::<sys::io_uring_rsrc_register>(&rr);
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_FILES2,
-            rr as *const _,
+            cast_ptr::<sys::io_uring_rsrc_register>(&rr).cast(),
             mem::size_of::<sys::io_uring_rsrc_register>() as _,
         )
         .map(drop)
@@ -222,7 +220,7 @@ impl<'a> Submitter<'a> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_FILES,
-            fds.as_ptr() as *const _,
+            fds.as_ptr().cast(),
             fds.len() as _,
         )
         .map(drop)
@@ -241,11 +239,10 @@ impl<'a> Submitter<'a> {
             resv: 0,
             fds: fds.as_ptr() as _,
         };
-        let fu = cast_ptr::<sys::io_uring_files_update>(&fu);
         let ret = execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_FILES_UPDATE,
-            fu as *const _,
+            cast_ptr::<sys::io_uring_files_update>(&fu).cast(),
             fds.len() as _,
         )?;
         Ok(ret as _)
@@ -256,7 +253,7 @@ impl<'a> Submitter<'a> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_EVENTFD,
-            cast_ptr::<RawFd>(&eventfd) as *const _,
+            cast_ptr::<RawFd>(&eventfd).cast(),
             1,
         )
         .map(drop)
@@ -269,7 +266,7 @@ impl<'a> Submitter<'a> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_EVENTFD_ASYNC,
-            cast_ptr::<RawFd>(&eventfd) as *const _,
+            cast_ptr::<RawFd>(&eventfd).cast(),
             1,
         )
         .map(drop)
@@ -447,11 +444,10 @@ impl<'a> Submitter<'a> {
             pad: 0,
             resv: Default::default(),
         };
-        let arg = cast_ptr::<sys::io_uring_buf_reg>(&arg);
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_PBUF_RING,
-            arg as *const _,
+            cast_ptr::<sys::io_uring_buf_reg>(&arg).cast(),
             1,
         )
         .map(drop)
@@ -468,11 +464,10 @@ impl<'a> Submitter<'a> {
             pad: 0,
             resv: Default::default(),
         };
-        let arg = cast_ptr::<sys::io_uring_buf_reg>(&arg);
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_UNREGISTER_PBUF_RING,
-            arg as *const _,
+            cast_ptr::<sys::io_uring_buf_reg>(&arg).cast(),
             1,
         )
         .map(drop)
@@ -517,7 +512,7 @@ impl<'a> Submitter<'a> {
             .fd
             .map(|target| match target {
                 types::sealed::Target::Fd(fd) => fd,
-                types::sealed::Target::Fixed(fd) => fd as i32,
+                types::sealed::Target::Fixed(idx) => idx as i32,
             })
             .unwrap_or(-1);
         let flags = builder.flags.bits();
@@ -529,11 +524,10 @@ impl<'a> Submitter<'a> {
             timeout: timespec,
             pad: [0u64; 4],
         };
-        let arg = cast_ptr::<sys::io_uring_sync_cancel_reg>(&arg);
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_SYNC_CANCEL,
-            arg as *const _,
+            cast_ptr::<sys::io_uring_sync_cancel_reg>(&arg).cast(),
             1,
         )
         .map(drop)

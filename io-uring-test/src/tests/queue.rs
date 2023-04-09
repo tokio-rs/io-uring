@@ -243,7 +243,7 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         let dest_slot = types::DestinationSlot::try_from_slot_target(1).unwrap();
         ring.submission()
             .push(
-                &opcode::MsgRingSendFd::new(fd, types::Fixed(0), dest_slot, 11, 22)
+                &opcode::MsgRingSendFd::new(fd, types::Fixed(0), dest_slot, 22)
                     .build()
                     .into(),
             )
@@ -260,7 +260,7 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         let dest_cqes: Vec<cqueue::Entry> = temp_ring.completion().map(Into::into).collect();
         assert_eq!(dest_cqes.len(), 1);
         assert_eq!(dest_cqes[0].user_data(), 22);
-        assert_eq!(dest_cqes[0].result(), 11);
+        assert_eq!(dest_cqes[0].result(), 0);
         assert_eq!(dest_cqes[0].flags(), 0);
     }
 
@@ -277,7 +277,7 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         let dest_slot = types::DestinationSlot::try_from_slot_target(2).unwrap();
         temp_ring
             .submission()
-            .push(&opcode::MsgRingSendFd::new(fd, types::Fixed(1), dest_slot, 33, 44).build())
+            .push(&opcode::MsgRingSendFd::new(fd, types::Fixed(1), dest_slot, 44).build())
             .expect("queue is full");
     }
     temp_ring.submit_and_wait(1)?;
@@ -291,7 +291,7 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         let dest_cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
         assert_eq!(dest_cqes.len(), 1);
         assert_eq!(dest_cqes[0].user_data(), 44);
-        assert_eq!(dest_cqes[0].result(), 33);
+        assert_eq!(dest_cqes[0].result(), 0);
         assert_eq!(dest_cqes[0].flags(), 0);
     }
 

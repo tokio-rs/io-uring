@@ -15,8 +15,8 @@ macro_rules! assign_fd {
     ( $sqe:ident . fd = $opfd:expr ) => {
         match $opfd {
             sealed::Target::Fd(fd) => $sqe.fd = fd,
-            sealed::Target::Fixed(i) => {
-                $sqe.fd = i as _;
+            sealed::Target::Fixed(idx) => {
+                $sqe.fd = idx as _;
                 $sqe.flags |= crate::squeue::Flags::FIXED_FILE.bits();
             }
         }
@@ -63,7 +63,6 @@ macro_rules! opcode {
             $( $opt_field : $opt_tname, )*
         }
 
-        #[allow(deprecated)]
         impl $name {
             $( #[$new_meta] )*
             #[inline]
@@ -101,7 +100,7 @@ fn sqe_zeroed() -> sys::io_uring_sqe {
     unsafe { std::mem::zeroed() }
 }
 
-opcode!(
+opcode! {
     /// Do not perform any I/O.
     ///
     /// This is useful for testing the performance of the io_uring implementation itself.
@@ -118,9 +117,9 @@ opcode!(
         sqe.fd = -1;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Vectored read, equivalent to `preadv2(2)`.
     #[derive(Debug)]
     pub struct Readv {
@@ -157,9 +156,9 @@ opcode!(
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Vectored write, equivalent to `pwritev2(2)`.
     #[derive(Debug)]
     pub struct Writev {
@@ -193,9 +192,9 @@ opcode!(
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// File sync, equivalent to `fsync(2)`.
     ///
     /// Note that, while I/O is initiated in the order in which it appears in the submission queue,
@@ -225,9 +224,9 @@ opcode!(
         sqe.__bindgen_anon_3.fsync_flags = flags.bits();
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Read from pre-mapped buffers that have been previously registered with
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
@@ -269,9 +268,9 @@ opcode!(
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Write to pre-mapped buffers that have been previously registered with
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
@@ -313,9 +312,9 @@ opcode!(
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Poll the specified fd.
     ///
     /// Unlike poll or epoll without `EPOLLONESHOT`, this interface defaults to work in one shot mode.
@@ -362,9 +361,9 @@ opcode!(
 
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Remove an existing [poll](PollAdd) request.
     ///
     /// If found, the `result` method of the `cqueue::Entry` will return 0.
@@ -383,12 +382,12 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.__bindgen_anon_2.addr = user_data as _;
+        sqe.__bindgen_anon_2.addr = user_data;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Sync a file segment with disk, equivalent to `sync_file_range(2)`.
     #[derive(Debug)]
     pub struct SyncFileRange {
@@ -413,14 +412,14 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.len = len as _;
+        sqe.len = len;
         sqe.__bindgen_anon_1.off = offset;
         sqe.__bindgen_anon_3.sync_range_flags = flags;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Send a message on a socket, equivalent to `send(2)`.
     ///
     /// fd must be set to the socket file descriptor, addr must contains a pointer to the msghdr
@@ -448,9 +447,9 @@ opcode!(
         sqe.__bindgen_anon_3.msg_flags = flags;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Receive a message on a socket, equivalent to `recvmsg(2)`.
     ///
     /// See also the description of [`SendMsg`].
@@ -479,9 +478,9 @@ opcode!(
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Receive multiple messages on a socket, equivalent to `recvmsg(2)`.
     ///
     /// Parameters:
@@ -504,7 +503,6 @@ opcode!(
     /// components.
     ///
     /// The recvmsg multishot variant is available since kernel 6.0.
-
     #[derive(Debug)]
     pub struct RecvMsgMulti {
         fd: { impl sealed::UseFixed },
@@ -531,9 +529,9 @@ opcode!(
         sqe.ioprio = ioprio | (sys::IORING_RECV_MULTISHOT as u16);
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Register a timeout operation.
     ///
     /// A timeout will trigger a wakeup event on the completion ring for anyone waiting for events.
@@ -567,11 +565,11 @@ opcode!(
         sqe.__bindgen_anon_3.timeout_flags = flags.bits();
         Entry(sqe)
     }
-);
+}
 
 // === 5.5 ===
 
-opcode!(
+opcode! {
     /// Attempt to remove an existing [timeout operation](Timeout).
     pub struct TimeoutRemove {
         user_data: { u64 },
@@ -586,12 +584,12 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.__bindgen_anon_2.addr = user_data as _;
+        sqe.__bindgen_anon_2.addr = user_data;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Attempt to update an existing [timeout operation](Timeout) with a new timespec.
     /// The optional `count` value of the original timeout value cannot be updated.
     pub struct TimeoutUpdate {
@@ -610,13 +608,13 @@ opcode!(
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
         sqe.__bindgen_anon_1.off = timespec as _;
-        sqe.__bindgen_anon_2.addr = user_data as _;
+        sqe.__bindgen_anon_2.addr = user_data;
         sqe.__bindgen_anon_3.timeout_flags = flags.bits() | sys::IORING_TIMEOUT_UPDATE;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Accept a new connection on a socket, equivalent to `accept4(2)`.
     pub struct Accept {
         fd: { impl sealed::UseFixed },
@@ -643,39 +641,9 @@ opcode!(
         }
         Entry(sqe)
     }
-);
+}
 
-opcode!(
-    /// Accept multiple new connections on a socket.
-    ///
-    /// Set the `allocate_file_index` property if fixed file table entries should be used.
-    pub struct AcceptMulti {
-        fd: { impl sealed::UseFixed },
-        ;;
-        allocate_file_index: bool = false,
-        flags: i32 = 0
-    }
-
-    pub const CODE = sys::IORING_OP_ACCEPT;
-
-    pub fn build(self) -> Entry {
-        let AcceptMulti { fd, allocate_file_index, flags } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = Self::CODE;
-        assign_fd!(sqe.fd = fd);
-        sqe.ioprio = sys::IORING_ACCEPT_MULTISHOT as u16;
-        // No out SockAddr is passed for the multishot accept case.
-        // The user should perform a syscall to get any resulting connection's remote address.
-        sqe.__bindgen_anon_3.accept_flags = flags as _;
-        if allocate_file_index {
-            sqe.__bindgen_anon_5.file_index = sys::IORING_FILE_INDEX_ALLOC as u32;
-        }
-        Entry(sqe)
-    }
-);
-
-opcode!(
+opcode! {
     /// Attempt to cancel an already issued request.
     pub struct AsyncCancel {
         user_data: { u64 }
@@ -692,12 +660,12 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
-        sqe.__bindgen_anon_2.addr = user_data as _;
+        sqe.__bindgen_anon_2.addr = user_data;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// This request must be linked with another request through
     /// [`Flags::IO_LINK`](crate::squeue::Flags::IO_LINK) which is described below.
     /// Unlike [`Timeout`], [`LinkTimeout`] acts on the linked request, not the completion queue.
@@ -720,9 +688,9 @@ opcode!(
         sqe.__bindgen_anon_3.timeout_flags = flags.bits();
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Connect a socket, equivalent to `connect(2)`.
     pub struct Connect {
         fd: { impl sealed::UseFixed },
@@ -743,16 +711,15 @@ opcode!(
         sqe.__bindgen_anon_1.off = addrlen as _;
         Entry(sqe)
     }
-);
+}
 
 // === 5.6 ===
 
-opcode!(
+opcode! {
     /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
-    #[deprecated(note = "use Fallocate64 instead, which always takes a 64-bit length")]
     pub struct Fallocate {
         fd: { impl sealed::UseFixed },
-        len: { libc::off_t },
+        len: { u64 },
         ;;
         offset: u64 = 0,
         mode: i32 = 0
@@ -766,39 +733,14 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_2.addr = len as _;
+        sqe.__bindgen_anon_2.addr = len;
         sqe.len = mode as _;
         sqe.__bindgen_anon_1.off = offset;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
-    /// Preallocate or deallocate space to a file, equivalent to `fallocate(2)`.
-    pub struct Fallocate64 {
-        fd: { impl sealed::UseFixed },
-        len: { libc::off64_t },
-        ;;
-        offset: u64 = 0,
-        mode: i32 = 0
-    }
-
-    pub const CODE = sys::IORING_OP_FALLOCATE;
-
-    pub fn build(self) -> Entry {
-        let Fallocate64 { fd, len, offset, mode } = self;
-
-        let mut sqe = sqe_zeroed();
-        sqe.opcode = Self::CODE;
-        assign_fd!(sqe.fd = fd);
-        sqe.__bindgen_anon_2.addr = len as _;
-        sqe.len = mode as _;
-        sqe.__bindgen_anon_1.off = offset;
-        Entry(sqe)
-    }
-);
-
-opcode!(
+opcode! {
     /// Open a file, equivalent to `openat(2)`.
     pub struct OpenAt {
         dirfd: { impl sealed::UseFd },
@@ -825,9 +767,9 @@ opcode!(
         }
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Close a file descriptor, equivalent to `close(2)`.
     ///
     /// Use a types::Fixed(fd) argument to close an io_uring direct descriptor.
@@ -844,17 +786,17 @@ opcode!(
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         match fd {
-            sealed::Target::Fd(i) => sqe.fd = i,
-            sealed::Target::Fixed(i) => {
+            sealed::Target::Fd(fd) => sqe.fd = fd,
+            sealed::Target::Fixed(idx) => {
                 sqe.fd = 0;
-                sqe.__bindgen_anon_5.file_index = i+1;
+                sqe.__bindgen_anon_5.file_index = idx + 1;
             }
         }
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// This command is an alternative to using
     /// [`Submitter::register_files_update`](crate::Submitter::register_files_update) which then
     /// works in an async fashion, like the rest of the io_uring commands.
@@ -878,9 +820,9 @@ opcode!(
         sqe.__bindgen_anon_1.off = offset as _;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Get file status, equivalent to `statx(2)`.
     pub struct Statx {
         dirfd: { impl sealed::UseFd },
@@ -908,9 +850,9 @@ opcode!(
         sqe.__bindgen_anon_3.statx_flags = flags as _;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
     ///
     /// * `fd` is the file descriptor to be operated on,
@@ -958,9 +900,9 @@ opcode!(
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
     ///
     /// * `fd` is the file descriptor to be operated on,
@@ -1005,9 +947,9 @@ opcode!(
         sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Predeclare an access pattern for file data, equivalent to `posix_fadvise(2)`.
     pub struct Fadvise {
         fd: { impl sealed::UseFixed },
@@ -1030,9 +972,9 @@ opcode!(
         sqe.__bindgen_anon_3.fadvise_advice = advice as _;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Give advice about use of memory, equivalent to `madvise(2)`.
     pub struct Madvise {
         addr: { *const libc::c_void },
@@ -1054,9 +996,9 @@ opcode!(
         sqe.__bindgen_anon_3.fadvise_advice = advice as _;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Send a message on a socket, equivalent to `send(2)`.
     pub struct Send {
         fd: { impl sealed::UseFixed },
@@ -1079,9 +1021,9 @@ opcode!(
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Receive a message from a socket, equivalent to `recv(2)`.
     pub struct Recv {
         fd: { impl sealed::UseFixed },
@@ -1106,9 +1048,9 @@ opcode!(
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Receive multiple messages from a socket, equivalent to `recv(2)`.
     ///
     /// Parameter:
@@ -1145,9 +1087,9 @@ opcode!(
         sqe.ioprio = sys::IORING_RECV_MULTISHOT as _;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Open a file, equivalent to `openat2(2)`.
     pub struct OpenAt2 {
         dirfd: { impl sealed::UseFd },
@@ -1173,9 +1115,9 @@ opcode!(
         }
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Modify an epoll file descriptor, equivalent to `epoll_ctl(2)`.
     pub struct EpollCtl {
         epfd: { impl sealed::UseFixed },
@@ -1198,11 +1140,11 @@ opcode!(
         sqe.__bindgen_anon_1.off = fd as _;
         Entry(sqe)
     }
-);
+}
 
 // === 5.7 ===
 
-opcode!(
+opcode! {
     /// Splice data to/from a pipe, equivalent to `splice(2)`.
     ///
     /// if `fd_in` refers to a pipe, `off_in` must be `-1`;
@@ -1231,9 +1173,9 @@ opcode!(
 
         sqe.__bindgen_anon_5.splice_fd_in = match fd_in {
             sealed::Target::Fd(fd) => fd,
-            sealed::Target::Fixed(i) => {
+            sealed::Target::Fixed(idx) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;
-                i as _
+                idx as _
             }
         };
 
@@ -1241,9 +1183,9 @@ opcode!(
         sqe.__bindgen_anon_3.splice_flags = flags;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Register `nbufs` buffers that each have the length `len` with ids starting from `big` in the
     /// group `bgid` that can be used for any request. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
@@ -1270,9 +1212,9 @@ opcode!(
         sqe.__bindgen_anon_4.buf_group = bgid;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Remove some number of buffers from a buffer group. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     pub struct RemoveBuffers {
@@ -1292,11 +1234,11 @@ opcode!(
         sqe.__bindgen_anon_4.buf_group = bgid;
         Entry(sqe)
     }
-);
+}
 
 // === 5.8 ===
 
-opcode!(
+opcode! {
     /// Duplicate pipe content, equivalent to `tee(2)`.
     pub struct Tee {
         fd_in: { impl sealed::UseFixed },
@@ -1319,9 +1261,9 @@ opcode!(
 
         sqe.__bindgen_anon_5.splice_fd_in = match fd_in {
             sealed::Target::Fd(fd) => fd,
-            sealed::Target::Fixed(i) => {
+            sealed::Target::Fixed(idx) => {
                 flags |= sys::SPLICE_F_FD_IN_FIXED;
-                i as _
+                idx as _
             }
         };
 
@@ -1329,11 +1271,11 @@ opcode!(
 
         Entry(sqe)
     }
-);
+}
 
 // === 5.11 ===
 
-opcode!(
+opcode! {
     /// Shut down all or part of a full duplex connection on a socket, equivalent to `shutdown(2)`.
     /// Available since kernel 5.11.
     pub struct Shutdown {
@@ -1353,9 +1295,9 @@ opcode!(
         sqe.len = how as _;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     // Change the name or location of a file, equivalent to `renameat2(2)`.
     // Available since kernel 5.11.
     pub struct RenameAt {
@@ -1385,9 +1327,9 @@ opcode!(
         sqe.__bindgen_anon_3.rename_flags = flags;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     // Delete a name and possible the file it refers to, equivalent to `unlinkat(2)`.
     // Available since kernel 5.11.
     pub struct UnlinkAt {
@@ -1409,11 +1351,11 @@ opcode!(
         sqe.__bindgen_anon_3.unlink_flags = flags as _;
         Entry(sqe)
     }
-);
+}
 
 // === 5.15 ===
 
-opcode!(
+opcode! {
     /// Make a directory, equivalent to `mkdirat2(2)`.
     pub struct MkDirAt {
         dirfd: { impl sealed::UseFd },
@@ -1434,9 +1376,9 @@ opcode!(
         sqe.len = mode;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Create a symlink, equivalent to `symlinkat2(2)`.
     pub struct SymlinkAt {
         newdirfd: { impl sealed::UseFd },
@@ -1457,9 +1399,9 @@ opcode!(
         sqe.__bindgen_anon_1.addr2 = linkpath as _;
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// Create a hard link, equivalent to `linkat2(2)`.
     pub struct LinkAt {
         olddirfd: { impl sealed::UseFd },
@@ -1484,11 +1426,11 @@ opcode!(
         sqe.__bindgen_anon_3.hardlink_flags = flags as _;
         Entry(sqe)
     }
-);
+}
 
 // === 5.18 ===
 
-opcode!(
+opcode! {
     /// Send a message (with data) to a target ring.
     pub struct MsgRingData {
         ring_fd: { impl sealed::UseFd },
@@ -1517,11 +1459,11 @@ opcode!(
         }
         Entry(sqe)
     }
-);
+}
 
 // === 5.19 ===
 
-opcode!(
+opcode! {
     /// A file/device-specific 16-byte command, akin (but not equivalent) to `ioctl(2)`.
     pub struct UringCmd16 {
         fd: { impl sealed::UseFixed },
@@ -1543,9 +1485,9 @@ opcode!(
         unsafe { *sqe.__bindgen_anon_6.cmd.as_mut().as_mut_ptr().cast::<[u8; 16]>() = cmd };
         Entry(sqe)
     }
-);
+}
 
-opcode!(
+opcode! {
     /// A file/device-specific 80-byte command, akin (but not equivalent) to `ioctl(2)`.
     pub struct UringCmd80 {
         fd: { impl sealed::UseFixed },
@@ -1570,11 +1512,9 @@ opcode!(
         unsafe { *sqe.__bindgen_anon_6.cmd.as_mut().as_mut_ptr().cast::<[u8; 16]>() = cmd1 };
         Entry128(Entry(sqe), cmd2)
     }
-);
+}
 
-// === 5.19 ===
-
-opcode!(
+opcode! {
     /// Create an endpoint for communication, equivalent to `socket(2)`.
     ///
     /// If the `file_index` argument is set, the resulting socket is
@@ -1582,6 +1522,8 @@ opcode!(
     /// returned as a normal file descriptor. The application must first
     /// have registered a file table, and the target slot should fit into
     /// it.
+    ///
+    /// Available since 5.19.
     pub struct Socket {
         domain: { i32 },
         socket_type: { i32 },
@@ -1607,17 +1549,48 @@ opcode!(
         }
         Entry(sqe)
     }
-);
+}
+
+opcode! {
+    /// Accept multiple new connections on a socket.
+    ///
+    /// Set the `allocate_file_index` property if fixed file table entries should be used.
+    ///
+    /// Available since 5.19.
+    pub struct AcceptMulti {
+        fd: { impl sealed::UseFixed },
+        ;;
+        allocate_file_index: bool = false,
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_ACCEPT;
+
+    pub fn build(self) -> Entry {
+        let AcceptMulti { fd, allocate_file_index, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.ioprio = sys::IORING_ACCEPT_MULTISHOT as u16;
+        // No out SockAddr is passed for the multishot accept case.
+        // The user should perform a syscall to get any resulting connection's remote address.
+        sqe.__bindgen_anon_3.accept_flags = flags as _;
+        if allocate_file_index {
+            sqe.__bindgen_anon_5.file_index = sys::IORING_FILE_INDEX_ALLOC as u32;
+        }
+        Entry(sqe)
+    }
+}
 
 // === 6.0 ===
 
-opcode!(
+opcode! {
     /// Send a message (with fixed FD) to a target ring.
     pub struct MsgRingSendFd {
         ring_fd: { impl sealed::UseFd },
         fixed_slot_src: { types::Fixed },
         dest_slot_index: { types::DestinationSlot },
-        result: { i32 },
         user_data: { u64 },
         ;;
         opcode_flags: u32 = 0
@@ -1626,24 +1599,23 @@ opcode!(
     pub const CODE = sys::IORING_OP_MSG_RING;
 
     pub fn build(self) -> Entry {
-        let MsgRingSendFd { ring_fd, fixed_slot_src, dest_slot_index, result, user_data, opcode_flags } = self;
+        let MsgRingSendFd { ring_fd, fixed_slot_src, dest_slot_index, user_data, opcode_flags } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.__bindgen_anon_2.addr = sys::IORING_MSG_SEND_FD.into();
         sqe.fd = ring_fd;
-        sqe.len = result as u32;
         sqe.__bindgen_anon_1.off = user_data;
         unsafe { sqe.__bindgen_anon_6.__bindgen_anon_1.as_mut().addr3 = fixed_slot_src.0 as u64 };
         sqe.__bindgen_anon_5.file_index = dest_slot_index.kernel_index_arg();
         sqe.__bindgen_anon_3.msg_ring_flags = opcode_flags;
         Entry(sqe)
     }
-);
+}
 
 // === 6.0 ===
 
-opcode!(
+opcode! {
     /// Send a zerocopy message on a socket, equivalent to `send(2)`.
     ///
     /// When `dest_addr` is non-zero it points to the address of the target with `dest_addr_len`
@@ -1689,11 +1661,11 @@ opcode!(
         sqe.__bindgen_anon_5.__bindgen_anon_1.addr_len = dest_addr_len as _;
         Entry(sqe)
     }
-);
+}
 
 // === 6.1 ===
 
-opcode!(
+opcode! {
     /// Send a zerocopy message on a socket, equivalent to `send(2)`.
     ///
     /// fd must be set to the socket file descriptor, addr must contains a pointer to the msghdr
@@ -1721,4 +1693,4 @@ opcode!(
         sqe.__bindgen_anon_3.msg_flags = flags;
         Entry(sqe)
     }
-);
+}

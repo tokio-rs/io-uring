@@ -23,9 +23,7 @@ use std::{cmp, io, mem};
 use std::os::unix::io::{AsFd, BorrowedFd};
 
 pub use cqueue::CompletionQueue;
-use cqueue::Sealed as _;
 pub use register::Probe;
-use squeue::Sealed as _;
 pub use squeue::SubmissionQueue;
 pub use submit::Submitter;
 use util::{Mmap, OwnedFd};
@@ -36,7 +34,11 @@ use util::{Mmap, OwnedFd};
 ///   [`squeue::Entry128`];
 /// - `C`: The ring's completion queue entry (CQE) type, either [`cqueue::Entry`] or
 ///   [`cqueue::Entry32`].
-pub struct IoUring<S: squeue::EntryMarker = squeue::Entry, C: cqueue::EntryMarker = cqueue::Entry> {
+pub struct IoUring<S = squeue::Entry, C = cqueue::Entry>
+where
+    S: squeue::EntryMarker,
+    C: cqueue::EntryMarker,
+{
     sq: squeue::Inner<S>,
     cq: cqueue::Inner<C>,
     fd: OwnedFd,
@@ -53,7 +55,11 @@ struct MemoryMap {
 
 /// IoUring build params
 #[derive(Clone, Default)]
-pub struct Builder<S: squeue::EntryMarker = squeue::Entry, C: cqueue::EntryMarker = cqueue::Entry> {
+pub struct Builder<S = squeue::Entry, C = cqueue::Entry>
+where
+    S: squeue::EntryMarker,
+    C: cqueue::EntryMarker,
+{
     dontfork: bool,
     params: sys::io_uring_params,
     phantom: PhantomData<(S, C)>,
@@ -75,48 +81,21 @@ impl IoUring<squeue::Entry, cqueue::Entry> {
     pub fn new(entries: u32) -> io::Result<Self> {
         Self::builder().build(entries)
     }
-
-    /// Create a [`Builder`] for an `IoUring` instance.
-    ///
-    /// This allows for further customization than [`new`](Self::new).
-    #[must_use]
-    pub fn builder() -> Builder<squeue::Entry, cqueue::Entry> {
-        Builder {
-            dontfork: false,
-            params: sys::io_uring_params {
-                flags: squeue::Entry::ADDITIONAL_FLAGS | cqueue::Entry::ADDITIONAL_FLAGS,
-                ..Default::default()
-            },
-            phantom: PhantomData,
-        }
-    }
 }
 
 impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
-    /// Create a new `IoUring` instance with default configuration parameters. See [`Builder`] to
-    /// customize it further.
-    ///
-    /// The `entries` sets the size of queue,
-    /// and its value should be the power of two.
-    ///
-    /// Unlike [`IoUring::new`], this function is available for any combination of submission queue
-    /// entry (SQE) and completion queue entry (CQE) types.
-    pub fn generic_new(entries: u32) -> io::Result<Self> {
-        Self::generic_builder().build(entries)
-    }
-
     /// Create a [`Builder`] for an `IoUring` instance.
     ///
-    /// This allows for further customization than [`generic_new`](Self::generic_new).
+    /// This allows for further customization than [`new`](Self::new).
     ///
-    /// Unlike [`IoUring::builder`], this function is available for any combination of submission
+    /// Unlike [`IoUring::new`], this function is available for any combination of submission
     /// queue entry (SQE) and completion queue entry (CQE) types.
     #[must_use]
-    pub fn generic_builder() -> Builder<S, C> {
+    pub fn builder() -> Builder<S, C> {
         Builder {
             dontfork: false,
             params: sys::io_uring_params {
-                flags: S::ADDITIONAL_FLAGS | C::ADDITIONAL_FLAGS,
+                flags: S::BUILD_FLAGS | C::BUILD_FLAGS,
                 ..Default::default()
             },
             phantom: PhantomData,
@@ -170,8 +149,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
             }
         }
 
-        let fd: OwnedFd =
-            unsafe { sys::io_uring_setup(entries, &mut p).map(|fd| OwnedFd::from_raw_fd(fd))? };
+        let fd: OwnedFd = unsafe { OwnedFd::from_raw_fd(sys::io_uring_setup(entries, &mut p)?) };
 
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 

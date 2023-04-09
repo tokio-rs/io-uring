@@ -4,6 +4,7 @@ use io_uring::squeue::Flags;
 use io_uring::types::Fd;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
+use std::convert::TryInto;
 use std::net::{TcpListener, TcpStream};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
@@ -549,8 +550,6 @@ pub fn test_tcp_accept_file_index<S: squeue::EntryMarker, C: cqueue::EntryMarker
     Ok(())
 }
 
-/// Skip ci, because multi accept does not exist in old release.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -558,6 +557,7 @@ pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     require!(
         test;
         test.probe.is_supported(opcode::Accept::CODE);
+        test.probe.is_supported(opcode::Socket::CODE); // check 5.19 kernel
     );
 
     println!("test tcp_accept_multi");
@@ -584,12 +584,12 @@ pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 2);
-    #[allow(clippy::needless_range_loop)]
-    for round in 0..=1 {
-        assert_eq!(cqes[round].user_data(), 2002);
-        assert!(cqes[round].result() >= 0);
 
-        let fd = cqes[round].result();
+    for cqe in cqes {
+        assert_eq!(cqe.user_data(), 2002);
+        assert!(cqe.result() >= 0);
+
+        let fd = cqe.result();
 
         unsafe {
             libc::close(fd);
@@ -627,8 +627,6 @@ pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
-/// Skip ci, because multi accept does not exist in old release.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_accept_multi_file_index<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -636,6 +634,7 @@ pub fn test_tcp_accept_multi_file_index<S: squeue::EntryMarker, C: cqueue::Entry
     require!(
         test;
         test.probe.is_supported(opcode::Accept::CODE);
+        test.probe.is_supported(opcode::Socket::CODE); // check 5.19 kernel
     );
 
     println!("test tcp_accept_multi_file_index");
@@ -912,8 +911,6 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
-/// Skip ci, because buf group does not exist in old release.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_buffer_select_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -1004,8 +1001,6 @@ pub fn test_tcp_buffer_select_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMa
     Ok(())
 }
 
-/// Skip ci, because buf group does not exist in old release.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_buffer_select_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -1081,8 +1076,6 @@ pub fn test_tcp_buffer_select_readv<S: squeue::EntryMarker, C: cqueue::EntryMark
     Ok(())
 }
 
-/// Skip ci, because recv multi feature does not exist in old release, requires 6.0.
-#[cfg(not(feature = "ci"))]
 pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -1394,14 +1387,15 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     assert!(!msg0.is_control_data_truncated());
     assert_eq!(msg0.control_data(), &[]);
     assert!(!msg0.is_name_data_truncated());
-    let (_, addr) = unsafe {
-        socket2::SockAddr::init(|storage, len| {
-            *len = msg0.name_data().len() as u32;
-            std::ptr::copy_nonoverlapping(msg0.name_data().as_ptr() as _, storage, 1);
-            Ok(())
-        })
-    }
-    .unwrap();
+    let addr = unsafe {
+        let storage = msg0
+            .name_data()
+            .as_ptr()
+            .cast::<libc::sockaddr_storage>()
+            .read_unaligned();
+        let len = msg0.name_data().len().try_into().unwrap();
+        socket2::SockAddr::new(storage, len)
+    };
     let addr = addr.as_socket_ipv4().unwrap();
     assert_eq!(addr.ip(), client_addr.ip());
     assert_eq!(addr.port(), client_addr.port());
@@ -1412,14 +1406,15 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     assert!(!msg1.is_control_data_truncated());
     assert_eq!(msg1.control_data(), &[]);
     assert!(!msg1.is_name_data_truncated());
-    let (_, addr) = unsafe {
-        socket2::SockAddr::init(|storage, len| {
-            *len = msg1.name_data().len() as u32;
-            std::ptr::copy_nonoverlapping(msg1.name_data().as_ptr() as _, storage, 1);
-            Ok(())
-        })
-    }
-    .unwrap();
+    let addr = unsafe {
+        let storage = msg1
+            .name_data()
+            .as_ptr()
+            .cast::<libc::sockaddr_storage>()
+            .read_unaligned();
+        let len = msg1.name_data().len().try_into().unwrap();
+        socket2::SockAddr::new(storage, len)
+    };
     let addr = addr.as_socket_ipv4().unwrap();
     assert_eq!(addr.ip(), client_addr.ip());
     assert_eq!(addr.port(), client_addr.port());
