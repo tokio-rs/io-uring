@@ -13,7 +13,7 @@ To use `io-uring` crate, first add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-io-uring = "0.5"
+io-uring = "0.6"
 ```
 
 Next we can start using `io-uring` crate.
