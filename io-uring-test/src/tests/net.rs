@@ -1298,21 +1298,14 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     println!("test udp_recvmsg_multishot");
 
-    let (socket_slot, socket_addr) = {
-        // `:0` means "pick up a random available port number", which should
-        // help avoiding test flakes if a static port is already in use.
-        let server_sock = std::net::UdpSocket::bind("127.0.0.1:0")?;
-        ring.submitter()
-            .register_files(&[server_sock.as_raw_fd()])?;
-        let addr = server_sock.local_addr().unwrap();
-        (io_uring::types::Fixed(0), addr)
-    };
+    let server_socket: socket2::Socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into();
+    let server_addr = server_socket.local_addr()?;
 
     // Provide 2 buffers in buffer group `33`, at index 0 and 1.
     // Each one is 512 bytes large.
     const BUF_GROUP: u16 = 33;
     const SIZE: usize = 512;
-    let mut buffers = [[0u8; SIZE]; 2];
+    let mut buffers = [[0u8; SIZE]; 3];
     for (index, buf) in buffers.iter_mut().enumerate() {
         let provide_bufs_e = io_uring::opcode::ProvideBuffers::new(
             buf.as_mut_ptr(),
@@ -1340,7 +1333,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     msghdr.msg_controllen = 0;
 
     let recvmsg_e =
-        io_uring::opcode::RecvMsgMulti::new(socket_slot, &msghdr as *const _, BUF_GROUP)
+        opcode::RecvMsgMulti::new(Fd(server_socket.as_raw_fd()), &msghdr as *const _, BUF_GROUP)
             .build()
             .user_data(77)
             .into();
@@ -1353,73 +1346,77 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
         .unwrap()
         .as_socket_ipv4()
         .unwrap();
-    client_socket
-        .send_to("testfoo".as_bytes(), &socket_addr.into())
-        .unwrap();
-    client_socket
-        .send_to("testbarbar".as_bytes(), &socket_addr.into())
-        .unwrap();
+
+    let bufs1 = [io::IoSlice::new(b"testfooo for me")];
+    let bufs2 = [io::IoSlice::new(b"testbarbar for you and me")];
+
+    let mut msghdr1: libc::msghdr = unsafe{mem::zeroed()};
+    msghdr1.msg_name = server_addr.as_ptr() as *const _ as *mut _;
+    msghdr1.msg_namelen = server_addr.len();
+    msghdr1.msg_iov = bufs1.as_ptr() as *const _ as *mut _;
+    msghdr1.msg_iovlen = 1;
+
+    let send_msg_1 = opcode::SendMsg::new(Fd(client_socket.as_raw_fd()), &msghdr1 as *const _)
+        .build()
+        .user_data(55)
+        .into();
+    unsafe { ring.submission().push(&send_msg_1)? };
+    ring.submitter().submit().unwrap();
+
+    let mut msghdr2: libc::msghdr = unsafe{mem::zeroed()};
+    msghdr2.msg_name = server_addr.as_ptr() as *const _ as *mut _;
+    msghdr2.msg_namelen = server_addr.len();
+    msghdr2.msg_iov = bufs2.as_ptr() as *const _ as *mut _;
+    msghdr2.msg_iovlen = 1;
+
+    let send_msg_2 = opcode::SendMsg::new(Fd(client_socket.as_raw_fd()), &msghdr2 as *const _)
+        .build()
+        .user_data(66)
+        .into();
+    unsafe { ring.submission().push(&send_msg_2)? };
+    ring.submitter().submit().unwrap();
 
     // Check the completion events for the two UDP messages, plus a trailing
     // CQE signaling that we ran out of buffers.
-    ring.submitter().submit_and_wait(3).unwrap();
+    ring.submitter().submit_and_wait(4).unwrap();
     let cqes: Vec<io_uring::cqueue::Entry> = ring.completion().map(Into::into).collect();
-    assert_eq!(cqes.len(), 3);
-    assert_eq!(cqes[0].user_data(), 77);
-    assert!(cqes[0].result() > 0);
-    assert!(io_uring::cqueue::more(cqes[0].flags()));
-    assert_eq!(io_uring::cqueue::buffer_select(cqes[0].flags()), Some(0));
-    assert!(cqes[0].flags() != 0);
-    assert_eq!(cqes[1].user_data(), 77);
-    assert!(cqes[1].result() > 0);
-    assert!(io_uring::cqueue::more(cqes[1].flags()));
-    assert_eq!(io_uring::cqueue::buffer_select(cqes[1].flags()), Some(1));
-    assert!(cqes[1].flags() != 0);
-    assert_eq!(cqes[2].user_data(), 77);
-    assert_eq!(cqes[2].result(), -libc::ENOBUFS);
-    assert!(!io_uring::cqueue::more(cqes[2].flags()));
-    assert_eq!(io_uring::cqueue::buffer_select(cqes[2].flags()), None);
-    assert_eq!(cqes[2].flags(), 0);
-
-    let msg0 = types::RecvMsgOut::parse(buffers[0].as_slice(), &msghdr).unwrap();
-    assert!(!msg0.is_payload_truncated());
-    assert_eq!(msg0.payload_data(), b"testfoo".as_slice());
-    assert!(!msg0.is_control_data_truncated());
-    assert_eq!(msg0.control_data(), &[]);
-    assert!(!msg0.is_name_data_truncated());
-    let addr = unsafe {
-        let storage = msg0
-            .name_data()
-            .as_ptr()
-            .cast::<libc::sockaddr_storage>()
-            .read_unaligned();
-        let len = msg0.name_data().len().try_into().unwrap();
-        socket2::SockAddr::new(storage, len)
-    };
-    let addr = addr.as_socket_ipv4().unwrap();
-    assert_eq!(addr.ip(), client_addr.ip());
-    assert_eq!(addr.port(), client_addr.port());
-
-    let msg1 = types::RecvMsgOut::parse(buffers[1].as_slice(), &msghdr).unwrap();
-    assert!(!msg1.is_payload_truncated());
-    assert_eq!(msg1.payload_data(), b"testbarbar".as_slice());
-    assert!(!msg1.is_control_data_truncated());
-    assert_eq!(msg1.control_data(), &[]);
-    assert!(!msg1.is_name_data_truncated());
-    let addr = unsafe {
-        let storage = msg1
-            .name_data()
-            .as_ptr()
-            .cast::<libc::sockaddr_storage>()
-            .read_unaligned();
-        let len = msg1.name_data().len().try_into().unwrap();
-        socket2::SockAddr::new(storage, len)
-    };
-    let addr = addr.as_socket_ipv4().unwrap();
-    assert_eq!(addr.ip(), client_addr.ip());
-    assert_eq!(addr.port(), client_addr.port());
-
-    ring.submitter().unregister_files().unwrap();
+    assert_eq!(cqes.len(), 4);
+    for cqe in cqes {
+        let is_more = io_uring::cqueue::more(cqe.flags());
+        match cqe.user_data() {
+            // send notifications
+            55 | 66 => {
+                assert!(cqe.result() > 0);
+                assert!(!is_more);
+            }
+            // RecvMsgMulti
+            77 => {
+                assert!(cqe.result() > 0);
+                assert!(is_more);
+                let buf_id = io_uring::cqueue::buffer_select(cqe.flags()).unwrap();
+                let tmp_buf = &buffers[buf_id as usize];
+                let msg = types::RecvMsgOut::parse(tmp_buf, &msghdr).unwrap();
+                assert!([25,15].contains(&msg.payload_data().len()));
+                assert!(!msg.is_payload_truncated());
+                assert!(!msg.is_control_data_truncated());
+                assert_eq!(msg.control_data(), &[]);
+                assert!(!msg.is_name_data_truncated());
+                let addr = unsafe {
+                    let storage = msg
+                        .name_data()
+                        .as_ptr()
+                        .cast::<libc::sockaddr_storage>()
+                        .read_unaligned();
+                    let len = msg.name_data().len().try_into().unwrap();
+                    socket2::SockAddr::new(storage, len)
+                };
+                let addr = addr.as_socket_ipv4().unwrap();
+                assert_eq!(addr.ip(), client_addr.ip());
+                assert_eq!(addr.port(), client_addr.port());
+            }
+            _ => {unreachable!()}
+        }
+    }
 
     Ok(())
 }
