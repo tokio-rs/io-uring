@@ -1293,7 +1293,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
         test;
         test.probe.is_supported(opcode::RecvMsg::CODE);
         test.probe.is_supported(opcode::ProvideBuffers::CODE);
-        test.probe.is_supported(opcode::SendZc::CODE);
+        test.probe.is_supported(opcode::SendMsgZc::CODE);
     );
 
     println!("test udp_recvmsg_multishot");
@@ -1359,6 +1359,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     msghdr1.msg_iov = bufs1.as_ptr() as *const _ as *mut _;
     msghdr1.msg_iovlen = 1;
 
+    // Non ZeroCopy
     let send_msg_1 = opcode::SendMsg::new(Fd(client_socket.as_raw_fd()), &msghdr1 as *const _)
         .build()
         .user_data(55)
@@ -1372,7 +1373,8 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     msghdr2.msg_iov = bufs2.as_ptr() as *const _ as *mut _;
     msghdr2.msg_iovlen = 1;
 
-    let send_msg_2 = opcode::SendMsg::new(Fd(client_socket.as_raw_fd()), &msghdr2 as *const _)
+    // ZeroCopy
+    let send_msg_2 = opcode::SendMsgZc::new(Fd(client_socket.as_raw_fd()), &msghdr2 as *const _)
         .build()
         .user_data(66)
         .into();
@@ -1381,16 +1383,24 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     // Check the completion events for the two UDP messages, plus a trailing
     // CQE signaling that we ran out of buffers.
-    ring.submitter().submit_and_wait(4).unwrap();
+    ring.submitter().submit_and_wait(5).unwrap();
     let cqes: Vec<io_uring::cqueue::Entry> = ring.completion().map(Into::into).collect();
-    assert_eq!(cqes.len(), 4);
+    assert_eq!(cqes.len(), 5);
     for cqe in cqes {
         let is_more = io_uring::cqueue::more(cqe.flags());
         match cqe.user_data() {
             // send notifications
-            55 | 66 => {
+            55 => {
                 assert!(cqe.result() > 0);
                 assert!(!is_more);
+            }
+            // SendMsgZc with two notification
+            66 => {
+                if cqe.result() > 0 {
+                    assert!(is_more);
+                } else {
+                    assert!(!is_more);
+                }
             }
             // RecvMsgMulti
             77 => {
