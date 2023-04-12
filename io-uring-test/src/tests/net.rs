@@ -1291,9 +1291,10 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     // We cannot probe for the former, so we check for the latter as a proxy instead.
     require!(
         test;
-        test.probe.is_supported(opcode::RecvMsg::CODE);
+        test.probe.is_supported(opcode::RecvMsgMulti::CODE);
         test.probe.is_supported(opcode::ProvideBuffers::CODE);
         test.probe.is_supported(opcode::SendMsgZc::CODE);
+        test.probe.is_supported(opcode::SendMsg::CODE);
     );
 
     println!("test udp_recvmsg_multishot");
