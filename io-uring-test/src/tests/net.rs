@@ -1332,11 +1332,14 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     msghdr.msg_namelen = 32;
     msghdr.msg_controllen = 0;
 
-    let recvmsg_e =
-        opcode::RecvMsgMulti::new(Fd(server_socket.as_raw_fd()), &msghdr as *const _, BUF_GROUP)
-            .build()
-            .user_data(77)
-            .into();
+    let recvmsg_e = opcode::RecvMsgMulti::new(
+        Fd(server_socket.as_raw_fd()),
+        &msghdr as *const _,
+        BUF_GROUP,
+    )
+    .build()
+    .user_data(77)
+    .into();
     unsafe { ring.submission().push(&recvmsg_e)? };
     ring.submitter().submit().unwrap();
 
@@ -1350,7 +1353,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     let bufs1 = [io::IoSlice::new(b"testfooo for me")];
     let bufs2 = [io::IoSlice::new(b"testbarbar for you and me")];
 
-    let mut msghdr1: libc::msghdr = unsafe{mem::zeroed()};
+    let mut msghdr1: libc::msghdr = unsafe { mem::zeroed() };
     msghdr1.msg_name = server_addr.as_ptr() as *const _ as *mut _;
     msghdr1.msg_namelen = server_addr.len();
     msghdr1.msg_iov = bufs1.as_ptr() as *const _ as *mut _;
@@ -1363,7 +1366,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     unsafe { ring.submission().push(&send_msg_1)? };
     ring.submitter().submit().unwrap();
 
-    let mut msghdr2: libc::msghdr = unsafe{mem::zeroed()};
+    let mut msghdr2: libc::msghdr = unsafe { mem::zeroed() };
     msghdr2.msg_name = server_addr.as_ptr() as *const _ as *mut _;
     msghdr2.msg_namelen = server_addr.len();
     msghdr2.msg_iov = bufs2.as_ptr() as *const _ as *mut _;
@@ -1396,7 +1399,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
                 let buf_id = io_uring::cqueue::buffer_select(cqe.flags()).unwrap();
                 let tmp_buf = &buffers[buf_id as usize];
                 let msg = types::RecvMsgOut::parse(tmp_buf, &msghdr).unwrap();
-                assert!([25,15].contains(&msg.payload_data().len()));
+                assert!([25, 15].contains(&msg.payload_data().len()));
                 assert!(!msg.is_payload_truncated());
                 assert!(!msg.is_control_data_truncated());
                 assert_eq!(msg.control_data(), &[]);
@@ -1414,7 +1417,9 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
                 assert_eq!(addr.ip(), client_addr.ip());
                 assert_eq!(addr.port(), client_addr.port());
             }
-            _ => {unreachable!()}
+            _ => {
+                unreachable!()
+            }
         }
     }
 
