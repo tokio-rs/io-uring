@@ -1186,7 +1186,7 @@ opcode! {
 }
 
 opcode! {
-    /// Register `nbufs` buffers that each have the length `len` with ids starting from `big` in the
+    /// Register `nbufs` buffers that each have the length `len` with ids starting from `bid` in the
     /// group `bgid` that can be used for any request. See
     /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     pub struct ProvideBuffers {
