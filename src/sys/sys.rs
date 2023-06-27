@@ -170,6 +170,13 @@ fn bindgen_test_layout___kernel_timespec() {
         16usize,
         concat!("Size of: ", stringify!(__kernel_timespec))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<__kernel_timespec>(),
+        4usize,
+        concat!("Alignment of ", stringify!(__kernel_timespec))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<__kernel_timespec>(),
         8usize,
@@ -212,6 +219,13 @@ fn bindgen_test_layout_open_how() {
         24usize,
         concat!("Size of: ", stringify!(open_how))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<open_how>(),
+        4usize,
+        concat!("Alignment of ", stringify!(open_how))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<open_how>(),
         8usize,
@@ -330,6 +344,13 @@ fn bindgen_test_layout_io_uring_sqe__bindgen_ty_1() {
         8usize,
         concat!("Size of: ", stringify!(io_uring_sqe__bindgen_ty_1))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_sqe__bindgen_ty_1>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_sqe__bindgen_ty_1))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_sqe__bindgen_ty_1>(),
         8usize,
@@ -381,6 +402,13 @@ fn bindgen_test_layout_io_uring_sqe__bindgen_ty_2() {
         8usize,
         concat!("Size of: ", stringify!(io_uring_sqe__bindgen_ty_2))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_sqe__bindgen_ty_2>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_sqe__bindgen_ty_2))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_sqe__bindgen_ty_2>(),
         8usize,
@@ -830,6 +858,16 @@ fn bindgen_test_layout_io_uring_sqe__bindgen_ty_6__bindgen_ty_1() {
             stringify!(io_uring_sqe__bindgen_ty_6__bindgen_ty_1)
         )
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_sqe__bindgen_ty_6__bindgen_ty_1>(),
+        4usize,
+        concat!(
+            "Alignment of ",
+            stringify!(io_uring_sqe__bindgen_ty_6__bindgen_ty_1)
+        )
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_sqe__bindgen_ty_6__bindgen_ty_1>(),
         8usize,
@@ -869,6 +907,13 @@ fn bindgen_test_layout_io_uring_sqe__bindgen_ty_6() {
         16usize,
         concat!("Size of: ", stringify!(io_uring_sqe__bindgen_ty_6))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_sqe__bindgen_ty_6>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_sqe__bindgen_ty_6))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_sqe__bindgen_ty_6>(),
         8usize,
@@ -903,6 +948,13 @@ fn bindgen_test_layout_io_uring_sqe() {
         64usize,
         concat!("Size of: ", stringify!(io_uring_sqe))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_sqe>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_sqe))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_sqe>(),
         8usize,
@@ -1067,6 +1119,13 @@ fn bindgen_test_layout_io_uring_cqe() {
         16usize,
         concat!("Size of: ", stringify!(io_uring_cqe))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_cqe>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_cqe))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_cqe>(),
         8usize,
@@ -1137,6 +1196,13 @@ fn bindgen_test_layout_io_sqring_offsets() {
         40usize,
         concat!("Size of: ", stringify!(io_sqring_offsets))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_sqring_offsets>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_sqring_offsets))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_sqring_offsets>(),
         8usize,
@@ -1255,6 +1321,13 @@ fn bindgen_test_layout_io_cqring_offsets() {
         40usize,
         concat!("Size of: ", stringify!(io_cqring_offsets))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_cqring_offsets>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_cqring_offsets))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_cqring_offsets>(),
         8usize,
@@ -1374,6 +1447,13 @@ fn bindgen_test_layout_io_uring_params() {
         120usize,
         concat!("Size of: ", stringify!(io_uring_params))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_params>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_params))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_params>(),
         8usize,
@@ -1525,6 +1605,13 @@ fn bindgen_test_layout_io_uring_files_update() {
         16usize,
         concat!("Size of: ", stringify!(io_uring_files_update))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_files_update>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_files_update))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_files_update>(),
         8usize,
@@ -1580,6 +1667,13 @@ fn bindgen_test_layout_io_uring_rsrc_register() {
         32usize,
         concat!("Size of: ", stringify!(io_uring_rsrc_register))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_rsrc_register>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_rsrc_register))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_rsrc_register>(),
         8usize,
@@ -1653,6 +1747,13 @@ fn bindgen_test_layout_io_uring_rsrc_update() {
         16usize,
         concat!("Size of: ", stringify!(io_uring_rsrc_update))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_rsrc_update>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_rsrc_update))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_rsrc_update>(),
         8usize,
@@ -1709,6 +1810,13 @@ fn bindgen_test_layout_io_uring_rsrc_update2() {
         32usize,
         concat!("Size of: ", stringify!(io_uring_rsrc_update2))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_rsrc_update2>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_rsrc_update2))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_rsrc_update2>(),
         8usize,
@@ -1791,6 +1899,13 @@ fn bindgen_test_layout_io_uring_notification_slot() {
         32usize,
         concat!("Size of: ", stringify!(io_uring_notification_slot))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_notification_slot>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_notification_slot))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_notification_slot>(),
         8usize,
@@ -1836,6 +1951,13 @@ fn bindgen_test_layout_io_uring_notification_register() {
         32usize,
         concat!("Size of: ", stringify!(io_uring_notification_register))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_notification_register>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_notification_register))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_notification_register>(),
         8usize,
@@ -2174,6 +2296,13 @@ fn bindgen_test_layout_io_uring_buf() {
         16usize,
         concat!("Size of: ", stringify!(io_uring_buf))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_buf>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_buf))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_buf>(),
         8usize,
@@ -2251,6 +2380,16 @@ fn bindgen_test_layout_io_uring_buf_ring__bindgen_ty_1__bindgen_ty_1() {
             stringify!(io_uring_buf_ring__bindgen_ty_1__bindgen_ty_1)
         )
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_buf_ring__bindgen_ty_1__bindgen_ty_1>(),
+        4usize,
+        concat!(
+            "Alignment of ",
+            stringify!(io_uring_buf_ring__bindgen_ty_1__bindgen_ty_1)
+        )
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_buf_ring__bindgen_ty_1__bindgen_ty_1>(),
         8usize,
@@ -2310,6 +2449,13 @@ fn bindgen_test_layout_io_uring_buf_ring__bindgen_ty_1() {
         16usize,
         concat!("Size of: ", stringify!(io_uring_buf_ring__bindgen_ty_1))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_buf_ring__bindgen_ty_1>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_buf_ring__bindgen_ty_1))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_buf_ring__bindgen_ty_1>(),
         8usize,
@@ -2342,6 +2488,13 @@ fn bindgen_test_layout_io_uring_buf_ring() {
         16usize,
         concat!("Size of: ", stringify!(io_uring_buf_ring))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_buf_ring>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_buf_ring))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_buf_ring>(),
         8usize,
@@ -2375,6 +2528,13 @@ fn bindgen_test_layout_io_uring_buf_reg() {
         40usize,
         concat!("Size of: ", stringify!(io_uring_buf_reg))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_buf_reg>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_buf_reg))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_buf_reg>(),
         8usize,
@@ -2455,6 +2615,13 @@ fn bindgen_test_layout_io_uring_getevents_arg() {
         24usize,
         concat!("Size of: ", stringify!(io_uring_getevents_arg))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_getevents_arg>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_getevents_arg))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_getevents_arg>(),
         8usize,
@@ -2520,6 +2687,13 @@ fn bindgen_test_layout_io_uring_sync_cancel_reg() {
         64usize,
         concat!("Size of: ", stringify!(io_uring_sync_cancel_reg))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_sync_cancel_reg>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_sync_cancel_reg))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_sync_cancel_reg>(),
         8usize,
@@ -2593,6 +2767,13 @@ fn bindgen_test_layout_io_uring_file_index_range() {
         16usize,
         concat!("Size of: ", stringify!(io_uring_file_index_range))
     );
+    #[cfg(target_arch = "x86")]
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_file_index_range>(),
+        4usize,
+        concat!("Alignment of ", stringify!(io_uring_file_index_range))
+    );
+    #[cfg(not(target_arch = "x86"))]
     assert_eq!(
         ::core::mem::align_of::<io_uring_file_index_range>(),
         8usize,
