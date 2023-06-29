@@ -11,7 +11,7 @@ use std::io;
 
 use libc::*;
 
-#[cfg(feature = "direct-syscall")]
+#[cfg(all(feature = "direct-syscall", any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64")))]
 fn to_result(ret: c_int) -> io::Result<c_int> {
     if ret >= 0 {
         Ok(ret)
@@ -20,7 +20,7 @@ fn to_result(ret: c_int) -> io::Result<c_int> {
     }
 }
 
-#[cfg(not(feature = "direct-syscall"))]
+#[cfg(not(all(feature = "direct-syscall", any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64"))))]
 fn to_result(ret: c_int) -> io::Result<c_int> {
     if ret >= 0 {
         Ok(ret)
@@ -56,7 +56,7 @@ const SYSCALL_ENTER: c_long = __NR_io_uring_enter as _;
 #[cfg(not(feature = "bindgen"))]
 const SYSCALL_ENTER: c_long = libc::SYS_io_uring_enter;
 
-#[cfg(not(feature = "direct-syscall"))]
+#[cfg(not(all(feature = "direct-syscall", any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64"))))]
 pub unsafe fn io_uring_register(
     fd: c_int,
     opcode: c_uint,
@@ -72,7 +72,7 @@ pub unsafe fn io_uring_register(
     ) as _)
 }
 
-#[cfg(feature = "direct-syscall")]
+#[cfg(all(feature = "direct-syscall", any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64")))]
 pub unsafe fn io_uring_register(
     fd: c_int,
     opcode: c_uint,
@@ -88,17 +88,17 @@ pub unsafe fn io_uring_register(
     ) as _)
 }
 
-#[cfg(not(feature = "direct-syscall"))]
+#[cfg(not(all(feature = "direct-syscall", any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64"))))]
 pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> io::Result<c_int> {
     to_result(syscall(SYSCALL_SETUP, entries as c_long, p as c_long) as _)
 }
 
-#[cfg(feature = "direct-syscall")]
+#[cfg(all(feature = "direct-syscall", any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64")))]
 pub unsafe fn io_uring_setup(entries: c_uint, p: *mut io_uring_params) -> io::Result<c_int> {
     to_result(sc::syscall2(SYSCALL_SETUP as usize, entries as usize, p as usize) as _)
 }
 
-#[cfg(not(feature = "direct-syscall"))]
+#[cfg(not(all(feature = "direct-syscall", any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64"))))]
 pub unsafe fn io_uring_enter(
     fd: c_int,
     to_submit: c_uint,
@@ -118,7 +118,7 @@ pub unsafe fn io_uring_enter(
     ) as _)
 }
 
-#[cfg(feature = "direct-syscall")]
+#[cfg(all(feature = "direct-syscall", any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64")))]
 pub unsafe fn io_uring_enter(
     fd: c_int,
     to_submit: c_uint,

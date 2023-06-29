@@ -26,6 +26,7 @@ io_safety = []
 bitflags = "1"
 
 libc = { version = "0.2.98", default-features = false }
+[target.'cfg(any(target_arch = "aarch64", target_arch = "riscv64", target_arch = "x86_64"))'.dependencies]
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]
