@@ -5,7 +5,11 @@
     non_snake_case,
     unused_qualifications
 )]
-#![allow(clippy::unreadable_literal, clippy::missing_safety_doc)]
+#![allow(
+    clippy::unreadable_literal,
+    clippy::missing_safety_doc,
+    clippy::incorrect_clone_impl_on_copy_type
+)]
 
 use std::io;
 
