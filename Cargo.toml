@@ -1,6 +1,6 @@
 [package]
 name = "io-uring"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -29,7 +29,7 @@ libc = { version = "0.2.98", default-features = false }
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]
-bindgen = { version = "0.64", optional = true }
+bindgen = { version = "0.66", optional = true }
 
 [dev-dependencies]
 anyhow = "1"

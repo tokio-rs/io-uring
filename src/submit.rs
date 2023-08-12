@@ -441,8 +441,7 @@ impl<'a> Submitter<'a> {
             ring_addr,
             ring_entries: ring_entries as _,
             bgid,
-            pad: 0,
-            resv: Default::default(),
+            ..Default::default()
         };
         execute(
             self.fd.as_raw_fd(),
@@ -461,8 +460,7 @@ impl<'a> Submitter<'a> {
             ring_addr: 0,
             ring_entries: 0,
             bgid,
-            pad: 0,
-            resv: Default::default(),
+            ..Default::default()
         };
         execute(
             self.fd.as_raw_fd(),
