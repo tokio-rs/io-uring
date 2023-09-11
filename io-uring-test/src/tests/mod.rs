@@ -1,3 +1,4 @@
+pub mod cancel;
 pub mod fs;
 pub mod net;
 pub mod poll;
