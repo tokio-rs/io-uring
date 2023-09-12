@@ -195,6 +195,14 @@ impl Timespec {
     }
 }
 
+impl From<std::time::Duration> for Timespec {
+    fn from(value: std::time::Duration) -> Self {
+        Timespec::new()
+            .sec(value.as_secs())
+            .nsec(value.subsec_nanos())
+    }
+}
+
 /// Submit arguments
 ///
 /// Note that arguments that exceed their lifetime will fail to compile.
@@ -613,9 +621,20 @@ impl CancelBuilder {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::types::sealed::Target;
 
     use super::*;
+
+    #[test]
+    fn timespec_from_duration_converts_correctly() {
+        let duration = Duration::new(2, 500);
+        let timespec = Timespec::from(duration);
+
+        assert_eq!(timespec.0.tv_sec as u64, duration.as_secs());
+        assert_eq!(timespec.0.tv_nsec as u32, duration.subsec_nanos());
+    }
 
     #[test]
     fn test_cancel_builder_flags() {
