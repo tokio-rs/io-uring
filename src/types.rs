@@ -51,12 +51,14 @@ pub use sys::__kernel_rwf_t as RwFlags;
 
 /// Opaque types, you should use [`statx`](struct@libc::statx) instead.
 #[repr(C)]
+#[allow(non_camel_case_types)]
 pub struct statx {
     _priv: (),
 }
 
 /// Opaque types, you should use [`epoll_event`](libc::epoll_event) instead.
 #[repr(C)]
+#[allow(non_camel_case_types)]
 pub struct epoll_event {
     _priv: (),
 }
@@ -543,6 +545,8 @@ impl CancelBuilder {
     /// Create a new [CancelBuilder] which will match any in-flight request.
     ///
     /// This will cancel every in-flight request in the ring.
+    ///
+    /// Async cancellation matching any requests is only available since 5.19.
     pub const fn any() -> Self {
         Self {
             flags: AsyncCancelFlags::ANY,
@@ -570,6 +574,8 @@ impl CancelBuilder {
     ///
     /// The first request with the given `fd` value will be canceled. [CancelBuilder::all](#method.all)
     /// can be called to instead match every request with the provided `fd` value.
+    ///
+    /// FD async cancellation is only available since 5.19.
     pub fn fd(fd: impl sealed::UseFixed) -> Self {
         let mut flags = AsyncCancelFlags::FD;
         let target = fd.into();
@@ -587,9 +593,21 @@ impl CancelBuilder {
     /// rather than just the first one.
     ///
     /// This has no effect when combined with [CancelBuilder::any](#method.any).
+    ///
+    /// Async cancellation matching all requests is only available since 5.19.
     pub fn all(mut self) -> Self {
         self.flags.insert(AsyncCancelFlags::ALL);
         self
+    }
+
+    pub(crate) fn to_fd(&self) -> i32 {
+        self.fd
+            .as_ref()
+            .map(|target| match *target {
+                sealed::Target::Fd(fd) => fd,
+                sealed::Target::Fixed(idx) => idx as i32,
+            })
+            .unwrap_or(-1)
     }
 }
 
