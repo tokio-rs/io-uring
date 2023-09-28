@@ -648,19 +648,20 @@ opcode! {
     pub struct AsyncCancel {
         user_data: { u64 }
         ;;
-
+        flags : types::AsyncCancelFlags = types::AsyncCancelFlags::empty()
         // TODO flags
     }
 
     pub const CODE = sys::IORING_OP_ASYNC_CANCEL;
 
     pub fn build(self) -> Entry {
-        let AsyncCancel { user_data } = self;
+        let AsyncCancel { user_data, flags } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = -1;
         sqe.__bindgen_anon_2.addr = user_data;
+        sqe.__bindgen_anon_3.cancel_flags = flags.bits();
         Entry(sqe)
     }
 }

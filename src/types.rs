@@ -110,7 +110,7 @@ bitflags! {
 bitflags! {
     /// Options for [`AsyncCancel`](super::AsyncCancel) and
     /// [`Submitter::register_sync_cancel`](super::Submitter::register_sync_cancel).
-    pub(crate) struct AsyncCancelFlags: u32 {
+    pub struct AsyncCancelFlags: u32 {
         /// Cancel all requests that match the given criteria, rather
         /// than just canceling the first one found.
         ///
