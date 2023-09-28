@@ -649,7 +649,6 @@ opcode! {
         user_data: { u64 }
         ;;
         flags : types::AsyncCancelFlags = types::AsyncCancelFlags::empty()
-        // TODO flags
     }
 
     pub const CODE = sys::IORING_OP_ASYNC_CANCEL;
