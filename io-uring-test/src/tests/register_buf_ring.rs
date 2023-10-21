@@ -664,6 +664,15 @@ fn buf_ring_play<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     normal_check(&buf3, 1); // bid 1 should come back first.
     normal_check(&buf4, 0); // bid 0 should come back second.
 
+    std::mem::drop(buf3);
+    std::mem::drop(buf4);
+
+    // Now we loop u16::MAX+1 times to ensure proper behavior when the tail
+    // overflows the bounds of a u16.
+    for _ in 0..(u16::MAX as usize + 1) {
+        let _ = buf_ring_read(ring, &buf_ring, fd, len)?;
+    }
+
     // Be nice. In this test, the buf_ring is manually unregistered.
     // There is no need to ensure the buffers have been dropped first.
     buf_ring.rc.unregister(ring)?;
