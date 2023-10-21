@@ -305,7 +305,7 @@ impl InnerBufRing {
         // for computing the ring entry, not to the tail value itself.
 
         let old_tail = self.local_tail.get();
-        self.local_tail.set(old_tail + 1);
+        self.local_tail.set(old_tail.wrapping_add(1));
         let ring_idx = old_tail & self.mask();
 
         let entries = self.ring_start.as_ptr_mut() as *mut BufRingEntry;
