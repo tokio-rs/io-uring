@@ -667,9 +667,9 @@ fn buf_ring_play<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     std::mem::drop(buf3);
     std::mem::drop(buf4);
 
-    // Now we loop u16::MAX+1 times to ensure proper behavior when the tail
+    // Now we loop u16::MAX times to ensure proper behavior when the tail
     // overflows the bounds of a u16.
-    for _ in 0..(u16::MAX as usize + 1) {
+    for _ in 0..=u16::MAX {
         let _ = buf_ring_read(ring, &buf_ring, fd, len)?;
     }
 
