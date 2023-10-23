@@ -305,7 +305,7 @@ impl InnerBufRing {
         // for computing the ring entry, not to the tail value itself.
 
         let old_tail = self.local_tail.get();
-        self.local_tail.set(old_tail + 1);
+        self.local_tail.set(old_tail.wrapping_add(1));
         let ring_idx = old_tail & self.mask();
 
         let entries = self.ring_start.as_ptr_mut() as *mut BufRingEntry;
@@ -663,6 +663,15 @@ fn buf_ring_play<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let buf4 = buf_ring_read(ring, &buf_ring, fd, len)?;
     normal_check(&buf3, 1); // bid 1 should come back first.
     normal_check(&buf4, 0); // bid 0 should come back second.
+
+    std::mem::drop(buf3);
+    std::mem::drop(buf4);
+
+    // Now we loop u16::MAX times to ensure proper behavior when the tail
+    // overflows the bounds of a u16.
+    for _ in 0..=u16::MAX {
+        let _ = buf_ring_read(ring, &buf_ring, fd, len)?;
+    }
 
     // Be nice. In this test, the buf_ring is manually unregistered.
     // There is no need to ensure the buffers have been dropped first.
