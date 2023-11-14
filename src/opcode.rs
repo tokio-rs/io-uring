@@ -871,7 +871,7 @@ opcode! {
         /// `offset` contains the read or write offset.
         ///
         /// If `fd` does not refer to a seekable file, `offset` must be set to zero.
-        /// If `offsett` is set to `-1`, the offset will use (and advance) the file position,
+        /// If `offset` is set to `-1`, the offset will use (and advance) the file position,
         /// like the `read(2)` and `write(2)` system calls.
         offset: u64 = 0,
         ioprio: u16 = 0,
