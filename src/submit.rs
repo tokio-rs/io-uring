@@ -399,26 +399,11 @@ impl<'a> Submitter<'a> {
     /// Tell io_uring on what CPUs the async workers can run. By default, async workers
     /// created by io_uring will inherit the CPU mask of its parent. This is usually
     /// all the CPUs in the system, unless the parent is being run with a limited set.
-    pub fn register_iowq_aff(&self, cores: &[u32]) -> io::Result<()> {
-        let mut cpu_set: libc::cpu_set_t = unsafe { mem::zeroed() };
-        let max_core = (mem::size_of::<libc::cpu_set_t>() * 8) as u32;
-
-        for &core in cores {
-            if core >= max_core {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Could not set {} in cpu_set", core),
-                ));
-            }
-            unsafe {
-                libc::CPU_SET(core as usize, &mut cpu_set);
-            }
-        }
-
+    pub fn register_iowq_aff(&self, cpu_set: &libc::cpu_set_t) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_IOWQ_AFF,
-            &cpu_set as *const _ as *const libc::c_void,
+            cpu_set as *const _ as *const libc::c_void,
             mem::size_of::<libc::cpu_set_t>() as u32,
         )
         .map(drop)
