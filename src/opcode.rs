@@ -1453,8 +1453,8 @@ opcode! {
         sqe.len = result as u32;
         sqe.__bindgen_anon_1.off = user_data;
         sqe.__bindgen_anon_3.msg_ring_flags = opcode_flags;
-        if let Some(_flags) = user_flags {
-            sqe.__bindgen_anon_5.file_index = _flags;
+        if let Some(flags) = user_flags {
+            sqe.__bindgen_anon_5.file_index = flags;
             unsafe {sqe.__bindgen_anon_3.msg_ring_flags |= sys::IORING_MSG_RING_FLAGS_PASS};
         }
         Entry(sqe)
