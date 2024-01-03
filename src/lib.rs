@@ -301,6 +301,15 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
+    /// If this flag is set, the IORING_SETUP_SQPOLL feature no longer
+    /// requires the use of fixed files. Any normal file descriptor can be
+    /// used for IO commands without needing registration.
+    /// Available since kernel 5.11.
+    pub fn feat_sqpoll_nonfixed(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_FEAT_SQPOLL_NONFIXED;
+        self
+    }
+
     /// Bind the kernel's poll thread to the specified cpu. This flag is only meaningful when
     /// [`Builder::setup_sqpoll`] is enabled.
     pub fn setup_sqpoll_cpu(&mut self, cpu: u32) -> &mut Self {
@@ -403,6 +412,91 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// userspace tasks can call [`Submitter::enter`] and higher level APIs. Available since 6.0.
     pub fn setup_single_issuer(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SINGLE_ISSUER;
+        self
+    }
+
+    /// If this flag is set, then io_uring supports using an internal poll
+    /// mechanism to drive data/space readiness. This means that requests
+    /// that cannot read or write data to a file no longer need to be
+    /// punted to an async thread for handling, instead they will begin
+    /// operation when the file is ready. This is similar to doing poll +
+    /// read/write in userspace, but eliminates the need to do so. If this
+    /// flag is set, requests waiting on space/data consume a lot less
+    /// resources doing so as they are not blocking a thread.
+    /// Available since kernel 5.7.
+    pub fn feat_fast_poll(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_FEAT_FAST_POLL;
+        self
+    }
+
+    /// If this flag is set, io_uring is using native workers for its async
+    /// helpers. Previous kernels used kernel threads that assumed the
+    /// identity of the original io_uring owning task, but later kernels
+    /// will actively create what looks more like regular process threads instead.
+    /// Available since kernel 5.12.
+    pub fn feat_native_workers(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_FEAT_NATIVE_WORKERS;
+        self
+    }
+
+    /// If this flag is set, then io_uring supports a variety of features
+    /// related to fixed files and buffers. In particular, it indicates
+    /// that registered buffers can be updated in-place, whereas before the
+    /// full set would have to be unregistered first.
+    /// Available since kernel 5.13.
+    pub fn feat_rsrc_tags(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_FEAT_RSRC_TAGS;
+        self
+    }
+
+    /// If this flag is set, then io_uring supports setting
+    /// IOSQE_CQE_SKIP_SUCCESS in the submitted SQE, indicating that no CQE
+    /// should be generated for this SQE if it executes normally. If an
+    /// error happens processing the SQE, a CQE with the appropriate error
+    /// value will still be generated.
+    /// Available since kernel 5.17.
+    pub fn feat_cqe_skip(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_FEAT_CQE_SKIP;
+        self
+    }
+
+    /// If this flag is set, then io_uring supports sane assignment of
+    /// files for SQEs that have dependencies. For example, if a chain of
+    /// SQEs are submitted with IOSQE_IO_LINK, then kernels without this
+    /// flag will prepare the file for each link upfront. If a previous
+    /// link opens a file with a known index, eg if direct descriptors are
+    /// used with open or accept, then file assignment needs to happen post
+    /// execution of that SQE. If this flag is set, then the kernel will
+    /// defer file assignment until execution of a given request is
+    /// started. Available since kernel 5.17.
+    pub fn feat_linked_file(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_FEAT_LINKED_FILE;
+        self
+    }
+
+    /// If this flag is set, io_uring supports almost never dropping
+    /// completion events. If a completion event occurs and the CQ ring is
+    /// full, the kernel stores the event internally until such a time that
+    /// the CQ ring has room for more entries. If this overflow condition
+    /// is entered, attempting to submit more IO will fail with the -EBUSY
+    /// error value, if it can't flush the overflown events to the CQ ring.
+    /// If this happens, the application must reap events from the CQ ring
+    /// and attempt the submit again. If the kernel has no free memory to
+    /// store the event internally it will be visible by an increase in the
+    /// overflow value on the cqring.
+    /// Additionally [`Submitter::enter`] will return -EBADR the next time it
+    /// would otherwise sleep waiting for completions (since kernel 5.19)
+    /// Available since kernel 5.5.
+    pub fn feat_nodrop(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_FEAT_NODROP;
+        self
+    }
+
+    /// If this flag is set, applications can be certain that any data for
+    /// async offload has been consumed when the kernel has consumed the SQE.
+    /// Available since kernel 5.5.
+    pub fn feat_submit_stable(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_FEAT_SUBMIT_STABLE;
         self
     }
 
