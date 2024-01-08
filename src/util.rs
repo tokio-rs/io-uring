@@ -127,7 +127,7 @@ pub(crate) const fn cast_ptr<T>(n: &T) -> *const T {
 ///
 /// This is a workaround for the lack of panic-in-const in older
 /// toolchains.
-#[allow(unconditional_panic)]
+#[allow(unconditional_panic, clippy::out_of_bounds_indexing)]
 pub(crate) const fn unwrap_u32(t: Option<u32>) -> u32 {
     match t {
         Some(v) => v,
@@ -139,7 +139,7 @@ pub(crate) const fn unwrap_u32(t: Option<u32>) -> u32 {
 ///
 /// This is a workaround for the lack of panic-in-const in older
 /// toolchains.
-#[allow(unconditional_panic)]
+#[allow(unconditional_panic, clippy::out_of_bounds_indexing)]
 pub(crate) const fn unwrap_nonzero(t: Option<NonZeroU32>) -> NonZeroU32 {
     match t {
         Some(v) => v,
