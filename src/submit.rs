@@ -509,12 +509,13 @@ impl<'a> Submitter<'a> {
         let flags = builder.flags.bits();
         let fd = builder.to_fd();
 
-        let arg = sys::io_uring_sync_cancel_reg {
-            addr: user_data,
-            fd,
-            flags,
-            timeout: timespec,
-            pad: [0u64; 4],
+        let arg = {
+            let mut arg = sys::io_uring_sync_cancel_reg::default();
+            arg.addr = user_data;
+            arg.fd = fd;
+            arg.flags = flags;
+            arg.timeout = timespec;
+            arg
         };
         execute(
             self.fd.as_raw_fd(),
