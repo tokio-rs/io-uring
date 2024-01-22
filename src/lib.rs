@@ -612,7 +612,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> AsRawFd for IoUring<S, C> {
 }
 
 #[cfg(feature = "io_safety")]
-impl AsFd for IoUring {
+impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> AsFd for IoUring<S, C> {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.fd.as_fd()
     }
