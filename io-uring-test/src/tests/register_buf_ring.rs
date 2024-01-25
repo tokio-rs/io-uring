@@ -189,7 +189,7 @@ impl InnerBufRing {
         // it is unregistered. The backing store is an AnonymousMmap which remains valid until it
         // is dropped which in this case, is when Self is dropped.
         let res = unsafe {
-            ring.submitter().register_buf_ring(
+            ring.submitter().register_buf_ring_unchecked(
                 self.ring_start.as_ptr() as _,
                 self.ring_entries(),
                 bgid,

@@ -1,11 +1,13 @@
+use std::convert::TryFrom;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, mem, ptr};
 
+use crate::buf_ring::BufRing;
 use crate::register::{execute, Probe};
 use crate::sys;
 use crate::types::{CancelBuilder, Timespec};
-use crate::util::{cast_ptr, OwnedFd};
+use crate::util::{cast_ptr, Mmap, OwnedFd};
 use crate::Parameters;
 
 use crate::register::Restriction;
@@ -437,6 +439,26 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
+    pub fn register_buf_ring(
+        &self,
+        ring_entries: u16,
+        bgid: u16,
+        entry_size: u32,
+    ) -> io::Result<BufRing> {
+        let bytes = || {
+            usize::from(ring_entries).checked_mul(
+                mem::size_of::<sys::io_uring_buf>()
+                    .checked_add(usize::try_from(entry_size).unwrap())?,
+            )
+        };
+
+        let ring = Mmap::new_anon(bytes().ok_or(io::ErrorKind::InvalidInput)?)?;
+        unsafe {
+            self.register_buf_ring_unchecked(ring.as_mut_ptr() as u64, ring_entries, bgid)?;
+        }
+        Ok(BufRing::init(ring, ring_entries, entry_size))
+    }
+
     /// Register buffer ring for provided buffers.
     ///
     /// Details can be found in the io_uring_register_buf_ring.3 man page.
@@ -451,7 +473,7 @@ impl<'a> Submitter<'a> {
     /// Developers must ensure that the `ring_addr` and its length represented by `ring_entries`
     /// are valid and will be valid until the bgid is unregistered or the ring destroyed,
     /// otherwise undefined behaviour may occur.
-    pub unsafe fn register_buf_ring(
+    pub unsafe fn register_buf_ring_unchecked(
         &self,
         ring_addr: u64,
         ring_entries: u16,

@@ -37,6 +37,26 @@ impl Mmap {
         }
     }
 
+    pub fn new_anon(len: usize) -> io::Result<Mmap> {
+        unsafe {
+            match libc::mmap(
+                ptr::null_mut(),
+                len,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
+                0,
+                0,
+            ) {
+                libc::MAP_FAILED => Err(io::Error::last_os_error()),
+                addr => {
+                    // here, `mmap` will never return null
+                    let addr = ptr::NonNull::new_unchecked(addr);
+                    Ok(Mmap { addr, len })
+                }
+            }
+        }
+    }
+
     /// Do not make the stored memory accessible by child processes after a `fork`.
     pub fn dontfork(&self) -> io::Result<()> {
         match unsafe { libc::madvise(self.addr.as_ptr(), self.len, libc::MADV_DONTFORK) } {
