@@ -43,6 +43,7 @@ pub(crate) mod sealed {
 use crate::sys;
 use crate::util::{cast_ptr, unwrap_nonzero, unwrap_u32};
 use bitflags::bitflags;
+use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::os::unix::io::RawFd;
@@ -377,10 +378,7 @@ pub struct RecvMsgOut<'buf> {
     /// If it is smaller, it gets 0-padded to fill the whole field. In either case,
     /// this fixed amount of space is reserved in the result buffer.
     msghdr_name_len: usize,
-    /// The fixed length of the control field, in bytes.
-    ///
-    /// This follows the same semantics as the field above, but for control data.
-    msghdr_control_len: usize,
+
     name_data: &'buf [u8],
     control_data: &'buf [u8],
     payload_data: &'buf [u8],
@@ -396,7 +394,15 @@ impl<'buf> RecvMsgOut<'buf> {
     /// (only `msg_namelen` and `msg_controllen` fields are relevant).
     #[allow(clippy::result_unit_err)]
     pub fn parse(buffer: &'buf [u8], msghdr: &libc::msghdr) -> Result<Self, ()> {
-        if buffer.len() < std::mem::size_of::<sys::io_uring_recvmsg_out>() {
+        let msghdr_name_len = usize::try_from(msghdr.msg_namelen).unwrap();
+        let msghdr_control_len = usize::try_from(msghdr.msg_controllen).unwrap();
+
+        if Self::DATA_START
+            .checked_add(msghdr_name_len)
+            .and_then(|acc| acc.checked_add(msghdr_control_len))
+            .map(|header_len| buffer.len() < header_len)
+            .unwrap_or(true)
+        {
             return Err(());
         }
         // SAFETY: buffer (minimum) length is checked here above.
@@ -407,45 +413,36 @@ impl<'buf> RecvMsgOut<'buf> {
                 .read_unaligned()
         };
 
-        let msghdr_name_len = msghdr.msg_namelen as _;
-        let msghdr_control_len = msghdr.msg_controllen as _;
-
-        // Check total length upfront, so that further logic here
-        // below can safely use unchecked/saturating math.
-        let length_overflow = Some(Self::DATA_START)
-            .and_then(|acc| acc.checked_add(msghdr_name_len))
-            .and_then(|acc| acc.checked_add(msghdr_control_len))
-            .and_then(|acc| acc.checked_add(header.payloadlen as usize))
-            .map(|total_len| total_len > buffer.len())
-            .unwrap_or(true);
-        if length_overflow {
-            return Err(());
-        }
-
+        // min is used because the header may indicate the true size of the data
+        // while what we received was truncated.
         let (name_data, control_start) = {
             let name_start = Self::DATA_START;
-            let name_size = usize::min(header.namelen as usize, msghdr_name_len);
-            let name_data_end = name_start.saturating_add(name_size);
-            let name_data = &buffer[name_start..name_data_end];
-            let name_field_end = name_start.saturating_add(msghdr_name_len);
-            (name_data, name_field_end)
+            let name_data_end =
+                name_start + usize::min(usize::try_from(header.namelen).unwrap(), msghdr_name_len);
+            let name_field_end = name_start + msghdr_name_len;
+            (&buffer[name_start..name_data_end], name_field_end)
         };
         let (control_data, payload_start) = {
-            let control_size = usize::min(header.controllen as usize, msghdr_control_len);
-            let control_data_end = control_start.saturating_add(control_size);
-            let control_data = &buffer[control_start..control_data_end];
-            let control_field_end = control_start.saturating_add(msghdr_control_len);
-            (control_data, control_field_end)
+            let control_data_end = control_start
+                + usize::min(
+                    usize::try_from(header.controllen).unwrap(),
+                    msghdr_control_len,
+                );
+            let control_field_end = control_start + msghdr_control_len;
+            (&buffer[control_start..control_data_end], control_field_end)
         };
         let payload_data = {
-            let payload_data_end = payload_start.saturating_add(header.payloadlen as usize);
+            let payload_data_end = payload_start
+                + usize::min(
+                    usize::try_from(header.payloadlen).unwrap(),
+                    buffer.len() - payload_start,
+                );
             &buffer[payload_start..payload_data_end]
         };
 
         Ok(Self {
             header,
             msghdr_name_len,
-            msghdr_control_len,
             name_data,
             control_data,
             payload_data,
@@ -490,7 +487,7 @@ impl<'buf> RecvMsgOut<'buf> {
     /// When `true`, data returned by `control_data()` is truncated and
     /// incomplete.
     pub fn is_control_data_truncated(&self) -> bool {
-        self.header.controllen as usize > self.msghdr_control_len
+        (self.header.flags & u32::try_from(libc::MSG_CTRUNC).unwrap()) != 0
     }
 
     /// Message control data, with the same semantics as `msghdr.msg_control`.
@@ -503,7 +500,7 @@ impl<'buf> RecvMsgOut<'buf> {
     /// When `true`, data returned by `payload_data()` is truncated and
     /// incomplete.
     pub fn is_payload_truncated(&self) -> bool {
-        self.header.flags & (libc::MSG_TRUNC as u32) != 0
+        (self.header.flags & u32::try_from(libc::MSG_TRUNC).unwrap()) != 0
     }
 
     /// Message payload, as buffered by the kernel.
