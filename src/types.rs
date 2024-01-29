@@ -508,6 +508,16 @@ impl<'buf> RecvMsgOut<'buf> {
         self.payload_data
     }
 
+    /// Return the length of the incoming `payload` data.
+    ///
+    /// This may be larger than the size of the content returned by
+    /// `payload_data()`, if the kernel could not fit all the incoming
+    /// data in the provided buffer size. In that case, payload data in
+    /// the result buffer gets truncated.
+    pub fn incoming_payload_len(&self) -> u32 {
+        self.header.payloadlen
+    }
+
     /// Message flags, with the same semantics as `msghdr.msg_flags`.
     pub fn flags(&self) -> u32 {
         self.header.flags
