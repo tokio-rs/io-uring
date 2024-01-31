@@ -6,9 +6,10 @@ macro_rules! require {
         $test:expr;
         $( $cond:expr ; )*
     ) => {
+        let test = $test;
         let mut cond = true;
 
-        if let Some(target) = $test.target.as_ref() {
+        if let Some(target) = test.target.as_ref() {
             cond &= function_name!().contains(target);
         }
 
@@ -20,7 +21,7 @@ macro_rules! require {
             return Ok(());
         }
 
-        $test.count.set($test.count.get() + 1);
+        test.count.set(test.count.get() + 1);
     }
 }
 

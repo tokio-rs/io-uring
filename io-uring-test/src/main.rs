@@ -4,11 +4,20 @@ mod tests;
 
 use io_uring::{cqueue, squeue, IoUring, Probe};
 use std::cell::Cell;
+use std::ffi::CStr;
+use std::mem;
 
 pub struct Test {
     probe: Probe,
     target: Option<String>,
     count: Cell<usize>,
+    kernel_version: semver::Version,
+}
+
+impl Test {
+    fn check_kernel_version(&self, min_version: &str) -> bool {
+        self.kernel_version >= semver::Version::parse(min_version).unwrap()
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -63,6 +72,16 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         probe,
         target: std::env::args().nth(1),
         count: Cell::new(0),
+        kernel_version: {
+            let mut uname: libc::utsname = unsafe { mem::zeroed() };
+            unsafe {
+                assert!(libc::uname(&mut uname) >= 0);
+            }
+
+            let version = unsafe { CStr::from_ptr(uname.release.as_ptr()) };
+            let version = version.to_str().unwrap();
+            semver::Version::parse(version).unwrap()
+        },
     };
 
     tests::queue::test_nop(&mut ring, &test)?;
@@ -132,6 +151,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::net::test_shutdown(&mut ring, &test)?;
     tests::net::test_socket(&mut ring, &test)?;
     tests::net::test_udp_recvmsg_multishot(&mut ring, &test)?;
+    tests::net::test_udp_recvmsg_multishot_trunc(&mut ring, &test)?;
     tests::net::test_udp_sendzc_with_dest(&mut ring, &test)?;
 
     // queue

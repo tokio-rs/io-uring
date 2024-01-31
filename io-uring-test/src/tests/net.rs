@@ -1436,6 +1436,142 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     Ok(())
 }
+pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::RecvMsgMulti::CODE);
+        test.probe.is_supported(opcode::ProvideBuffers::CODE);
+        test.probe.is_supported(opcode::SendMsg::CODE);
+        test.check_kernel_version("6.6.0" /* 6.2 is totally broken and returns nonsense upon truncation */);
+    );
+
+    println!("test udp_recvmsg_multishot_trunc");
+
+    let server_socket: socket2::Socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into();
+    let server_addr = server_socket.local_addr()?;
+
+    const BUF_GROUP: u16 = 33;
+    const DATA: &[u8] = b"testfooo for me";
+    let mut buf1 = [0u8; 20]; // 20 = size_of::<io_uring_recvmsg_out>() + msghdr.msg_namelen
+    let mut buf2 = [0u8; 20 + DATA.len()];
+    let mut buf3 = [0u8; 20 + DATA.len()];
+    let mut buffers = [
+        buf1.as_mut_slice(),
+        buf2.as_mut_slice(),
+        buf3.as_mut_slice(),
+    ];
+
+    for (index, buf) in buffers.iter_mut().enumerate() {
+        let provide_bufs_e = io_uring::opcode::ProvideBuffers::new(
+            (**buf).as_mut_ptr(),
+            buf.len() as i32,
+            1,
+            BUF_GROUP,
+            index as u16,
+        )
+        .build()
+        .user_data(11)
+        .into();
+        unsafe { ring.submission().push(&provide_bufs_e)? };
+        ring.submitter().submit_and_wait(1)?;
+        let cqes: Vec<io_uring::cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 11);
+        assert_eq!(cqes[0].result(), 0);
+        assert_eq!(cqes[0].flags(), 0);
+    }
+
+    // This structure is actually only used for input arguments to the kernel
+    // (and only name length and control length are actually relevant).
+    let mut msghdr: libc::msghdr = unsafe { std::mem::zeroed() };
+    msghdr.msg_namelen = 4;
+
+    let recvmsg_e = opcode::RecvMsgMulti::new(
+        Fd(server_socket.as_raw_fd()),
+        &msghdr as *const _,
+        BUF_GROUP,
+    )
+    .flags(libc::MSG_TRUNC as u32)
+    .build()
+    .user_data(77)
+    .into();
+    unsafe { ring.submission().push(&recvmsg_e)? };
+    ring.submitter().submit().unwrap();
+
+    let client_socket: socket2::Socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into();
+
+    let data = [io::IoSlice::new(DATA)];
+    let mut msghdr1: libc::msghdr = unsafe { mem::zeroed() };
+    msghdr1.msg_name = server_addr.as_ptr() as *const _ as *mut _;
+    msghdr1.msg_namelen = server_addr.len();
+    msghdr1.msg_iov = data.as_ptr() as *const _ as *mut _;
+    msghdr1.msg_iovlen = 1;
+
+    let send_msgs = (0..2)
+        .map(|_| {
+            opcode::SendMsg::new(Fd(client_socket.as_raw_fd()), &msghdr1 as *const _)
+                .build()
+                .user_data(55)
+                .into()
+        })
+        .collect::<Vec<_>>();
+    unsafe { ring.submission().push_multiple(&send_msgs)? };
+    ring.submitter().submit().unwrap();
+
+    ring.submitter().submit_and_wait(4).unwrap();
+    let cqes: Vec<io_uring::cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 4);
+    let mut i = 0;
+    for cqe in cqes {
+        let is_more = io_uring::cqueue::more(cqe.flags());
+        match cqe.user_data() {
+            // send notifications
+            55 => {
+                assert!(cqe.result() > 0);
+                assert!(!is_more);
+            }
+            // RecvMsgMulti
+            77 => {
+                assert!(cqe.result() > 0);
+                assert!(is_more);
+                let buf_id = io_uring::cqueue::buffer_select(cqe.flags()).unwrap();
+                let tmp_buf = &buffers[buf_id as usize];
+                let msg = types::RecvMsgOut::parse(tmp_buf, &msghdr);
+
+                match i {
+                    0 => {
+                        let msg = msg.unwrap();
+                        assert!(msg.is_payload_truncated());
+                        assert!(msg.is_name_data_truncated());
+                        assert_eq!(DATA.len(), msg.incoming_payload_len() as usize);
+                        assert!(msg.payload_data().is_empty());
+                        assert!(4 < msg.incoming_name_len());
+                        assert_eq!(4, msg.name_data().len());
+                    }
+                    1 => {
+                        let msg = msg.unwrap();
+                        assert!(!msg.is_payload_truncated());
+                        assert!(msg.is_name_data_truncated());
+                        assert_eq!(DATA.len(), msg.incoming_payload_len() as usize);
+                        assert_eq!(DATA, msg.payload_data());
+                        assert!(4 < msg.incoming_name_len());
+                        assert_eq!(4, msg.name_data().len());
+                    }
+                    _ => unreachable!(),
+                }
+                i += 1;
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    Ok(())
+}
 pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
