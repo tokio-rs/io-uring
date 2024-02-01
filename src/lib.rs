@@ -6,6 +6,7 @@
 
 #[macro_use]
 mod util;
+pub mod buf_ring;
 pub mod cqueue;
 pub mod opcode;
 pub mod register;
