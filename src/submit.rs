@@ -396,6 +396,30 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
+    /// Tell io_uring on what CPUs the async workers can run. By default, async workers
+    /// created by io_uring will inherit the CPU mask of its parent. This is usually
+    /// all the CPUs in the system, unless the parent is being run with a limited set.
+    pub fn register_iowq_aff(&self, cpu_set: &libc::cpu_set_t) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_IOWQ_AFF,
+            cpu_set as *const _ as *const libc::c_void,
+            mem::size_of::<libc::cpu_set_t>() as u32,
+        )
+        .map(drop)
+    }
+
+    /// Undoes a CPU mask previously set with register_iowq_aff
+    pub fn unregister_iowq_aff(&self) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_UNREGISTER_IOWQ_AFF,
+            ptr::null(),
+            0,
+        )
+        .map(drop)
+    }
+
     /// Get and/or set the limit for number of io_uring worker threads per NUMA
     /// node. `max[0]` holds the limit for bounded workers, which process I/O
     /// operations expected to be bound in time, that is I/O on regular files or
