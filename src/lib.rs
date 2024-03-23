@@ -27,6 +27,7 @@ pub use register::Probe;
 pub use squeue::SubmissionQueue;
 pub use submit::Submitter;
 use util::{Mmap, OwnedFd};
+use crate::sys::__u32;
 
 /// IoUring instance
 ///
@@ -403,6 +404,16 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// userspace tasks can call [`Submitter::enter`] and higher level APIs. Available since 6.0.
     pub fn setup_single_issuer(&mut self) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_SINGLE_ISSUER;
+        self
+    }
+
+    pub fn with_flags(&mut self, flags : __u32) -> &mut Self {
+        self.params.flags |= flags;
+        self
+    }
+
+    pub fn with_features(&mut self, features : __u32) -> &mut Self{
+        self.params.features |= features;
         self
     }
 
