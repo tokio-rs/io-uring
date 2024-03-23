@@ -407,12 +407,12 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
-    pub fn with_flags(&mut self, flags : __u32) -> &mut Self {
+    pub fn with_flags(&mut self, flags: __u32) -> &mut Self {
         self.params.flags |= flags;
         self
     }
 
-    pub fn with_features(&mut self, features : __u32) -> &mut Self{
+    pub fn with_features(&mut self, features: __u32) -> &mut Self{
         self.params.features |= features;
         self
     }
