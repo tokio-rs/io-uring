@@ -321,6 +321,7 @@ impl EntryMarker for Entry {
 }
 
 impl Clone for Entry {
+    #[inline(always)]
     fn clone(&self) -> Entry {
         // io_uring_sqe doesn't implement Clone due to the 'cmd' incomplete array field.
         Entry(unsafe { mem::transmute_copy(&self.0) })
