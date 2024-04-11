@@ -5,7 +5,7 @@ use io_uring::types::Fd;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
 use std::convert::TryInto;
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream, Shutdown};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::{io, mem};
@@ -1120,6 +1120,7 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // write all 1024 + 256
     send_stream.write_all(&input)?;
+    send_stream.shutdown(Shutdown::Write)?;
 
     // multishot recv using a buf_group with 1024 length buffers
     let recv_e = opcode::RecvMulti::new(recv_fd, 0xdead)
@@ -1146,16 +1147,16 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes[1].result(), 256); // length 256
     assert!(cqueue::more(cqes[1].flags()));
     assert_eq!(cqueue::buffer_select(cqes[1].flags()), Some(1));
-    assert_eq!(&bufs[1024..(1024 + 256)], &input[1024..(1024 + 256)]);
+    assert_eq!(&bufs[1024..][..256], &input[1024..][..256]);
 
     assert_eq!(cqes[2].user_data(), 0x22);
-    assert!(cqueue::more(cqes[1].flags()));
+    assert!(!cqueue::more(cqes[2].flags()));
     assert_eq!(cqes[2].result(), -105); // No buffer space available
 
     Ok(())
 }
 
-pub fn test_shutdown<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+pub fn test_tcp_shutdown<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
 ) -> anyhow::Result<()> {
@@ -1165,7 +1166,7 @@ pub fn test_shutdown<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         test.probe.is_supported(opcode::Shutdown::CODE);
     );
 
-    println!("test shutdown");
+    println!("test tcp_shutdown");
 
     const SHUT_WR: i32 = 1;
 
@@ -1176,7 +1177,7 @@ pub fn test_shutdown<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&shutdown_e.build().into())
+            .push(&shutdown_e.build().user_data(0x28).into())
             .expect("queue is full");
     }
 
@@ -1185,6 +1186,7 @@ pub fn test_shutdown<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
 
     assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x28);
     assert_eq!(cqes[0].result(), 0);
 
     let text = b"C'est la vie";
