@@ -5,7 +5,7 @@ use io_uring::types::Fd;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
 use std::convert::TryInto;
-use std::net::{TcpListener, TcpStream, Shutdown};
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::{io, mem};
