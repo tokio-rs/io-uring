@@ -1,5 +1,6 @@
 pub mod cancel;
 pub mod fs;
+pub mod futex;
 pub mod net;
 pub mod poll;
 pub mod queue;
