@@ -11,7 +11,6 @@ use std::{io, ptr, thread};
 // From: https://github.com/torvalds/linux/blob/v6.7/include/uapi/linux/futex.h#L63
 const FUTEX2_SIZE_U32: u32 = 2;
 
-const USER_DATA: u64 = 0xDEAD_BEEF_DEAD_BEEF;
 const INIT_VAL: u32 = 0xDEAD_BEEF;
 
 fn syscall_futex(futex: *const u32, op: libc::c_int, val: u32) -> io::Result<i64> {
@@ -41,6 +40,8 @@ pub fn test_futex_wait<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         test;
         test.probe.is_supported(opcode::FutexWait::CODE);
     );
+
+    const USER_DATA: u64 = 0xDEAD_BEEF_DEAD_BEEF;
 
     println!("test futex_wait");
 
@@ -89,6 +90,8 @@ pub fn test_futex_wake<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         test;
         test.probe.is_supported(opcode::FutexWake::CODE);
     );
+
+    const USER_DATA: u64 = 0xBEEF_DEAD_BEEF_DEAD;
 
     println!("test futex_wake");
 
@@ -141,6 +144,8 @@ pub fn test_futex_waitv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         test;
         test.probe.is_supported(opcode::FutexWaitV::CODE);
     );
+
+    const USER_DATA: u64 = 0xDEAD_BEEF_BEEF_DEAD;
 
     println!("test futex_waitv");
 
