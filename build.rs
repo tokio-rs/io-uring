@@ -13,6 +13,7 @@ fn main() {
 #include <linux/stat.h>
 #include <linux/openat2.h>
 #include <linux/io_uring.h>
+#include <linux/futex.h>
     "#;
 
     #[cfg(not(feature = "overwrite"))]
@@ -38,7 +39,7 @@ fn main() {
         .derive_default(true)
         .generate_comments(true)
         .use_core()
-        .allowlist_type("io_uring_.*|io_.qring_.*|__kernel_timespec|open_how")
+        .allowlist_type("io_uring_.*|io_.qring_.*|__kernel_timespec|open_how|futex_waitv")
         .allowlist_var("__NR_io_uring.*|IOSQE_.*|IORING_.*|IO_URING_.*|SPLICE_F_FD_IN_FIXED")
         .generate()
         .unwrap()

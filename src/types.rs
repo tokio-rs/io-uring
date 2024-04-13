@@ -626,6 +626,38 @@ impl CancelBuilder {
     }
 }
 
+/// Wrapper around `futex_waitv` as used in [`futex_waitv` system
+/// call](https://www.kernel.org/doc/html/latest/userspace-api/futex2.html).
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct FutexWaitV(sys::futex_waitv);
+
+impl FutexWaitV {
+    pub const fn new() -> Self {
+        Self(sys::futex_waitv {
+            val: 0,
+            uaddr: 0,
+            flags: 0,
+            __reserved: 0,
+        })
+    }
+
+    pub const fn val(mut self, val: u64) -> Self {
+        self.0.val = val;
+        self
+    }
+
+    pub const fn uaddr(mut self, uaddr: u64) -> Self {
+        self.0.uaddr = uaddr;
+        self
+    }
+
+    pub const fn flags(mut self, flags: u32) -> Self {
+        self.0.flags = flags;
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;

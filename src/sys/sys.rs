@@ -2766,3 +2766,66 @@ fn bindgen_test_layout_io_uring_recvmsg_out() {
         )
     );
 }
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct futex_waitv {
+    pub val: __u64,
+    pub uaddr: __u64,
+    pub flags: __u32,
+    pub __reserved: __u32,
+}
+#[test]
+fn bindgen_test_layout_futex_waitv() {
+    const UNINIT: ::core::mem::MaybeUninit<futex_waitv> = ::core::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::core::mem::size_of::<futex_waitv>(),
+        24usize,
+        concat!("Size of: ", stringify!(futex_waitv))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<futex_waitv>(),
+        8usize,
+        concat!("Alignment of ", stringify!(futex_waitv))
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).val) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(futex_waitv),
+            "::",
+            stringify!(val)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).uaddr) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(futex_waitv),
+            "::",
+            stringify!(uaddr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(futex_waitv),
+            "::",
+            stringify!(flags)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).__reserved) as usize - ptr as usize },
+        20usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(futex_waitv),
+            "::",
+            stringify!(__reserved)
+        )
+    );
+}

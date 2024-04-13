@@ -1735,3 +1735,102 @@ opcode! {
         Entry(sqe)
     }
 }
+
+// === 6.7 ===
+
+opcode! {
+    /// Wait on a futex, like but not equivalant to `futex(2)`'s `FUTEX_WAIT_BITSET`.
+    ///
+    /// Wait on a futex at address `futex` and which still has the value `val` and with `futex2(2)`
+    /// flags of `futex_flags`. `musk` can be set to a specific bitset mask, which will be matched
+    /// by the waking side to decide who to wake up. To always get woken, an application may use
+    /// `FUTEX_BITSET_MATCH_ANY` (truncated to futex bits). `futex_flags` follows the `futex2(2)`
+    /// flags, not the `futex(2)` v1 interface flags. `flags` are currently unused and hence `0`
+    /// must be passed.
+    #[derive(Debug)]
+    pub struct FutexWait {
+        futex: { *const u32 },
+        val: { u64 },
+        mask: { u64 },
+        futex_flags: { u32 },
+        ;;
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_FUTEX_WAIT;
+
+    pub fn build(self) -> Entry {
+        let FutexWait { futex, val, mask, futex_flags, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = futex_flags as _;
+        sqe.__bindgen_anon_2.addr = futex as usize as _;
+        sqe.__bindgen_anon_1.off = val;
+        unsafe { sqe.__bindgen_anon_6.__bindgen_anon_1.as_mut().addr3 = mask };
+        sqe.__bindgen_anon_3.futex_flags = flags;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Wake up waiters on a futex, like but not equivalant to `futex(2)`'s `FUTEX_WAKE_BITSET`.
+    ///
+    /// Wake any waiters on the futex indicated by `futex` and at most `val` futexes. `futex_flags`
+    /// indicates the `futex2(2)` modifier flags. If a given bitset for who to wake is desired,
+    /// then that must be set in `mask`. Use `FUTEX_BITSET_MATCH_ANY` (truncated to futex bits) to
+    /// match any waiter on the given futex. `flags` are currently unused and hence `0` must be
+    /// passed.
+    #[derive(Debug)]
+    pub struct FutexWake {
+        futex: { *const u32 },
+        val: { u64 },
+        mask: { u64 },
+        futex_flags: { u32 },
+        ;;
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_FUTEX_WAKE;
+
+    pub fn build(self) -> Entry {
+        let FutexWake { futex, val, mask, futex_flags, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = futex_flags as _;
+        sqe.__bindgen_anon_2.addr = futex as usize as _;
+        sqe.__bindgen_anon_1.off = val;
+        unsafe { sqe.__bindgen_anon_6.__bindgen_anon_1.as_mut().addr3 = mask };
+        sqe.__bindgen_anon_3.futex_flags = flags;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Wait on multiple futexes.
+    ///
+    /// Wait on multiple futexes at the same time. Futexes are given by `futexv` and `nr_futex` is
+    /// the number of futexes in that array. Unlike `FutexWait`, the desired bitset mask and values
+    /// are passed in `futexv`. `flags` are currently unused and hence `0` must be passed.
+    #[derive(Debug)]
+    pub struct FutexWaitV {
+        futexv: { *const types::FutexWaitV },
+        nr_futex: { u32 },
+        ;;
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_FUTEX_WAITV;
+
+    pub fn build(self) -> Entry {
+        let FutexWaitV { futexv, nr_futex, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.__bindgen_anon_2.addr = futexv as usize as _;
+        sqe.len = nr_futex;
+        sqe.__bindgen_anon_3.futex_flags = flags;
+        Entry(sqe)
+    }
+}
