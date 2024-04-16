@@ -97,7 +97,7 @@ macro_rules! opcode {
 /// inline zeroed to improve codegen
 #[inline(always)]
 fn sqe_zeroed() -> sys::io_uring_sqe {
-    unsafe { std::mem::zeroed() }
+    unsafe { mem::zeroed() }
 }
 
 opcode! {
