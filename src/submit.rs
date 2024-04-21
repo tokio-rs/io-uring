@@ -63,10 +63,10 @@ impl<'a> Submitter<'a> {
         }
     }
 
-    /// CQ ring is overflown
-    fn sq_cq_overflow(&self) -> bool {
+    /// CQ ring is overflown or a deferred task is runnable. Either case requires entering the kernel
+    fn sq_cq_overflow_or_taskrun(&self) -> bool {
         unsafe {
-            (*self.sq_flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0
+            (*self.sq_flags).load(atomic::Ordering::Acquire) & (sys::IORING_SQ_CQ_OVERFLOW | sys::IORING_SQ_TASKRUN) != 0
         }
     }
 
@@ -115,12 +115,12 @@ impl<'a> Submitter<'a> {
         let len = self.sq_len();
         let mut flags = 0;
 
-        // This logic suffers from the fact the sq_cq_overflow and sq_need_wakeup
+        // This logic suffers from the fact the sq_cq_overflow_or_taskrun and sq_need_wakeup
         // each cause an atomic load of the same variable, self.sq_flags.
         // In the hottest paths, when a server is running with sqpoll,
         // this is going to be hit twice, when once would be sufficient.
 
-        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow() {
+        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow_or_taskrun() {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
@@ -145,7 +145,7 @@ impl<'a> Submitter<'a> {
         let len = self.sq_len();
         let mut flags = sys::IORING_ENTER_EXT_ARG;
 
-        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow() {
+        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow_or_taskrun() {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
