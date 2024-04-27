@@ -33,7 +33,7 @@ pub fn test_register_buffers<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let fd = Fd(file.as_raw_fd());
 
     // Create the buffers
-    let slices = (0..BUFFERS)
+    let mut slices = (0..BUFFERS)
         .map(|i| {
             let v = vec![b'A' + i as u8; BUF_SIZE];
             let slice = v.leak();
@@ -47,15 +47,21 @@ pub fn test_register_buffers<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         .enumerate()
         .for_each(|(i, s)| assert!(s.iter().all(|&x| x == (b'A' + i as u8))));
 
-    // Register the buffers
+    // Now actually set up and register the buffers
+
+    // Safety: `IoSliceMut` is ABI compatible with the `iovec` type on Unix platforms, so it is safe
+    // to cast these as `slices` is valid for this entire function
     let iovecs: &[iovec] =
         unsafe { std::slice::from_raw_parts(slices.as_ptr().cast(), slices.len()) };
+
     let submitter = ring.submitter();
+    // Safety: Since `iovecs` is derived from valid `IoSliceMut`s, this upholds the safety contract
+    // of `register_buffers` that the buffers are valid until the buffers are unregistered
     unsafe { submitter.register_buffers(iovecs)? };
 
     // Prepare writing the buffers out to the file
     (0..BUFFERS).for_each(|index| {
-        let buf_ptr = iovecs[index].iov_base;
+        let buf_ptr = slices[index].as_ptr();
 
         let write_entry = WriteFixed::new(fd, buf_ptr.cast(), BUF_SIZE as u32, index as u16)
             .offset((index * BUF_SIZE) as u64)
@@ -63,6 +69,8 @@ pub fn test_register_buffers<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
             .user_data(index as u64);
 
         let mut submission_queue = ring.submission();
+        // Safety: We have guaranteed that the buffers in `slices` are all valid for the entire
+        // duration of this function
         unsafe {
             submission_queue.push(&write_entry.into()).unwrap();
         }
@@ -85,16 +93,13 @@ pub fn test_register_buffers<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // Zero out all buffers in memory
     (0..BUFFERS).for_each(|index| {
-        let iov = iovecs[index];
-        let slice: &mut [u8] =
-            unsafe { std::slice::from_raw_parts_mut(iov.iov_base.cast(), iov.iov_len) };
-        slice.fill(0);
-        assert!(slice.iter().all(|&x| x == 0));
+        slices[index].fill(0);
+        assert!(slices[index].iter().all(|&x| x == 0));
     });
 
     // Prepare reading the data back into the buffers from the file
     (0..BUFFERS).for_each(|index| {
-        let buf_ptr = iovecs[index].iov_base;
+        let buf_ptr = slices[index].as_mut_ptr();
 
         let read_entry = ReadFixed::new(fd, buf_ptr.cast(), BUF_SIZE as u32, index as u16)
             .offset((index * BUF_SIZE) as u64)
@@ -102,6 +107,8 @@ pub fn test_register_buffers<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
             .user_data(index as u64);
 
         let mut submission_queue = ring.submission();
+        // Safety: We have guaranteed that the buffers in `slices` are all valid for the entire
+        // duration of this function
         unsafe {
             submission_queue.push(&read_entry.into()).unwrap();
         }
@@ -123,12 +130,7 @@ pub fn test_register_buffers<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     });
 
     // Check that the data has been restored
-    (0..BUFFERS).for_each(|index| {
-        let iov = iovecs[index];
-        let slice: &mut [u8] =
-            unsafe { std::slice::from_raw_parts_mut(iov.iov_base.cast(), iov.iov_len) };
-        assert!(slice.iter().all(|&x| x == (b'A' + index as u8)));
-    });
+    assert!((0..BUFFERS).all(|index| { slices[index].iter().all(|&x| x == (b'A' + index as u8)) }));
 
     // Unregister the buffers
     let submitter = ring.submitter();
