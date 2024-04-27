@@ -201,7 +201,7 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
         // [#197]: https://github.com/tokio-rs/io-uring/issues/197
         atomic::fence(atomic::Ordering::SeqCst);
         unsafe {
-            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
+            (*self.queue.flags).load(atomic::Ordering::Relaxed) & sys::IORING_SQ_NEED_WAKEUP != 0
         }
     }
 
@@ -216,7 +216,7 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     #[inline]
     pub fn need_wakeup_after_intermittent_seqcst(&self) -> bool {
         unsafe {
-            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
+            (*self.queue.flags).load(atomic::Ordering::Relaxed) & sys::IORING_SQ_NEED_WAKEUP != 0
         }
     }
 
