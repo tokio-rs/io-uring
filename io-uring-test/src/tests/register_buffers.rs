@@ -9,6 +9,7 @@ use io_uring::{
 use libc::iovec;
 use std::{
     io::{self, IoSliceMut},
+    ops::DerefMut,
     os::fd::AsRawFd,
 };
 
@@ -33,19 +34,21 @@ pub fn test_register_buffers<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let fd = Fd(file.as_raw_fd());
 
     // Create the buffers
-    let mut slices = (0..BUFFERS)
-        .map(|i| {
-            let v = vec![b'A' + i as u8; BUF_SIZE];
-            let slice = v.leak();
-            IoSliceMut::new(slice)
-        })
+    let mut bufs = (0..BUFFERS)
+        .map(|i| vec![b'A' + i as u8; BUF_SIZE])
         .collect::<Vec<_>>();
 
+    // Create the slices that point to the buffers
+    let mut slices: Vec<IoSliceMut<'_>> = bufs
+        .iter_mut()
+        .map(|buf| IoSliceMut::new(buf.deref_mut()))
+        .collect();
+
     // Check that the data is correct
-    slices
+    assert!(slices
         .iter()
         .enumerate()
-        .for_each(|(i, s)| assert!(s.iter().all(|&x| x == (b'A' + i as u8))));
+        .all(|(i, s)| s.iter().all(|&x| x == (b'A' + i as u8))));
 
     // Now actually set up and register the buffers
 
