@@ -178,10 +178,45 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
 
     /// When [`is_setup_sqpoll`](crate::Parameters::is_setup_sqpoll) is set, whether the kernel
     /// threads has gone to sleep and requires a system call to wake it up.
+    ///
+    /// A result of `false` is only meaningful if the function was called after the latest update
+    /// to the queue head. Other interpretations could lead to a race condition where the kernel
+    /// concurrently put the device to sleep and no further progress is made.
     #[inline]
     pub fn need_wakeup(&self) -> bool {
+        // See discussions that happened in [#197] and its linked threads in liburing. We need to
+        // ensure that writes to the head have been visible _to the kernel_ if this load results in
+        // decision to sleep. This is solved with a SeqCst fence. There is no common modified
+        // memory location that would provide alternative synchronization.
+        //
+        // The kernel, from its sequencing, first writes the wake flag, then performs a full
+        // barrier (`smp_mb`, or `smp_mb__after_atomic`), then reads the head. We assume that our
+        // user first writes the head and then reads the `need_wakeup` flag as documented. It is
+        // necessary to ensure that at least one observes the other write. By establishing a point
+        // of sequential consistency on both sides between their respective write and read, at
+        // least one coherency order holds. With regards to the interpretation of the atomic memory
+        // model of Rust (that is, that of C++20) we're assuming that an `smp_mb` provides at least
+        // the effect of a `fence(SeqCst)`.
+        //
+        // [#197]: https://github.com/tokio-rs/io-uring/issues/197
+        atomic::fence(atomic::Ordering::SeqCst);
         unsafe {
-            (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
+            (*self.queue.flags).load(atomic::Ordering::Relaxed) & sys::IORING_SQ_NEED_WAKEUP != 0
+        }
+    }
+
+    /// The effect of [`Self::need_wakeup`], after synchronization work performed by the caller.
+    ///
+    /// This function should only be called if the caller can guarantee that a `SeqCst` fence has
+    /// been inserted after the last write to the queue's head. The function is then a little more
+    /// efficient by avoiding to perform one itself.
+    ///
+    /// Failure to uphold the precondition can result in an effective dead-lock due to a sleeping
+    /// device.
+    #[inline]
+    pub fn need_wakeup_after_intermittent_seqcst(&self) -> bool {
+        unsafe {
+            (*self.queue.flags).load(atomic::Ordering::Relaxed) & sys::IORING_SQ_NEED_WAKEUP != 0
         }
     }
 
