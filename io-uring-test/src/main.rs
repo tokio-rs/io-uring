@@ -168,6 +168,9 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // regression test
     tests::regression::test_issue154(&mut ring, &test)?;
 
+    // api tests
+    tests::api::test_sendness(&mut ring, &test)?;
+
     println!("Test count: {}", test.count.get());
 
     Ok(())

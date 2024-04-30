@@ -69,7 +69,13 @@ where
 #[derive(Clone)]
 pub struct Parameters(sys::io_uring_params);
 
+/// SAFETY: there isn't anything thread-local about an io_uring instance.
+/// (We do not attempt to model `IORING_SETUP_SINGLE_ISSUER` in the type system.)
 unsafe impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Send for IoUring<S, C> {}
+/// SAFETY: mutating methods take `&mut self`, thereby eliminating data races between
+/// different userspace borrowers at compile time via standard borrowing rules.
+/// (There are `unsafe` methods like `submission_shared()` and `completion_shared()`
+///  that allow violating this.)
 unsafe impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Sync for IoUring<S, C> {}
 
 impl IoUring<squeue::Entry, cqueue::Entry> {
