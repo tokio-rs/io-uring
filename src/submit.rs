@@ -66,7 +66,7 @@ impl<'a> Submitter<'a> {
     /// CQ ring is overflown
     fn sq_cq_overflow(&self) -> bool {
         unsafe {
-            (*self.sq_flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0
+            (*self.sq_flags).load(atomic::Ordering::Relaxed) & sys::IORING_SQ_CQ_OVERFLOW != 0
         }
     }
 
