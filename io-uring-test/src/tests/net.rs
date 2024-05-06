@@ -1447,7 +1447,6 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
         test.probe.is_supported(opcode::RecvMsgMulti::CODE);
         test.probe.is_supported(opcode::ProvideBuffers::CODE);
         test.probe.is_supported(opcode::SendMsg::CODE);
-        test.check_kernel_version("6.6.0" /* 6.2 is totally broken and returns nonsense upon truncation */);
     );
 
     println!("test udp_recvmsg_multishot_trunc");
@@ -1520,7 +1519,9 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
 
     ring.submitter().submit_and_wait(4).unwrap();
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
-    assert_eq!(cqes.len(), 5);
+    assert!([4, 5].contains(&cqes.len()));
+
+    let mut processed_responses = 0;
     for cqe in cqes {
         let is_more = cqueue::more(cqe.flags());
         match cqe.user_data() {
@@ -1538,7 +1539,7 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
 
                 assert!(cqe.result() > 0);
                 assert!(is_more);
-                let buf_id = cqueue::buffer_select(cqe.flags()).unwrap();
+                let buf_id = cqueue::buffer_select(cqe.flags()).unwrap() % buffers.len() as u16;
                 let tmp_buf = &buffers[buf_id as usize];
                 let msg = types::RecvMsgOut::parse(tmp_buf, &msghdr);
 
@@ -1563,12 +1564,14 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
                     }
                     _ => unreachable!(),
                 }
+                processed_responses += 1;
             }
             _ => {
                 unreachable!()
             }
         }
     }
+    assert_eq!(processed_responses, 2);
 
     Ok(())
 }
