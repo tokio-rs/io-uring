@@ -395,7 +395,7 @@ impl<'buf> RecvMsgOut<'buf> {
     #[allow(clippy::result_unit_err)]
     pub fn parse(buffer: &'buf [u8], msghdr: &libc::msghdr) -> Result<Self, ()> {
         let msghdr_name_len = usize::try_from(msghdr.msg_namelen).unwrap();
-        let msghdr_control_len = usize::try_from(msghdr.msg_controllen).unwrap();
+        let msghdr_control_len = msghdr.msg_controllen;
 
         if Self::DATA_START
             .checked_add(msghdr_name_len)

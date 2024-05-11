@@ -8,7 +8,7 @@
 #![allow(
     clippy::unreadable_literal,
     clippy::missing_safety_doc,
-    clippy::incorrect_clone_impl_on_copy_type
+    clippy::non_canonical_clone_impl
 )]
 
 use std::io;
