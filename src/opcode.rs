@@ -230,23 +230,11 @@ opcode! {
     /// Read from a file into a fixed buffer that has been previously registered with
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
-    /// The operation designated by this `opcode` will read data from a file at a specific offset
-    /// into a fixed buffer that has been registered into the `io-uring` instance via
-    /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
-    ///
-    /// The caller must ensure that the `buf_index` argument indexes into the list of buffers that
-    /// have been registered and that the buffer the index refers to has a base pointer of `buf` and
-    /// a length of `len`.
-    ///
     /// The return values match those documented in the `preadv2(2)` man pages.
     ///
     /// See the man pages for `io_uring_prep_read_fixed(3)` for more information.
     #[derive(Debug)]
     pub struct ReadFixed {
-        /// This operation is only valid if `buf_index` is an index into an array of previously
-        /// registered fixed buffers, and the `buf` and `len` arguments fall within the region
-        /// specified by `buf_index`. Note that `buf` does not need to be aligned with the start of
-        /// the registered buffer.
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
         len: { u32 },
@@ -287,23 +275,11 @@ opcode! {
     /// Write to a file from a fixed buffer that have been previously registered with
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
-    /// The operation designated by this `opcode` will write data into a file at a specific offset
-    /// from a fixed buffer that has been registered into the `io-uring` instance via
-    /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
-    ///
-    /// The caller must ensure that the `buf_index` argument indexes into the list of buffers that
-    /// have been registered and that the buffer the index refers to has a base pointer of `buf` and
-    /// a length of `len`.
-    ///
     /// The return values match those documented in the `pwritev2(2)` man pages.
     ///
     /// See the man pages for `io_uring_prep_write_fixed(3)` for more information.
     #[derive(Debug)]
     pub struct WriteFixed {
-        /// This operation is only valid if `buf_index` is an index into an array of previously
-        /// registered fixed buffers, and the `buf` and `len` arguments fall within the region
-        /// specified by `buf_index`. Note that `buf` does not need to be aligned with the start of
-        /// the registered buffer.
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
         len: { u32 },
@@ -313,7 +289,7 @@ opcode! {
         /// The offset of the file to write to.
         offset: u64 = 0,
         /// Specified for write operations, contains a bitwise OR of per-I/O flags, as described in
-        /// the `preadv2(2)` man page.
+        /// the `pwritev2(2)` man page.
         rw_flags: types::RwFlags = 0
     }
 
