@@ -59,14 +59,14 @@ impl<'a> Submitter<'a> {
     #[inline]
     fn sq_need_wakeup(&self) -> bool {
         unsafe {
-            (*self.sq_flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_NEED_WAKEUP != 0
+            (*self.sq_flags).load(atomic::Ordering::Relaxed) & sys::IORING_SQ_NEED_WAKEUP != 0
         }
     }
 
     /// CQ ring is overflown
     fn sq_cq_overflow(&self) -> bool {
         unsafe {
-            (*self.sq_flags).load(atomic::Ordering::Acquire) & sys::IORING_SQ_CQ_OVERFLOW != 0
+            (*self.sq_flags).load(atomic::Ordering::Relaxed) & sys::IORING_SQ_CQ_OVERFLOW != 0
         }
     }
 
@@ -119,12 +119,17 @@ impl<'a> Submitter<'a> {
         // each cause an atomic load of the same variable, self.sq_flags.
         // In the hottest paths, when a server is running with sqpoll,
         // this is going to be hit twice, when once would be sufficient.
+        // However, consider that the `SeqCst` barrier required for interpreting
+        // the IORING_ENTER_SQ_WAKEUP bit is required in all paths where sqpoll
+        // is setup when consolidating the reads.
 
         if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow() {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
         if self.params.is_setup_sqpoll() {
+            // See discussion in [`SubmissionQueue::need_wakeup`].
+            atomic::fence(atomic::Ordering::SeqCst);
             if self.sq_need_wakeup() {
                 flags |= sys::IORING_ENTER_SQ_WAKEUP;
             } else if want == 0 {
@@ -150,6 +155,8 @@ impl<'a> Submitter<'a> {
         }
 
         if self.params.is_setup_sqpoll() {
+            // See discussion in [`SubmissionQueue::need_wakeup`].
+            atomic::fence(atomic::Ordering::SeqCst);
             if self.sq_need_wakeup() {
                 flags |= sys::IORING_ENTER_SQ_WAKEUP;
             } else if want == 0 {
