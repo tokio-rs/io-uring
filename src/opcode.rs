@@ -231,8 +231,6 @@ opcode! {
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
     /// The return values match those documented in the `preadv2(2)` man pages.
-    ///
-    /// See the man pages for `io_uring_prep_read_fixed(3)` for more information.
     #[derive(Debug)]
     pub struct ReadFixed {
         fd: { impl sealed::UseFixed },
@@ -276,8 +274,6 @@ opcode! {
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
     /// The return values match those documented in the `pwritev2(2)` man pages.
-    ///
-    /// See the man pages for `io_uring_prep_write_fixed(3)` for more information.
     #[derive(Debug)]
     pub struct WriteFixed {
         fd: { impl sealed::UseFixed },
