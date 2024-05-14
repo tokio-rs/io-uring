@@ -427,7 +427,7 @@ impl<'buf> RecvMsgOut<'buf> {
             let control_data_end = control_start
                 + usize::min(
                     usize::try_from(header.controllen).unwrap(),
-                    msghdr_control_len,
+                    usize::try_from(msghdr_control_len).unwrap(),
                 );
             let control_field_end = control_start + msghdr_control_len;
             (&buffer[control_start..control_data_end], control_field_end)
