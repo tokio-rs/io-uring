@@ -396,7 +396,7 @@ impl<'buf> RecvMsgOut<'buf> {
     #[allow(clippy::useless_conversion)]
     pub fn parse(buffer: &'buf [u8], msghdr: &libc::msghdr) -> Result<Self, ()> {
         let msghdr_name_len = usize::try_from(msghdr.msg_namelen).unwrap();
-        let msghdr_control_len = msghdr.msg_controllen;
+        let msghdr_control_len = usize::try_from(msghdr.msg_controllen).unwrap();
 
         if Self::DATA_START
             .checked_add(msghdr_name_len)
@@ -427,7 +427,7 @@ impl<'buf> RecvMsgOut<'buf> {
             let control_data_end = control_start
                 + usize::min(
                     usize::try_from(header.controllen).unwrap(),
-                    usize::try_from(msghdr_control_len).unwrap(),
+                    msghdr_control_len,
                 );
             let control_field_end = control_start + msghdr_control_len;
             (&buffer[control_start..control_data_end], control_field_end)
