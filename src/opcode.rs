@@ -227,23 +227,22 @@ opcode! {
 }
 
 opcode! {
-    /// Read from pre-mapped buffers that have been previously registered with
+    /// Read from a file into a fixed buffer that has been previously registered with
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
     /// The return values match those documented in the `preadv2(2)` man pages.
     #[derive(Debug)]
     pub struct ReadFixed {
-        /// The `buf_index` is an index into an array of fixed buffers,
-        /// and is only valid if fixed buffers were registered.
         fd: { impl sealed::UseFixed },
         buf: { *mut u8 },
         len: { u32 },
         buf_index: { u16 },
         ;;
-        offset: u64 = 0,
         ioprio: u16 = 0,
-        /// specified for read operations, contains a bitwise OR of per-I/O flags,
-        /// as described in the `preadv2(2)` man page.
+        /// The offset of the file to read from.
+        offset: u64 = 0,
+        /// Specified for read operations, contains a bitwise OR of per-I/O flags, as described in
+        /// the `preadv2(2)` man page.
         rw_flags: types::RwFlags = 0
     }
 
@@ -271,23 +270,22 @@ opcode! {
 }
 
 opcode! {
-    /// Write to pre-mapped buffers that have been previously registered with
+    /// Write to a file from a fixed buffer that have been previously registered with
     /// [`Submitter::register_buffers`](crate::Submitter::register_buffers).
     ///
     /// The return values match those documented in the `pwritev2(2)` man pages.
     #[derive(Debug)]
     pub struct WriteFixed {
-        /// The `buf_index` is an index into an array of fixed buffers,
-        /// and is only valid if fixed buffers were registered.
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
         len: { u32 },
         buf_index: { u16 },
         ;;
         ioprio: u16 = 0,
+        /// The offset of the file to write to.
         offset: u64 = 0,
-        /// specified for write operations, contains a bitwise OR of per-I/O flags,
-        /// as described in the `preadv2(2)` man page.
+        /// Specified for write operations, contains a bitwise OR of per-I/O flags, as described in
+        /// the `pwritev2(2)` man page.
         rw_flags: types::RwFlags = 0
     }
 
