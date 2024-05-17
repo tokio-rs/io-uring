@@ -95,6 +95,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // register
     tests::register::test_register_files_sparse(&mut ring, &test)?;
     tests::register_buf_ring::test_register_buf_ring(&mut ring, &test)?;
+    tests::register_buffers::test_register_buffers(&mut ring, &test)?;
     tests::register_sync_cancel::test_register_sync_cancel(&mut ring, &test)?;
     tests::register_sync_cancel::test_register_sync_cancel_unsubmitted(&mut ring, &test)?;
     tests::register_sync_cancel::test_register_sync_cancel_any(&mut ring, &test)?;
