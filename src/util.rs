@@ -5,7 +5,9 @@ use std::{io, ptr};
 
 pub(crate) mod private {
     /// Private trait that we use as a supertrait of `EntryMarker` to prevent it from being
-    /// implemented from outside this crate: https://jack.wrenn.fyi/blog/private-trait-methods/
+    /// implemented from outside this crate.
+    ///
+    /// See this [blog](https://jack.wrenn.fyi/blog/private-trait-methods/) for more details.
     pub trait Sealed {}
 }
 

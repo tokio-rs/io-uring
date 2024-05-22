@@ -393,6 +393,7 @@ impl<'buf> RecvMsgOut<'buf> {
     /// is the same content provided as input to the corresponding SQE
     /// (only `msg_namelen` and `msg_controllen` fields are relevant).
     #[allow(clippy::result_unit_err)]
+    #[allow(clippy::useless_conversion)]
     pub fn parse(buffer: &'buf [u8], msghdr: &libc::msghdr) -> Result<Self, ()> {
         let msghdr_name_len = usize::try_from(msghdr.msg_namelen).unwrap();
         let msghdr_control_len = usize::try_from(msghdr.msg_controllen).unwrap();

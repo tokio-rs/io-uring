@@ -506,7 +506,7 @@ impl<'a> Submitter<'a> {
     /// except that it completes synchronously.
     ///
     /// Cancellation can target a specific request, or all requests matching some criteria. The
-    /// [CancelBuilder](types::CancelBuilder) builder supports describing the match criteria for cancellation.
+    /// [`CancelBuilder`] builder supports describing the match criteria for cancellation.
     ///
     /// An optional `timeout` can be provided to specify how long to wait for matched requests to be
     /// canceled. If no timeout is provided, the default is to wait indefinitely.
@@ -540,14 +540,14 @@ impl<'a> Submitter<'a> {
         let flags = builder.flags.bits();
         let fd = builder.to_fd();
 
-        let arg = {
-            let mut arg = sys::io_uring_sync_cancel_reg::default();
-            arg.addr = user_data;
-            arg.fd = fd;
-            arg.flags = flags;
-            arg.timeout = timespec;
-            arg
+        let arg = sys::io_uring_sync_cancel_reg {
+            addr: user_data,
+            fd,
+            flags,
+            timeout: timespec,
+            ..Default::default()
         };
+
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_SYNC_CANCEL,
