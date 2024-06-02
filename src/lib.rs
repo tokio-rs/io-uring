@@ -81,6 +81,11 @@ impl IoUring<squeue::Entry, cqueue::Entry> {
     pub fn new(entries: u32) -> io::Result<Self> {
         Self::builder().build(entries)
     }
+
+    /// Create an `IoUring` instance from a pre-opened file descriptor.
+    pub unsafe fn from_fd(fd: RawFd, params: Parameters) -> io::Result<Self> {
+        Self::with_fd_and_params(OwnedFd::from_raw_fd(fd), params.0)
+    }
 }
 
 impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
@@ -103,6 +108,11 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
     }
 
     fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<Self> {
+        let fd: OwnedFd = unsafe { OwnedFd::from_raw_fd(sys::io_uring_setup(entries, &mut p)?) };
+        unsafe { Self::with_fd_and_params(fd, p) }
+    }
+
+    unsafe fn with_fd_and_params(fd: OwnedFd, p: sys::io_uring_params) -> io::Result<Self> {
         // NOTE: The `SubmissionQueue` and `CompletionQueue` are references,
         // and their lifetime can never exceed `MemoryMap`.
         //
@@ -148,8 +158,6 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
                 Ok((mm, sq, cq))
             }
         }
-
-        let fd: OwnedFd = unsafe { OwnedFd::from_raw_fd(sys::io_uring_setup(entries, &mut p)?) };
 
         let (mm, sq, cq) = unsafe { setup_queue(&fd, &p)? };
 
