@@ -66,7 +66,11 @@ where
 }
 
 /// The parameters that were used to construct an [`IoUring`].
+///
+/// This type is a transparent wrapper over the system structure `io_uring_params`. A value can be
+/// (unsafely) created from any properly laid-out and initialized memory representation.
 #[derive(Clone)]
+#[repr(transparent)]
 pub struct Parameters(sys::io_uring_params);
 
 unsafe impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Send for IoUring<S, C> {}
@@ -83,6 +87,12 @@ impl IoUring<squeue::Entry, cqueue::Entry> {
     }
 
     /// Create an `IoUring` instance from a pre-opened file descriptor.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold that the file descriptor is owned and refers to a uring. The
+    /// `params` argument must be equivalent to the those previously filled in by the kernel when
+    /// the provided ring was created.
     pub unsafe fn from_fd(fd: RawFd, params: Parameters) -> io::Result<Self> {
         Self::with_fd_and_params(OwnedFd::from_raw_fd(fd), params.0)
     }
