@@ -1,5 +1,7 @@
 //! Common Linux types not provided by libc.
 
+use std::mem::size_of;
+
 pub(crate) mod sealed {
     use super::{Fd, Fixed};
     use std::os::unix::io::RawFd;
@@ -250,7 +252,7 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     #[inline]
     pub fn sigmask<'new>(mut self, sigmask: &'new libc::sigset_t) -> SubmitArgs<'now, 'new> {
         self.args.sigmask = cast_ptr(sigmask) as _;
-        self.args.sigmask_sz = std::mem::size_of::<libc::sigset_t>() as _;
+        self.args.sigmask_sz = size_of::<libc::sigset_t>() as _;
 
         SubmitArgs {
             args: self.args,
@@ -385,7 +387,7 @@ pub struct RecvMsgOut<'buf> {
 }
 
 impl<'buf> RecvMsgOut<'buf> {
-    const DATA_START: usize = std::mem::size_of::<sys::io_uring_recvmsg_out>();
+    const DATA_START: usize = size_of::<sys::io_uring_recvmsg_out>();
 
     /// Parse the data buffered upon completion of a `RecvMsg` multishot operation.
     ///
