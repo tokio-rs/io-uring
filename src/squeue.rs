@@ -275,6 +275,7 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     pub unsafe fn push(&mut self, entry: &E) -> Result<(), PushError> {
         if !self.is_full() {
             self.push_unchecked(entry);
+            self.tail = self.tail.wrapping_add(1);
             Ok(())
         } else {
             Err(PushError)
@@ -298,6 +299,7 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
         for entry in entries {
             self.push_unchecked(entry);
         }
+        self.tail = self.tail.wrapping_add(entries.len() as u32);
 
         Ok(())
     }
@@ -308,7 +310,6 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
             .queue
             .sqes
             .add((self.tail & self.queue.ring_mask) as usize) = entry.clone();
-        self.tail = self.tail.wrapping_add(1);
     }
 }
 
