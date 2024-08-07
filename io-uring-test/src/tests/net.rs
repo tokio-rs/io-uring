@@ -1,10 +1,12 @@
 use crate::utils;
 use crate::Test;
+use crate::tests::register_buf_ring;
 use io_uring::squeue::Flags;
-use io_uring::types::Fd;
+use io_uring::types::{BufRingEntry, Fd};
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
 use std::convert::TryInto;
+use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
@@ -113,6 +115,61 @@ pub fn test_tcp_send_recv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes[1].result(), text.len() as i32);
 
     assert_eq!(&output[..cqes[1].result() as usize], text);
+
+    Ok(())
+}
+
+pub fn test_tcp_send_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::SendBundle::CODE);
+        ring.params().is_feature_recvsend_bundle(); // requires 6.10
+    );
+
+    println!("test tcp_send_bundle");
+
+    let (send_stream, mut recv_stream) = tcp_pair()?;
+
+    let send_fd = types::Fd(send_stream.as_raw_fd());
+
+    let text = b"The quick brown fox jumps over the lazy dog.";
+    let mut output = vec![0; text.len()];
+
+    let buf_ring = register_buf_ring::Builder::new(0xdead).ring_entries(2).buf_cnt(2).buf_len(22).build()?;
+    buf_ring.rc.register(ring)?;
+    let ptr1 = buf_ring.rc.ring_start.as_ptr_mut() as *mut BufRingEntry;
+    unsafe {
+        let ptr2 = ptr1.add(1);
+        std::ptr::copy_nonoverlapping(text.as_ptr(), ptr1.as_mut().unwrap().addr() as *mut u8, 22);
+        std::ptr::copy_nonoverlapping(text[22..].as_ptr(), ptr2.as_mut().unwrap().addr() as *mut u8, 22);
+    }
+
+    let send_e = opcode::SendBundle::new(send_fd, 0xdead);
+
+    unsafe {
+        let mut queue = ring.submission();
+        let send_e = send_e
+            .build()
+            .user_data(0x01)
+            .flags(squeue::Flags::IO_LINK)
+            .into();
+        queue.push(&send_e).expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x01);
+    assert_eq!(cqes[0].result(), text.len() as i32);
+
+    assert_eq!(recv_stream.read(&mut output).expect("could not read stream"), text.len());
+    assert_eq!(&output, text);
+    buf_ring.rc.unregister(ring)?;
 
     Ok(())
 }
@@ -1152,6 +1209,197 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes[2].user_data(), 0x22);
     assert!(!cqueue::more(cqes[2].flags()));
     assert_eq!(cqes[2].result(), -105); // No buffer space available
+
+    Ok(())
+}
+
+pub fn test_tcp_recv_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    use std::io::Write;
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::RecvBundle::CODE);
+        ring.params().is_feature_recvsend_bundle(); // requires 6.10
+    );
+
+    println!("test tcp_recv_bundle");
+
+    let (mut send_stream, recv_stream) = tcp_pair()?;
+
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+
+    // Send one package made of four segments, and receive as up to two buffer bundles
+    let mut input = vec![0x0d; 256];
+    input.extend_from_slice(&[0x0e; 256]);
+    input.extend_from_slice(&[0x0a; 256]);
+    input.extend_from_slice(&[0x0d; 128]);
+
+    // Prepare BufRing
+    let buf_ring = register_buf_ring::Builder::new(0xdeff).ring_entries(16).buf_cnt(32).buf_len(256).build()?;
+    buf_ring.rc.register(ring)?;
+
+    send_stream.write_all(&input)?;
+    send_stream.shutdown(Shutdown::Write)?;
+
+    let recv_e = opcode::RecvBundle::new(recv_fd, 0xdeff)
+        .build()
+        .user_data(0x30)
+        .into();
+
+    unsafe {
+        ring.submission().push(&recv_e).expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let mut cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+
+    assert_eq!(cqe.user_data(), 0x30);
+    assert!(cqueue::buffer_select(cqe.flags()).is_some());
+    let mut remaining = cqe.result() as usize;
+    let bufs = buf_ring.rc.get_bufs(&buf_ring, remaining as u32, cqe.flags());
+    let mut section;
+    let mut input = input.as_slice();
+    for buf in &bufs {
+        // In case of bundled recv first bundle may not be full
+        let to_check = std::cmp::min(256, remaining);
+        (section, input) = input.split_at(to_check);
+        assert_eq!(buf.as_slice(), section);
+        remaining -= to_check;
+    }
+    assert_eq!(remaining, 0);
+
+    // Linux kernel 6.10 packs a single buffer into first recv and remaining buffers into second recv
+    // This behavior may change in the future
+    if !input.is_empty() {
+        assert!(cqueue::sock_nonempty(cqe.flags()));
+
+        unsafe {
+            ring.submission().push(&recv_e).expect("queue is full");
+        }
+
+        ring.submit_and_wait(1)?;
+
+        cqe = ring.completion().next().expect("cqueue is empty").into();
+
+        assert_eq!(cqe.user_data(), 0x30);
+        assert!(cqueue::buffer_select(cqe.flags()).is_some());
+        remaining = cqe.result() as usize;
+        let second_bufs = buf_ring.rc.get_bufs(&buf_ring, remaining as u32, cqe.flags());
+        for buf in &second_bufs {
+            let to_check = std::cmp::min(256, remaining);
+            (section, input) = input.split_at(to_check);
+            assert_eq!(buf.as_slice(), section);
+            remaining -= to_check;
+        }
+        assert_eq!(remaining, 0);
+    }
+    assert!(input.is_empty());
+
+    buf_ring.rc.unregister(ring)?;
+
+    Ok(())
+}
+
+pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::RecvMultiBundle::CODE);
+        ring.params().is_feature_recvsend_bundle(); // requires 6.10
+    );
+
+    println!("test tcp_recv_multi_bundle");
+
+    let (mut send_stream, recv_stream) = tcp_pair()?;
+
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+
+    // Send one package made of four segments, and receive as up to two buffer bundles
+    let mut input = vec![0x0d; 256];
+    input.extend_from_slice(&[0x0e; 256]);
+    input.extend_from_slice(&[0x0a; 256]);
+    input.extend_from_slice(&[0x0d; 128]);
+
+    // Prepare BufRing
+    let buf_ring = register_buf_ring::Builder::new(0xdebf).ring_entries(2).buf_cnt(5).buf_len(256).build()?;
+    buf_ring.rc.register(ring)?;
+
+    send_stream.write_all(&input)?;
+    send_stream.shutdown(Shutdown::Write)?;
+
+    let recv_e = opcode::RecvMultiBundle::new(recv_fd, 0xdebf)
+        .build()
+        .user_data(0x31)
+        .into();
+
+    unsafe {
+        ring.submission().push(&recv_e).expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let mut cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+
+    assert_eq!(cqe.user_data(), 0x31);
+    assert!(cqueue::buffer_select(cqe.flags()).is_some());
+    let mut remaining = cqe.result() as usize;
+    let bufs = buf_ring.rc.get_bufs(&buf_ring, remaining as u32, cqe.flags());
+    let mut section;
+    let mut input = input.as_slice();
+    for buf in &bufs {
+        // In case of bundled recv first bundle may not be full
+        let to_check = std::cmp::min(256, remaining);
+        (section, input) = input.split_at(to_check);
+        assert_eq!(buf.as_slice(), section);
+        remaining -= to_check;
+    }
+    assert_eq!(remaining, 0);
+
+    let mut used_bufs = bufs.len();
+
+    // Linux kernel 6.10 packs a single buffer into first recv and remaining buffers into second recv
+    // This behavior may change in the future
+    if !input.is_empty() {
+        assert!(cqueue::more(cqe.flags()));
+
+        ring.submit_and_wait(1)?;
+
+        cqe = ring.completion().next().expect("cqueue is empty").into();
+
+        assert_eq!(cqe.user_data(), 0x31);
+        assert!(cqueue::buffer_select(cqe.flags()).is_some());
+        remaining = cqe.result() as usize;
+        let second_bufs = buf_ring.rc.get_bufs(&buf_ring, remaining as u32, cqe.flags());
+        for buf in &second_bufs {
+            let to_check = std::cmp::min(256, remaining);
+            (section, input) = input.split_at(to_check);
+            assert_eq!(buf.as_slice(), section);
+            remaining -= to_check;
+        }
+        assert_eq!(remaining, 0);
+        used_bufs += second_bufs.len();
+    }
+    assert!(input.is_empty());
+
+    if cqueue::more(cqe.flags()) {
+        ring.submit_and_wait(1)?;
+        cqe = ring.completion().next().expect("cqueue is empty").into();
+        assert_eq!(cqe.user_data(), 0x31);
+        assert!(!cqueue::more(cqe.flags()));
+        if used_bufs < 5 {
+            assert_eq!(cqe.result(), 0); // Buffer space is avaialble
+        } else {
+            assert_eq!(cqe.result(), -105); // No buffer space available
+        }
+    }
+    buf_ring.rc.unregister(ring)?;
 
     Ok(())
 }

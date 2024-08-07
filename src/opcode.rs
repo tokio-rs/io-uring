@@ -1832,3 +1832,160 @@ opcode! {
         Entry(sqe)
     }
 }
+
+// === 6.8 ===
+
+opcode! {
+    /// Install a fixed file descriptor
+    ///
+    /// Turns a direct descriptor into a regular file descriptor that can be later used by regular
+    /// system calls that take a normal raw file descriptor
+    #[derive(Debug)]
+    pub struct FixedFdInstall {
+        fd: { types::Fixed },
+        file_flags: { u32 },
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_FIXED_FD_INSTALL;
+
+    pub fn build(self) -> Entry {
+        let FixedFdInstall { fd, file_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.fd = fd.0 as _;
+        sqe.flags = 1 << sys::IOSQE_FIXED_FILE_BIT;
+        sqe.__bindgen_anon_3.install_fd_flags = file_flags;
+        Entry(sqe)
+    }
+}
+
+// === 6.9 ===
+
+opcode! {
+    /// Perform file truncation, equivalent to `ftruncate(2)`.
+    #[derive(Debug)]
+    pub struct FTruncate {
+        fd: { impl sealed::UseFixed },
+        len: { u64 },
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_FTRUNCATE;
+
+    pub fn build(self) -> Entry {
+        let FTruncate { fd, len } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.off = len;
+        Entry(sqe)
+    }
+}
+
+// === 6.10 ===
+
+
+opcode! {
+    /// Send a bundle of messages on a socket in a single request.
+    pub struct SendBundle {
+        fd: { impl sealed::UseFixed },
+        buf_group: { u16 },
+        ;;
+        flags: i32 = 0,
+        len: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_SEND;
+
+    pub fn build(self) -> Entry {
+        let SendBundle { fd, len, flags, buf_group } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.len = len;
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.ioprio |= sys::IORING_RECVSEND_BUNDLE as u16;
+        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Receive a bundle of buffers from a socket.
+    ///
+    /// Parameter
+    ///     buf_group: The id of the provided buffer pool to use for the bundle.
+    ///
+    /// Note that as of kernel 6.10 first recv always gets a single buffer, while second
+    /// obtains the bundle of remaining buffers. This behavior may change in the future.
+    ///
+    /// Bundle variajnt is available since kernel 6.10
+    pub struct RecvBundle {
+        fd: { impl sealed::UseFixed },
+        buf_group: { u16 },
+        ;;
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_RECV;
+
+    pub fn build(self) -> Entry {
+        let RecvBundle { fd, buf_group, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.ioprio |= sys::IORING_RECVSEND_BUNDLE as u16;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Receive multiple messages from a socket as a bundle.
+    ///
+    /// Parameter:
+    ///     buf_group: The id of the provided buffer pool to use for each received message.
+    ///
+    /// MSG_WAITALL should not be set in flags.
+    ///
+    /// The multishot version allows the application to issue a single receive request, which
+    /// repeatedly posts a CQE when data is available. Each CQE will take a bundle of buffers 
+    /// out of a provided buffer pool for receiving. The application should check the flags of each CQE,
+    /// regardless of its result. If a posted CQE does not have the IORING_CQE_F_MORE flag set then
+    /// the multishot receive will be done and the application should issue a new request.
+    ///
+    /// Note that as of kernel 6.10 first CQE always gets a single buffer, while second
+    /// obtains the bundle of remaining buffers. This behavior may change in the future.
+    ///
+    /// Multishot bundle variant is available since kernel 6.10.
+    pub struct RecvMultiBundle {
+        fd: { impl sealed::UseFixed },
+        buf_group: { u16 },
+        ;;
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_RECV;
+
+    pub fn build(self) -> Entry {
+        let RecvMultiBundle { fd, buf_group, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.ioprio = sys::IORING_RECV_MULTISHOT as _;
+        sqe.ioprio |= sys::IORING_RECVSEND_BUNDLE as u16;
+        Entry(sqe)
+    }
+}

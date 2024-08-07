@@ -89,7 +89,7 @@ impl Drop for AnonymousMmap {
     }
 }
 
-struct InnerBufRing {
+pub(crate) struct InnerBufRing {
     // All these fields are constant once the struct is instantiated except the one of type Cell<u16>.
     bgid: Bgid,
 
@@ -100,7 +100,7 @@ struct InnerBufRing {
 
     // `ring_start` holds the memory allocated for the buf_ring, the ring of entries describing
     // the buffers being made available to the uring interface for this buf group id.
-    ring_start: AnonymousMmap,
+    pub(crate) ring_start: AnonymousMmap,
 
     buf_list: Vec<Vec<u8>>,
 
@@ -178,7 +178,7 @@ impl InnerBufRing {
     // Normally this is done automatically when building a BufRing.
     //
     // Warning: requires the CURRENT driver is already in place or will panic.
-    fn register<S, C>(&self, ring: &mut IoUring<S, C>) -> io::Result<()>
+    pub(crate) fn register<S, C>(&self, ring: &mut IoUring<S, C>) -> io::Result<()>
     where
         S: squeue::EntryMarker,
         C: cqueue::EntryMarker,
@@ -239,7 +239,7 @@ impl InnerBufRing {
 
     // Unregister the buffer ring from the io_uring.
     // Normally this is done automatically when the BufRing goes out of scope.
-    fn unregister<S, C>(&self, ring: &mut IoUring<S, C>) -> io::Result<()>
+    pub(crate) fn unregister<S, C>(&self, ring: &mut IoUring<S, C>) -> io::Result<()>
     where
         S: squeue::EntryMarker,
         C: cqueue::EntryMarker,
@@ -268,6 +268,19 @@ impl InnerBufRing {
         assert!(len <= self.buf_len);
 
         Ok(GBuf::new(buf_ring, bid, len))
+    }
+
+    // Returns vector of buffers for completion results that can return a bundle
+    pub(crate) fn get_bufs(&self, buf_ring: &FixedSizeBufRing, res: u32, flags: u32) -> Vec<GBuf> {
+        let mut bid = io_uring::cqueue::buffer_select(flags).unwrap();
+        let mut len = res as usize;
+        let mut output = Vec::with_capacity(len / self.buf_len);
+        while len > 0 {
+            output.push(GBuf::new(buf_ring.clone(), bid, std::cmp::min(len, self.buf_len)));
+            len = len.saturating_sub(self.buf_len);
+            bid += 1;
+        }
+        output
     }
 
     // Safety: dropping a duplicate bid is likely to cause undefined behavior
@@ -329,10 +342,10 @@ impl InnerBufRing {
 }
 
 #[derive(Clone)]
-struct FixedSizeBufRing {
+pub(crate) struct FixedSizeBufRing {
     // The BufRing is reference counted because each buffer handed out has a reference back to its
     // buffer group, or in this case, to its buffer ring.
-    rc: Rc<InnerBufRing>,
+    pub(crate) rc: Rc<InnerBufRing>,
 }
 
 impl FixedSizeBufRing {
@@ -345,7 +358,7 @@ impl FixedSizeBufRing {
 
 // The Builder API for a FixedSizeBufRing.
 #[derive(Copy, Clone)]
-struct Builder {
+pub(crate) struct Builder {
     bgid: Bgid,
     ring_entries: u16,
     buf_cnt: u16,
@@ -360,7 +373,7 @@ impl Builder {
     //
     // The caller is responsible for picking a bgid that does not conflict with other buffer
     // groups that have been registered with the same uring interface.
-    fn new(bgid: Bgid) -> Builder {
+    pub(crate) fn new(bgid: Bgid) -> Builder {
         Builder {
             bgid,
             ring_entries: 128,
@@ -373,25 +386,25 @@ impl Builder {
     //
     // The number will be made a power of 2, and will be the maximum of the ring_entries setting
     // and the buf_cnt setting. The interface will enforce a maximum of 2^15 (32768).
-    fn ring_entries(mut self, ring_entries: u16) -> Builder {
+    pub(crate) fn ring_entries(mut self, ring_entries: u16) -> Builder {
         self.ring_entries = ring_entries;
         self
     }
 
     // The number of buffers to allocate. If left zero, the ring_entries value will be used.
-    fn buf_cnt(mut self, buf_cnt: u16) -> Builder {
+    pub(crate) fn buf_cnt(mut self, buf_cnt: u16) -> Builder {
         self.buf_cnt = buf_cnt;
         self
     }
 
     // The length to be preallocated for each buffer.
-    fn buf_len(mut self, buf_len: usize) -> Builder {
+    pub(crate) fn buf_len(mut self, buf_len: usize) -> Builder {
         self.buf_len = buf_len;
         self
     }
 
     // Return a FixedSizeBufRing.
-    fn build(&self) -> io::Result<FixedSizeBufRing> {
+    pub(crate) fn build(&self) -> io::Result<FixedSizeBufRing> {
         let mut b: Builder = *self;
 
         // Two cases where both buf_cnt and ring_entries are set to the max of the two.
@@ -423,7 +436,7 @@ impl Builder {
 
 // This tracks a buffer that has been filled in by the kernel, having gotten the memory
 // from a buffer ring, and returned to userland via a cqe entry.
-struct GBuf {
+pub(crate) struct GBuf {
     bufgroup: FixedSizeBufRing,
     len: usize,
     bid: Bid,
@@ -472,7 +485,7 @@ impl GBuf {
     }
 
     // Return a byte slice reference.
-    fn as_slice(&self) -> &[u8] {
+    pub(crate) fn as_slice(&self) -> &[u8] {
         let p = self.bufgroup.rc.stable_ptr(self.bid);
         unsafe { std::slice::from_raw_parts(p, self.len) }
     }
