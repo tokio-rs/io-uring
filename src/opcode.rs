@@ -1887,7 +1887,6 @@ opcode! {
 
 // === 6.10 ===
 
-
 opcode! {
     /// Send a bundle of messages on a socket in a single request.
     pub struct SendBundle {
@@ -1957,7 +1956,7 @@ opcode! {
     /// MSG_WAITALL should not be set in flags.
     ///
     /// The multishot version allows the application to issue a single receive request, which
-    /// repeatedly posts a CQE when data is available. Each CQE will take a bundle of buffers 
+    /// repeatedly posts a CQE when data is available. Each CQE will take a bundle of buffers
     /// out of a provided buffer pool for receiving. The application should check the flags of each CQE,
     /// regardless of its result. If a posted CQE does not have the IORING_CQE_F_MORE flag set then
     /// the multishot receive will be done and the application should issue a new request.

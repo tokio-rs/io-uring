@@ -1,6 +1,6 @@
+use crate::tests::register_buf_ring;
 use crate::utils;
 use crate::Test;
-use crate::tests::register_buf_ring;
 use io_uring::squeue::Flags;
 use io_uring::types::{BufRingEntry, Fd};
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
@@ -138,13 +138,21 @@ pub fn test_tcp_send_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut output = vec![0; text.len()];
 
-    let buf_ring = register_buf_ring::Builder::new(0xdead).ring_entries(2).buf_cnt(2).buf_len(22).build()?;
+    let buf_ring = register_buf_ring::Builder::new(0xdead)
+        .ring_entries(2)
+        .buf_cnt(2)
+        .buf_len(22)
+        .build()?;
     buf_ring.rc.register(ring)?;
     let ptr1 = buf_ring.rc.ring_start.as_ptr_mut() as *mut BufRingEntry;
     unsafe {
         let ptr2 = ptr1.add(1);
         std::ptr::copy_nonoverlapping(text.as_ptr(), ptr1.as_mut().unwrap().addr() as *mut u8, 22);
-        std::ptr::copy_nonoverlapping(text[22..].as_ptr(), ptr2.as_mut().unwrap().addr() as *mut u8, 22);
+        std::ptr::copy_nonoverlapping(
+            text[22..].as_ptr(),
+            ptr2.as_mut().unwrap().addr() as *mut u8,
+            22,
+        );
     }
 
     let send_e = opcode::SendBundle::new(send_fd, 0xdead);
@@ -167,7 +175,12 @@ pub fn test_tcp_send_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes[0].user_data(), 0x01);
     assert_eq!(cqes[0].result(), text.len() as i32);
 
-    assert_eq!(recv_stream.read(&mut output).expect("could not read stream"), text.len());
+    assert_eq!(
+        recv_stream
+            .read(&mut output)
+            .expect("could not read stream"),
+        text.len()
+    );
     assert_eq!(&output, text);
     buf_ring.rc.unregister(ring)?;
 
@@ -1238,7 +1251,11 @@ pub fn test_tcp_recv_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     input.extend_from_slice(&[0x0d; 128]);
 
     // Prepare BufRing
-    let buf_ring = register_buf_ring::Builder::new(0xdeff).ring_entries(16).buf_cnt(32).buf_len(256).build()?;
+    let buf_ring = register_buf_ring::Builder::new(0xdeff)
+        .ring_entries(16)
+        .buf_cnt(32)
+        .buf_len(256)
+        .build()?;
     buf_ring.rc.register(ring)?;
 
     send_stream.write_all(&input)?;
@@ -1260,7 +1277,9 @@ pub fn test_tcp_recv_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqe.user_data(), 0x30);
     assert!(cqueue::buffer_select(cqe.flags()).is_some());
     let mut remaining = cqe.result() as usize;
-    let bufs = buf_ring.rc.get_bufs(&buf_ring, remaining as u32, cqe.flags());
+    let bufs = buf_ring
+        .rc
+        .get_bufs(&buf_ring, remaining as u32, cqe.flags());
     let mut section;
     let mut input = input.as_slice();
     for buf in &bufs {
@@ -1288,7 +1307,9 @@ pub fn test_tcp_recv_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         assert_eq!(cqe.user_data(), 0x30);
         assert!(cqueue::buffer_select(cqe.flags()).is_some());
         remaining = cqe.result() as usize;
-        let second_bufs = buf_ring.rc.get_bufs(&buf_ring, remaining as u32, cqe.flags());
+        let second_bufs = buf_ring
+            .rc
+            .get_bufs(&buf_ring, remaining as u32, cqe.flags());
         for buf in &second_bufs {
             let to_check = std::cmp::min(256, remaining);
             (section, input) = input.split_at(to_check);
@@ -1308,7 +1329,6 @@ pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker
     ring: &mut IoUring<S, C>,
     test: &Test,
 ) -> anyhow::Result<()> {
-
     require!(
         test;
         test.probe.is_supported(opcode::RecvMultiBundle::CODE);
@@ -1328,7 +1348,11 @@ pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker
     input.extend_from_slice(&[0x0d; 128]);
 
     // Prepare BufRing
-    let buf_ring = register_buf_ring::Builder::new(0xdebf).ring_entries(2).buf_cnt(5).buf_len(256).build()?;
+    let buf_ring = register_buf_ring::Builder::new(0xdebf)
+        .ring_entries(2)
+        .buf_cnt(5)
+        .buf_len(256)
+        .build()?;
     buf_ring.rc.register(ring)?;
 
     send_stream.write_all(&input)?;
@@ -1350,7 +1374,9 @@ pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker
     assert_eq!(cqe.user_data(), 0x31);
     assert!(cqueue::buffer_select(cqe.flags()).is_some());
     let mut remaining = cqe.result() as usize;
-    let bufs = buf_ring.rc.get_bufs(&buf_ring, remaining as u32, cqe.flags());
+    let bufs = buf_ring
+        .rc
+        .get_bufs(&buf_ring, remaining as u32, cqe.flags());
     let mut section;
     let mut input = input.as_slice();
     for buf in &bufs {
@@ -1376,7 +1402,9 @@ pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker
         assert_eq!(cqe.user_data(), 0x31);
         assert!(cqueue::buffer_select(cqe.flags()).is_some());
         remaining = cqe.result() as usize;
-        let second_bufs = buf_ring.rc.get_bufs(&buf_ring, remaining as u32, cqe.flags());
+        let second_bufs = buf_ring
+            .rc
+            .get_bufs(&buf_ring, remaining as u32, cqe.flags());
         for buf in &second_bufs {
             let to_check = std::cmp::min(256, remaining);
             (section, input) = input.split_at(to_check);

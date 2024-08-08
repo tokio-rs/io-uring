@@ -276,7 +276,11 @@ impl InnerBufRing {
         let mut len = res as usize;
         let mut output = Vec::with_capacity(len / self.buf_len);
         while len > 0 {
-            output.push(GBuf::new(buf_ring.clone(), bid, std::cmp::min(len, self.buf_len)));
+            output.push(GBuf::new(
+                buf_ring.clone(),
+                bid,
+                std::cmp::min(len, self.buf_len),
+            ));
             len = len.saturating_sub(self.buf_len);
             bid += 1;
         }

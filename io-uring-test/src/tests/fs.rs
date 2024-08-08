@@ -813,7 +813,6 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
 ) -> anyhow::Result<()> {
-
     require!(
         test;
         test.probe.is_supported(opcode::FTruncate::CODE);
@@ -828,14 +827,9 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let input = &[0x9f; 1024];
 
     fs::write(&file, input)?;
-    let fd = fs::OpenOptions::new()
-        .write(true)
-        .open(&file)?;
+    let fd = fs::OpenOptions::new().write(true).open(&file)?;
     let fd = types::Fd(fd.as_raw_fd());
-    let ftruncate_e = opcode::FTruncate::new(
-        fd,
-        512
-    );
+    let ftruncate_e = opcode::FTruncate::new(fd, 512);
 
     unsafe {
         ring.submission()
@@ -850,12 +844,12 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x33);
     assert_eq!(cqes[0].result(), 0);
-    assert_eq!(fs::read(&file).expect("could not read truncated file"), &input[..512]);
-
-    let ftruncate_e = opcode::FTruncate::new(
-        fd,
-        0
+    assert_eq!(
+        fs::read(&file).expect("could not read truncated file"),
+        &input[..512]
     );
+
+    let ftruncate_e = opcode::FTruncate::new(fd, 0);
 
     unsafe {
         ring.submission()
@@ -870,7 +864,12 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x34);
     assert_eq!(cqes[0].result(), 0);
-    assert_eq!(fs::metadata(&file).expect("could not read truncated file").len(), 0);
+    assert_eq!(
+        fs::metadata(&file)
+            .expect("could not read truncated file")
+            .len(),
+        0
+    );
 
     Ok(())
 }
@@ -879,7 +878,6 @@ pub fn test_fixed_fd_install<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
 ) -> anyhow::Result<()> {
-
     require!(
         test;
         test.probe.is_supported(opcode::Read::CODE);
@@ -896,17 +894,16 @@ pub fn test_fixed_fd_install<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let mut output = vec![0; 1024];
 
     fs::write(&file, input)?;
-    let fd = fs::OpenOptions::new()
-        .read(true)
-        .open(&file)?;
+    let fd = fs::OpenOptions::new().read(true).open(&file)?;
     let fd = types::Fd(fd.as_raw_fd());
     ring.submitter().register_files(&[fd.0])?;
     let fd = types::Fixed(0);
 
     let read_e = opcode::Read::new(fd, output.as_mut_ptr(), output.len() as _);
-    unsafe {ring.submission()
-        .push(&read_e.build().user_data(0x01).into())
-        .expect("queue is full");
+    unsafe {
+        ring.submission()
+            .push(&read_e.build().user_data(0x01).into())
+            .expect("queue is full");
     }
 
     assert_eq!(ring.submit_and_wait(1)?, 1);
@@ -916,10 +913,7 @@ pub fn test_fixed_fd_install<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes[0].result(), 1024);
     assert_eq!(output, input);
 
-    let fixed_fd_install_e = opcode::FixedFdInstall::new(
-        fd,
-        0
-    );
+    let fixed_fd_install_e = opcode::FixedFdInstall::new(fd, 0);
 
     unsafe {
         ring.submission()
