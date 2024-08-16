@@ -1662,10 +1662,12 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
                 // First SendZc notification
                 11 => {
                     assert!(cqueue::more(cqe.flags()));
+                    assert!(!cqueue::notif(cqe.flags()));
                 }
                 // Last SendZc notification
                 0 => {
                     assert!(!cqueue::more(cqe.flags()));
+                    assert!(cqueue::notif(cqe.flags()));
                 }
                 _ => panic!("wrong result for notification"),
             },
