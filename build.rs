@@ -1,8 +1,12 @@
-#[cfg(not(feature = "bindgen"))]
-fn main() {}
+fn main() {
+    #[cfg(feature = "bindgen")]
+    build();
+
+    println!("cargo::rustc-check-cfg=cfg(io_uring_skip_arch_check)");
+}
 
 #[cfg(feature = "bindgen")]
-fn main() {
+fn build() {
     use std::env;
     use std::path::PathBuf;
 

@@ -31,31 +31,7 @@ jobs:
       - name: Bench
         run: cargo bench --package io-uring-bench
 
-  check-32bit:
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-
-      matrix:
-        toolchain:
-          - stable
-          - "1.63"
-        target:
-          - i686-unknown-linux-gnu
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          target: ${{ matrix.target }}
-          components: clippy
-          override: true
-      - name: Lint
-        run: cargo clippy --features bindgen --target ${{ matrix.target }}
-
-  check-64bit:
+  check-x86_64:
     runs-on: ubuntu-latest
 
     strategy:
@@ -68,6 +44,30 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.target }}
+          components: clippy
+          override: true
+      - name: Lint
+        run: cargo clippy --target ${{ matrix.target }}
+
+  check-other:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        toolchain:
+          - stable
+          - "1.63"
+        target:
+          - i686-unknown-linux-gnu
           - aarch64-unknown-linux-gnu
 
     steps:
@@ -79,6 +79,8 @@ jobs:
           components: clippy
           override: true
       - name: Lint
+        env:
+          RUSTFLAGS: --cfg=io_uring_skip_arch_check
         run: cargo clippy --target ${{ matrix.target }}
 
   fmt:

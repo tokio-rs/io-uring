@@ -33,6 +33,17 @@ fn to_result(ret: c_int) -> io::Result<c_int> {
     }
 }
 
+#[cfg(all(
+    not(feature = "bindgen"),
+    not(target_arch = "x86_64"),
+    not(io_uring_skip_arch_check)
+))]
+compile_error!(
+    "The prebuilt `sys.rs` may not be compatible with your target,
+please use bindgen feature to generate new `sys.rs` of your arch
+or use `--cfg=io_uring_skip_arch_check` to skip the check."
+);
+
 #[cfg(all(feature = "bindgen", not(feature = "overwrite")))]
 include!(concat!(env!("OUT_DIR"), "/sys.rs"));
 
