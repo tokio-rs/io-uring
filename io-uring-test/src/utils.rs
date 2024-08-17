@@ -102,7 +102,7 @@ pub fn writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let mut output = vec![0; text.len()];
     let mut output2 = vec![0; text2.len()];
 
-    let text3 = vec![IoSlice::new(text), IoSlice::new(text2)];
+    let text3 = [IoSlice::new(text), IoSlice::new(text2)];
     let mut output3 = vec![IoSliceMut::new(&mut output), IoSliceMut::new(&mut output2)];
 
     let write_e = opcode::Writev::new(fd_in, text3.as_ptr().cast(), text3.len() as _);

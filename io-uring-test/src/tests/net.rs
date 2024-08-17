@@ -1661,11 +1661,11 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
             33 => match cqe.result() {
                 // First SendZc notification
                 11 => {
-                    assert_eq!(cqueue::more(cqe.flags()), true);
+                    assert!(cqueue::more(cqe.flags()));
                 }
                 // Last SendZc notification
                 0 => {
-                    assert_eq!(cqueue::more(cqe.flags()), false);
+                    assert!(!cqueue::more(cqe.flags()));
                 }
                 _ => panic!("wrong result for notification"),
             },

@@ -172,11 +172,10 @@ pub fn test_msg_ring_data<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let fd = types::Fd(dest_ring.as_raw_fd());
     let result = 82; // b'R'
     let user_data = 85; // b'U'
-    let flags = None;
     unsafe {
         ring.submission()
             .push(
-                &opcode::MsgRingData::new(fd, result, user_data, flags)
+                &opcode::MsgRingData::new(fd, result, user_data, None)
                     .build()
                     .into(),
             )
@@ -194,7 +193,7 @@ pub fn test_msg_ring_data<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(dest_cqes.len(), 1);
     assert_eq!(dest_cqes[0].user_data(), user_data);
     assert_eq!(dest_cqes[0].result(), result);
-    assert_eq!(dest_cqes[0].flags(), flags.unwrap_or(0));
+    assert_eq!(dest_cqes[0].flags(), 0);
 
     Ok(())
 }
