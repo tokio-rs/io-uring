@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 io-uring = { path = ".." }
-criterion = "0.4"
+criterion = "0.5"
 tempfile = "3"
 
 [[bench]]
