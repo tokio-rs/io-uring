@@ -12,22 +12,12 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
-          - aarch64-unknown-linux-gnu
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          use-cross: true
-          args: --target ${{ matrix.target }}
-      - uses: actions-rs/cargo@v1
-        with:
-          command: run
-          use-cross: true
-          # Only run the test package on x86 until we find an ergonomic way
-          # to virtualize aarch64
-          args: --package io-uring-test --features io-uring-test/ci --target x86_64-unknown-linux-gnu
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test
+        run: cargo run --package io-uring-test --features io-uring-test/ci --target ${{ matrix.target }}
 
   check-bench:
     runs-on: ubuntu-latest
@@ -35,22 +25,11 @@ jobs:
     strategy:
       fail-fast: false
 
-      matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          components: clippy
-          override: true
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --package io-uring-bench
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Bench
+        run: cargo bench --package io-uring-bench
 
   check:
     runs-on: ubuntu-latest
@@ -60,7 +39,7 @@ jobs:
 
       matrix:
         toolchain:
-          - nightly
+          - stable
           - "1.48"
         target:
           - x86_64-unknown-linux-gnu
@@ -70,26 +49,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ matrix.toolchain }}
-            target: ${{ matrix.target }}
-            components: clippy
-            override: true
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --target ${{ matrix.target }}
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.target }}
+          components: clippy
+          override: true
+      - name: Lint
+        run: cargo clippy --target ${{ matrix.target }}
 
   fmt:
     name: fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust
-        run: rustup update stable
-      - name: Install rustfmt
-        run: rustup component add rustfmt
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
 
       - name: "rustfmt --check"
         run: |

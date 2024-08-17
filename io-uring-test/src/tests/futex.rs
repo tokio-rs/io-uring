@@ -26,7 +26,7 @@ fn syscall_futex(futex: *const u32, op: libc::c_int, val: u32) -> io::Result<i64
         )
     };
     if ret >= 0 {
-        Ok(ret)
+        Ok(ret as _)
     } else {
         Err(io::Error::from_raw_os_error(-ret as _))
     }
