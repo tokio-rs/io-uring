@@ -323,7 +323,7 @@ impl BufRingEntry {
     /// of the buf_ring for the resv field to even be considered the tail field of the ring.
     /// The entry must also be properly initialized.
     pub unsafe fn tail(ring_base: *const BufRingEntry) -> *const u16 {
-        &(*ring_base).0.resv
+        std::ptr::addr_of!((*ring_base).0.resv)
     }
 }
 
