@@ -2,7 +2,8 @@ fn main() {
     #[cfg(feature = "bindgen")]
     build();
 
-    println!("cargo::rustc-check-cfg=cfg(io_uring_skip_arch_check)");
+    println!("cargo:rustc-check-cfg=cfg(io_uring_skip_arch_check)");
+    println!("cargo:rustc-check-cfg=cfg(io_uring_use_own_sys)");
 }
 
 #[cfg(feature = "bindgen")]
@@ -26,6 +27,8 @@ fn build() {
     #[cfg(feature = "overwrite")]
     let outdir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("src/sys");
 
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+
     let mut builder = bindgen::Builder::default();
 
     if let Some(path) = env::var("BUILD_IO_URING_INCLUDE_FILE")
@@ -37,6 +40,8 @@ fn build() {
         builder = builder.header_contents("include-file.h", INCLUDE);
     }
 
+    let target_file = outdir.join(format!("sys_{}.rs", target_arch));
+
     builder
         .ctypes_prefix("libc")
         .prepend_enum_name(false)
@@ -47,6 +52,6 @@ fn build() {
         .allowlist_var("__NR_io_uring.*|IOSQE_.*|IORING_.*|IO_URING_.*|SPLICE_F_FD_IN_FIXED")
         .generate()
         .unwrap()
-        .write_to_file(outdir.join("sys.rs"))
+        .write_to_file(target_file)
         .unwrap();
 }
