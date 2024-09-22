@@ -1354,7 +1354,7 @@ opcode! {
 // === 5.15 ===
 
 opcode! {
-    /// Make a directory, equivalent to `mkdirat2(2)`.
+    /// Make a directory, equivalent to `mkdirat(2)`.
     pub struct MkDirAt {
         dirfd: { impl sealed::UseFd },
         pathname: { *const libc::c_char },
@@ -1377,7 +1377,7 @@ opcode! {
 }
 
 opcode! {
-    /// Create a symlink, equivalent to `symlinkat2(2)`.
+    /// Create a symlink, equivalent to `symlinkat(2)`.
     pub struct SymlinkAt {
         newdirfd: { impl sealed::UseFd },
         target: { *const libc::c_char },
@@ -1400,7 +1400,7 @@ opcode! {
 }
 
 opcode! {
-    /// Create a hard link, equivalent to `linkat2(2)`.
+    /// Create a hard link, equivalent to `linkat(2)`.
     pub struct LinkAt {
         olddirfd: { impl sealed::UseFd },
         oldpath: { *const libc::c_char },
