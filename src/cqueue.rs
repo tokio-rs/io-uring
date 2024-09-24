@@ -333,3 +333,11 @@ pub fn more(flags: u32) -> bool {
 pub fn sock_nonempty(flags: u32) -> bool {
     flags & sys::IORING_CQE_F_SOCK_NONEMPTY != 0
 }
+
+/// Returns whether this completion event is a notification.
+///
+/// This corresponds to the `IORING_CQE_F_NOTIF` flag,
+/// currently used by the [SendZc](crate::opcode::SendZc) operation.
+pub fn notif(flags: u32) -> bool {
+    flags & sys::IORING_CQE_F_NOTIF != 0
+}

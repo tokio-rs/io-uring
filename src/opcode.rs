@@ -1662,6 +1662,12 @@ opcode! {
     ///
     /// A fixed (pre-mapped) buffer can optionally be used from pre-mapped buffers that have been
     /// previously registered with [`Submitter::register_buffers`](crate::Submitter::register_buffers).
+    ///
+    /// This operation might result in two completion queue entries.
+    /// See the `IORING_OP_SEND_ZC` section at [io_uring_enter][] for the exact semantics.
+    /// Notifications posted by this operation can be checked with [notif](crate::cqueue::notif).
+    ///
+    /// [io_uring_enter]: https://man7.org/linux/man-pages/man2/io_uring_enter.2.html
     pub struct SendZc {
         fd: { impl sealed::UseFixed },
         buf: { *const u8 },
