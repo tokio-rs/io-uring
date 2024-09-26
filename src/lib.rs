@@ -591,6 +591,14 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_LINKED_FILE != 0
     }
 
+    /// Whether the kernel supports `IORING_RECVSEND_BUNDLE`.
+    ///
+    /// This feature allows sending and recieving multiple buffers as a single bundle. Available
+    /// since kernel 6.10.
+    pub fn is_feature_recvsend_bundle(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_RECVSEND_BUNDLE != 0
+    }
+
     /// The number of submission queue entries allocated.
     pub fn sq_entries(&self) -> u32 {
         self.0.sq_entries

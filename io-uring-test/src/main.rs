@@ -103,6 +103,8 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     #[cfg(not(feature = "ci"))]
     tests::fs::test_statx(&mut ring, &test)?;
     tests::fs::test_file_splice(&mut ring, &test)?;
+    tests::fs::test_ftruncate(&mut ring, &test)?;
+    tests::fs::test_fixed_fd_install(&mut ring, &test)?;
 
     // timeout
     tests::timeout::test_timeout(&mut ring, &test)?;
@@ -117,6 +119,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::net::test_tcp_write_read(&mut ring, &test)?;
     tests::net::test_tcp_writev_readv(&mut ring, &test)?;
     tests::net::test_tcp_send_recv(&mut ring, &test)?;
+    tests::net::test_tcp_send_bundle(&mut ring, &test)?;
     tests::net::test_tcp_zero_copy_send_recv(&mut ring, &test)?;
     tests::net::test_tcp_zero_copy_send_fixed(&mut ring, &test)?;
     tests::net::test_tcp_sendmsg_recvmsg(&mut ring, &test)?;
@@ -130,6 +133,9 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::net::test_tcp_buffer_select_recvmsg(&mut ring, &test)?;
     tests::net::test_tcp_buffer_select_readv(&mut ring, &test)?;
     tests::net::test_tcp_recv_multi(&mut ring, &test)?;
+    tests::net::test_tcp_recv_bundle(&mut ring, &test)?;
+    tests::net::test_tcp_recv_multi_bundle(&mut ring, &test)?;
+
     tests::net::test_tcp_shutdown(&mut ring, &test)?;
     tests::net::test_socket(&mut ring, &test)?;
     tests::net::test_udp_recvmsg_multishot(&mut ring, &test)?;
