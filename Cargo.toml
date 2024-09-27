@@ -1,14 +1,15 @@
 [package]
 name = "io-uring"
-version = "0.6.4"
+version = "0.7.0"
 authors = ["quininer <quininer@live.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/tokio-rs/io-uring"
 homepage = "https://github.com/tokio-rs/io-uring"
 documentation = "https://docs.rs/io-uring"
 description = "The low-level `io_uring` userspace interface for Rust"
 categories = [ "asynchronous", "network-programming", "filesystem" ]
+rust-version = "1.63"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,14 +23,14 @@ direct-syscall = [ "sc" ]
 io_safety = []
 
 [dependencies]
-# Since we need to work on rustc 1.48, we cannot use 2021 edition.
-bitflags = "1"
+bitflags = "2"
+cfg-if = "1"
 
 libc = { version = "0.2.98", default-features = false }
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]
-bindgen = { version = "0.65", optional = true }
+bindgen = { version = "0.69", optional = true }
 
 [dev-dependencies]
 anyhow = "1"

@@ -88,6 +88,7 @@ bitflags! {
     /// The default behavior when the timeout expires is to return a CQE with -libc::ETIME in
     /// the res field. To change this behavior to have zero returned, include
     /// [`types::TimeoutFlags::ETIME_SUCCESS`].
+    #[derive(Debug, Clone, Copy)]
     pub struct TimeoutFlags: u32 {
         const ABS = sys::IORING_TIMEOUT_ABS;
 
@@ -103,6 +104,7 @@ bitflags! {
 
 bitflags! {
     /// Options for [`Fsync`](super::Fsync).
+    #[derive(Debug, Clone, Copy)]
     pub struct FsyncFlags: u32 {
         const DATASYNC = sys::IORING_FSYNC_DATASYNC;
     }
@@ -111,6 +113,7 @@ bitflags! {
 bitflags! {
     /// Options for [`AsyncCancel`](super::AsyncCancel) and
     /// [`Submitter::register_sync_cancel`](super::Submitter::register_sync_cancel).
+    #[derive(Debug, Clone, Copy)]
     pub(crate) struct AsyncCancelFlags: u32 {
         /// Cancel all requests that match the given criteria, rather
         /// than just canceling the first one found.
@@ -320,7 +323,7 @@ impl BufRingEntry {
     /// of the buf_ring for the resv field to even be considered the tail field of the ring.
     /// The entry must also be properly initialized.
     pub unsafe fn tail(ring_base: *const BufRingEntry) -> *const u16 {
-        &(*ring_base).0.resv
+        std::ptr::addr_of!((*ring_base).0.resv)
     }
 }
 

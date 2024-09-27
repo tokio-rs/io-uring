@@ -15,32 +15,26 @@ use std::io;
 
 use libc::*;
 
-#[cfg(feature = "direct-syscall")]
-fn to_result(ret: c_int) -> io::Result<c_int> {
-    if ret >= 0 {
-        Ok(ret)
-    } else {
-        Err(io::Error::from_raw_os_error(-ret))
-    }
-}
-
-#[cfg(not(feature = "direct-syscall"))]
-fn to_result(ret: c_int) -> io::Result<c_int> {
-    if ret >= 0 {
-        Ok(ret)
-    } else {
-        Err(io::Error::last_os_error())
-    }
-}
-
-#[cfg(all(feature = "bindgen", not(feature = "overwrite")))]
-include!(concat!(env!("OUT_DIR"), "/sys.rs"));
-
-#[cfg(any(
+#[cfg(all(
     not(feature = "bindgen"),
-    all(feature = "bindgen", feature = "overwrite")
+    not(any(target_arch = "x86_64", target_arch = "aarch64")),
+    not(io_uring_skip_arch_check)
 ))]
-include!("sys.rs");
+compile_error!(
+    "The prebuilt `sys.rs` may not be compatible with your target,
+please use bindgen feature to generate new `sys.rs` of your arch
+or use `--cfg=io_uring_skip_arch_check` to skip the check."
+);
+
+cfg_if::cfg_if! {
+    if #[cfg(io_uring_use_own_sys)] {
+        include!(env!("IO_URING_OWN_SYS_BINDING"));
+    } else if #[cfg(all(feature = "bindgen", not(feature = "overwrite")))] {
+        include!(concat!(env!("OUT_DIR"), "/sys.rs"));
+    } else {
+        include!("sys.rs");
+    }
+}
 
 #[cfg(feature = "bindgen")]
 const SYSCALL_REGISTER: c_long = __NR_io_uring_register as _;
@@ -59,6 +53,24 @@ const SYSCALL_ENTER: c_long = __NR_io_uring_enter as _;
 
 #[cfg(not(feature = "bindgen"))]
 const SYSCALL_ENTER: c_long = libc::SYS_io_uring_enter;
+
+#[cfg(feature = "direct-syscall")]
+fn to_result(ret: c_int) -> io::Result<c_int> {
+    if ret >= 0 {
+        Ok(ret)
+    } else {
+        Err(io::Error::from_raw_os_error(-ret))
+    }
+}
+
+#[cfg(not(feature = "direct-syscall"))]
+fn to_result(ret: c_int) -> io::Result<c_int> {
+    if ret >= 0 {
+        Ok(ret)
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
 
 #[cfg(not(feature = "direct-syscall"))]
 pub unsafe fn io_uring_register(

@@ -744,6 +744,8 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x03);
+
+    // when fs does not support Direct IO, it may fallback to buffered IO.
     assert_eq_warn!(cqes[0].result(), -libc::EINVAL);
 
     Ok(())
