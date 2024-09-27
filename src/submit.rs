@@ -1,6 +1,7 @@
+use std::mem::size_of;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
-use std::{io, mem, ptr};
+use std::{io, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
@@ -91,7 +92,7 @@ impl<'a> Submitter<'a> {
         let arg = arg
             .map(|arg| cast_ptr(arg).cast())
             .unwrap_or_else(ptr::null);
-        let size = mem::size_of::<T>();
+        let size = size_of::<T>();
         sys::io_uring_enter(
             self.fd.as_raw_fd(),
             to_submit,
@@ -210,7 +211,7 @@ impl<'a> Submitter<'a> {
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_FILES2,
             cast_ptr::<sys::io_uring_rsrc_register>(&rr).cast(),
-            mem::size_of::<sys::io_uring_rsrc_register>() as _,
+            size_of::<sys::io_uring_rsrc_register>() as _,
         )
         .map(drop)
     }
@@ -411,7 +412,7 @@ impl<'a> Submitter<'a> {
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_IOWQ_AFF,
             cpu_set as *const _ as *const libc::c_void,
-            mem::size_of::<libc::cpu_set_t>() as u32,
+            size_of::<libc::cpu_set_t>() as u32,
         )
         .map(drop)
     }
