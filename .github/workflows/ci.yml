@@ -16,6 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Test API
+        run: cargo test --target ${{ matrix.target }}
       - name: Test
         run: cargo run --package io-uring-test --features io-uring-test/ci --target ${{ matrix.target }}
 
