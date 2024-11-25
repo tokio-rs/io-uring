@@ -1575,6 +1575,79 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
 
     Ok(())
 }
+
+pub fn test_udp_send_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Recv::CODE);
+        test.probe.is_supported(opcode::Send::CODE);
+    );
+
+    println!("test udp_send_with_dest");
+
+    let socket: socket2::Socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into();
+    let addr = socket.local_addr()?;
+    let fd = Fd(socket.as_raw_fd());
+
+    // We are going to do a send below. To confirm that it works, start a
+    // recv to receive the data sent by the send.
+    let mut in_buf = vec![0; 1024];
+    let recv = opcode::Recv::new(fd, in_buf.as_mut_ptr(), in_buf.len() as u32)
+        .build()
+        .user_data(1)
+        .into();
+
+    let out_buf = b"test message";
+
+    // For the first send, we don't specify a destination address. This should
+    // result in an error.
+    let send1 = opcode::Send::new(fd, out_buf.as_ptr(), out_buf.len() as u32)
+        .build()
+        .user_data(2)
+        .into();
+
+    // For the second send, we do specify the destination address, and we should
+    // receive our test message there.
+    let send2 = opcode::Send::new(fd, out_buf.as_ptr(), out_buf.len() as u32)
+        .dest_addr(addr.as_ptr())
+        .dest_addr_len(addr.len())
+        .build()
+        .user_data(3)
+        .into();
+
+    unsafe { ring.submission().push_multiple(&[recv, send1, send2])? };
+    ring.submitter().submit_and_wait(3)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 3);
+
+    for cqe in cqes {
+        match cqe.user_data() {
+            1 => {
+                // The receive, we should have received the test message here.
+                let n_received = cqe.result();
+                assert_eq!(n_received, out_buf.len() as i32);
+                assert_eq!(&in_buf[..n_received as usize], out_buf);
+            }
+            2 => {
+                // The send should have failed because it had no destination address.
+                assert_eq!(cqe.result(), -libc::EDESTADDRREQ);
+            }
+            3 => {
+                // The send that should have succeeded.
+                let n_sent = cqe.result();
+                assert_eq!(n_sent, out_buf.len() as i32);
+            }
+            _ => unreachable!("We only submit user data 1, 2, and 3."),
+        }
+    }
+
+    Ok(())
+}
+
 pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
