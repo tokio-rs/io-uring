@@ -3,10 +3,10 @@ use std::sync::atomic;
 use std::{io, mem, ptr};
 
 use crate::register::{execute, Probe};
-use crate::sys;
 use crate::types::{CancelBuilder, Timespec};
 use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
+use crate::{buf_ring, sys};
 
 use crate::register::Restriction;
 
@@ -464,42 +464,24 @@ impl<'a> Submitter<'a> {
         ring_entries: u16,
         bgid: u16,
     ) -> io::Result<()> {
-        // The interface type for ring_entries is u32 but the same interface only allows a u16 for
-        // the tail to be specified, so to try and avoid further confusion, we limit the
-        // ring_entries to u16 here too. The value is actually limited to 2^15 (32768) but we can
-        // let the kernel enforce that.
-        let arg = sys::io_uring_buf_reg {
-            ring_addr,
-            ring_entries: ring_entries as _,
-            bgid,
-            ..Default::default()
-        };
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_REGISTER_PBUF_RING,
-            cast_ptr::<sys::io_uring_buf_reg>(&arg).cast(),
-            1,
-        )
-        .map(drop)
+        buf_ring::register(self.fd.as_raw_fd(), ring_addr, ring_entries, bgid)
     }
 
     /// Unregister a previously registered buffer ring.
     ///
     /// Available since 5.19.
     pub fn unregister_buf_ring(&self, bgid: u16) -> io::Result<()> {
-        let arg = sys::io_uring_buf_reg {
-            ring_addr: 0,
-            ring_entries: 0,
-            bgid,
-            ..Default::default()
-        };
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_UNREGISTER_PBUF_RING,
-            cast_ptr::<sys::io_uring_buf_reg>(&arg).cast(),
-            1,
-        )
-        .map(drop)
+        buf_ring::unregister(self.fd.as_raw_fd(), bgid)
+    }
+
+    /// Setup and register a buffer ring. See [`Submitter::register_buf_ring`] for
+    /// requirements of `ring_entries`.
+    pub fn setup_buf_ring(
+        &self,
+        ring_entries: u16,
+        bgid: u16,
+    ) -> io::Result<buf_ring::BufRing<'a>> {
+        buf_ring::BufRing::new(self.fd, ring_entries, bgid)
     }
 
     /// Performs a synchronous cancellation request, similar to [AsyncCancel](crate::opcode::AsyncCancel),
