@@ -26,7 +26,7 @@ io_safety = []
 bitflags = "2"
 cfg-if = "1"
 
-libc = { version = "0.2.98", default-features = false }
+libc = { version = "0.2.167", default-features = false }
 sc = { version = "0.2", optional = true }
 
 [build-dependencies]

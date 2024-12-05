@@ -103,6 +103,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     #[cfg(not(feature = "ci"))]
     tests::fs::test_statx(&mut ring, &test)?;
     tests::fs::test_file_splice(&mut ring, &test)?;
+    tests::fs::test_file_ftruncate(&mut ring, &test)?;
 
     // timeout
     tests::timeout::test_timeout(&mut ring, &test)?;

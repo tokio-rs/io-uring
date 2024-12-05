@@ -1,5 +1,6 @@
 use crate::utils;
 use crate::Test;
+use io_uring::types::Fd;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use std::ffi::CString;
 use std::fs;
@@ -807,6 +808,54 @@ pub fn test_file_splice<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     pipe_out.read_exact(&mut output)?;
 
     assert_eq!(input, &output[..]);
+
+    Ok(())
+}
+
+fn get_file_size(fd: Fd) -> anyhow::Result<i64> {
+    let mut stats: libc::stat64 = unsafe { std::mem::zeroed() };
+    let ret = unsafe { libc::fstat64(fd.0, &mut stats as *mut libc::stat64) };
+    if ret != 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    Ok(stats.st_size)
+}
+
+pub fn test_file_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Ftruncate::CODE);
+    );
+
+    println!("test file_ftruncate");
+
+    let file = tempfile::tempfile()?;
+    let fd = types::Fd(file.as_raw_fd());
+
+    utils::write_read(ring, fd, fd)?;
+    assert!(get_file_size(fd).unwrap() > 6);
+
+    // Truncate to 6 bytes.
+    let ftrunc_e = opcode::Ftruncate::new(fd, 6);
+
+    unsafe {
+        ring.submission()
+            .push(&ftrunc_e.build().user_data(0xaaa).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0xaaa);
+    assert_eq!(cqes[0].result(), 0);
+
+    assert_eq!(get_file_size(fd).unwrap(), 6);
 
     Ok(())
 }
