@@ -815,7 +815,7 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 ) -> anyhow::Result<()> {
     require!(
         test;
-        test.probe.is_supported(opcode::FTruncate::CODE);
+        test.probe.is_supported(opcode::Ftruncate::CODE);
     );
 
     println!("test ftruncate");
@@ -829,7 +829,7 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     fs::write(&file, input)?;
     let fd = fs::OpenOptions::new().write(true).open(&file)?;
     let fd = types::Fd(fd.as_raw_fd());
-    let ftruncate_e = opcode::FTruncate::new(fd, 512);
+    let ftruncate_e = opcode::Ftruncate::new(fd, 512);
 
     unsafe {
         ring.submission()
@@ -849,7 +849,7 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         &input[..512]
     );
 
-    let ftruncate_e = opcode::FTruncate::new(fd, 0);
+    let ftruncate_e = opcode::Ftruncate::new(fd, 0);
 
     unsafe {
         ring.submission()

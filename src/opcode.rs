@@ -1866,7 +1866,7 @@ opcode! {
 opcode! {
     /// Perform file truncation, equivalent to `ftruncate(2)`.
     #[derive(Debug)]
-    pub struct FTruncate {
+    pub struct Ftruncate {
         fd: { impl sealed::UseFixed },
         len: { u64 },
         ;;
@@ -1875,7 +1875,7 @@ opcode! {
     pub const CODE = sys::IORING_OP_FTRUNCATE;
 
     pub fn build(self) -> Entry {
-        let FTruncate { fd, len } = self;
+        let Ftruncate { fd, len } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -1923,7 +1923,7 @@ opcode! {
     /// Note that as of kernel 6.10 first recv always gets a single buffer, while second
     /// obtains the bundle of remaining buffers. This behavior may change in the future.
     ///
-    /// Bundle variajnt is available since kernel 6.10
+    /// Bundle variant is available since kernel 6.10
     pub struct RecvBundle {
         fd: { impl sealed::UseFixed },
         buf_group: { u16 },
