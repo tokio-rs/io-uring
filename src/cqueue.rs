@@ -142,7 +142,7 @@ impl<E: EntryMarker> CompletionQueue<'_, E> {
         let len = std::cmp::min(self.len(), entries.len());
 
         for entry in &mut entries[..len] {
-            *entry = MaybeUninit::new(unsafe { self.pop() });
+            entry.write(unsafe { self.pop() });
         }
 
         unsafe { std::slice::from_raw_parts_mut(entries as *mut _ as *mut E, len) }
@@ -210,7 +210,7 @@ impl Entry {
     ///
     /// This is currently used for:
     /// - Storing the selected buffer ID, if one was selected. See
-    /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
+    ///   [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     #[inline]
     pub fn flags(&self) -> u32 {
         self.0.flags
@@ -259,7 +259,7 @@ impl Entry32 {
     ///
     /// This is currently used for:
     /// - Storing the selected buffer ID, if one was selected. See
-    /// [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
+    ///   [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     #[inline]
     pub fn flags(&self) -> u32 {
         self.0 .0.flags
@@ -332,4 +332,12 @@ pub fn more(flags: u32) -> bool {
 /// can provide this bit in their respective CQE.
 pub fn sock_nonempty(flags: u32) -> bool {
     flags & sys::IORING_CQE_F_SOCK_NONEMPTY != 0
+}
+
+/// Returns whether this completion event is a notification.
+///
+/// This corresponds to the `IORING_CQE_F_NOTIF` flag,
+/// currently used by the [SendZc](crate::opcode::SendZc) operation.
+pub fn notif(flags: u32) -> bool {
+    flags & sys::IORING_CQE_F_NOTIF != 0
 }

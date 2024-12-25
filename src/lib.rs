@@ -2,7 +2,6 @@
 //!
 //! The crate only provides a summary of the parameters.
 //! For more detailed documentation, see manpage.
-#![warn(rust_2018_idioms, unused_qualifications)]
 
 #[macro_use]
 mod util;
