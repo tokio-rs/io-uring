@@ -1870,7 +1870,7 @@ opcode! {
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         sqe.fd = fd.0 as _;
-        sqe.flags = 1 << sys::IOSQE_FIXED_FILE_BIT;
+        sqe.flags = crate::squeue::Flags::FIXED_FILE.bits();
         sqe.__bindgen_anon_3.install_fd_flags = file_flags;
         Entry(sqe)
     }
