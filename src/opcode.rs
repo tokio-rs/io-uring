@@ -523,7 +523,7 @@ opcode! {
         sqe.len = 1;
         sqe.__bindgen_anon_3.msg_flags = flags;
         sqe.__bindgen_anon_4.buf_group = buf_group;
-        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.flags |= crate::squeue::Flags::BUFFER_SELECT.bits();
         sqe.ioprio = ioprio | (sys::IORING_RECV_MULTISHOT as u16);
         Entry(sqe)
     }
@@ -1090,7 +1090,7 @@ opcode! {
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
-        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.flags |= crate::squeue::Flags::BUFFER_SELECT.bits();
         sqe.ioprio = sys::IORING_RECV_MULTISHOT as _;
         Entry(sqe)
     }
@@ -1923,7 +1923,7 @@ opcode! {
         sqe.len = len;
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.ioprio |= sys::IORING_RECVSEND_BUNDLE as u16;
-        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.flags |= crate::squeue::Flags::BUFFER_SELECT.bits();
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
@@ -1956,7 +1956,7 @@ opcode! {
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
-        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.flags |= crate::squeue::Flags::BUFFER_SELECT.bits();
         sqe.ioprio |= sys::IORING_RECVSEND_BUNDLE as u16;
         Entry(sqe)
     }
@@ -1997,7 +1997,7 @@ opcode! {
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
-        sqe.flags |= 1 << sys::IOSQE_BUFFER_SELECT_BIT;
+        sqe.flags |= crate::squeue::Flags::BUFFER_SELECT.bits();
         sqe.ioprio = sys::IORING_RECV_MULTISHOT as _;
         sqe.ioprio |= sys::IORING_RECVSEND_BUNDLE as u16;
         Entry(sqe)
