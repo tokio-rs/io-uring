@@ -3,7 +3,7 @@ use crate::Test;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use std::ffi::CString;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 
@@ -807,6 +807,133 @@ pub fn test_file_splice<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     pipe_out.read_exact(&mut output)?;
 
     assert_eq!(input, &output[..]);
+
+    Ok(())
+}
+
+pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Ftruncate::CODE);
+    );
+
+    println!("test ftruncate");
+
+    let dir = tempfile::TempDir::new_in(".")?;
+    let dir = dir.path();
+    let file = dir.join("io-uring-test-file-input");
+
+    let input = &[0x9f; 1024];
+
+    fs::write(&file, input)?;
+    let fd = fs::OpenOptions::new().write(true).open(&file)?;
+    let fd = types::Fd(fd.as_raw_fd());
+    let ftruncate_e = opcode::Ftruncate::new(fd, 512);
+
+    unsafe {
+        ring.submission()
+            .push(&ftruncate_e.build().user_data(0x33).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x33);
+    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(
+        fs::read(&file).expect("could not read truncated file"),
+        &input[..512]
+    );
+
+    let ftruncate_e = opcode::Ftruncate::new(fd, 0);
+
+    unsafe {
+        ring.submission()
+            .push(&ftruncate_e.build().user_data(0x34).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x34);
+    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(
+        fs::metadata(&file)
+            .expect("could not read truncated file")
+            .len(),
+        0
+    );
+
+    Ok(())
+}
+
+pub fn test_fixed_fd_install<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Read::CODE);
+        test.probe.is_supported(opcode::FixedFdInstall::CODE);
+    );
+
+    println!("test fixed_fd_install");
+
+    let dir = tempfile::TempDir::new_in(".")?;
+    let dir = dir.path();
+    let file = dir.join("io-uring-test-file-input");
+
+    let input = &[0x9f; 1024];
+    let mut output = vec![0; 1024];
+
+    fs::write(&file, input)?;
+    let fd = fs::OpenOptions::new().read(true).open(&file)?;
+    let fd = types::Fd(fd.as_raw_fd());
+    ring.submitter().register_files(&[fd.0])?;
+    let fd = types::Fixed(0);
+
+    let read_e = opcode::Read::new(fd, output.as_mut_ptr(), output.len() as _);
+    unsafe {
+        ring.submission()
+            .push(&read_e.build().user_data(0x01).into())
+            .expect("queue is full");
+    }
+
+    assert_eq!(ring.submit_and_wait(1)?, 1);
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x01);
+    assert_eq!(cqes[0].result(), 1024);
+    assert_eq!(output, input);
+
+    let fixed_fd_install_e = opcode::FixedFdInstall::new(fd, 0);
+
+    unsafe {
+        ring.submission()
+            .push(&fixed_fd_install_e.build().user_data(0x02).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x02);
+    let fd = cqes[0].result();
+    assert!(fd > 0);
+    let mut file = unsafe { fs::File::from_raw_fd(fd) };
+    file.read_exact(&mut output)?;
+    assert_eq!(output, input);
 
     Ok(())
 }
