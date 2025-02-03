@@ -29,10 +29,20 @@ pub struct CompletionQueue<'a, E: EntryMarker = Entry> {
     queue: &'a Inner<E>,
 }
 
+/// SAFETY: there isn't anything thread-local about the completion queue memory;
+unsafe impl<'a, E: EntryMarker> Send for CompletionQueue<'a, E> {}
+/// SAFETY: mutating methods take `&mut self`, thereby eliminating data races between
+/// different userspace borrowers at compile time via standard borrowing rules.
+/// (There are `unsafe` methods like `borrow_shared()` that allow violating this.)
+///
+/// The various pointers to atomics are pointers to shared state between
+/// userspace and kernel, and orthogonal to this unsafe impl.
+unsafe impl<'a, E: EntryMarker> Sync for CompletionQueue<'a, E> {}
+
 /// A completion queue entry (CQE), representing a complete I/O operation.
 ///
 /// This is implemented for [`Entry`] and [`Entry32`].
-pub trait EntryMarker: Clone + Debug + Into<Entry> + private::Sealed {
+pub trait EntryMarker: Send + Clone + Debug + Into<Entry> + private::Sealed {
     const BUILD_FLAGS: u32;
 }
 
