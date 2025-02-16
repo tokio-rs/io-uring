@@ -278,6 +278,22 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
         }
     }
 
+    /// Sets a timeout in microseconds to start waiting for a minimum of a single completion.
+    ///
+    /// Once the timeout expires, the kernel will return when a single completion has been received
+    /// instead of waiting for the minimum amount of completions specified by the `want` parameter
+    /// in the call to [`Submitter::submit_and_wait`](crate::Submitter::submit_and_wait) or
+    /// [`Submitter::submit_with_args`](crate::Submitter::submit_with_args).
+    ///
+    /// Available since 6.12. Use the
+    /// [`Parameters::is_feature_min_timeout`](crate::Parameters::is_feature_min_timeout) method to
+    /// check for availability.
+    #[inline]
+    pub fn min_wait_usec(mut self, min_wait_usec: u32) -> Self {
+        self.args.min_wait_usec = min_wait_usec;
+        self
+    }
+
     #[inline]
     /// Timeout for submit operation
     pub fn timespec<'new>(mut self, timespec: &'new Timespec) -> SubmitArgs<'now, 'new> {

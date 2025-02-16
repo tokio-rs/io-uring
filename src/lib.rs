@@ -637,6 +637,14 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_RECVSEND_BUNDLE != 0
     }
 
+    /// If this flag is set, applications can use the
+    /// [`SubmitArgs::min_wait_usec`](types::SubmitArgs::min_wait_usec) method to specify a timeout
+    /// after which the kernel will return as soon as a single completion is received instead of
+    /// waiting for the minimum specified by the application. Available since kernel 6.12.
+    pub fn is_feature_min_timeout(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_MIN_TIMEOUT != 0
+    }
+
     /// The number of submission queue entries allocated.
     pub fn sq_entries(&self) -> u32 {
         self.0.sq_entries
