@@ -21,14 +21,6 @@ fn build() {
 #include <linux/futex.h>
     "#;
 
-    #[cfg(not(feature = "overwrite"))]
-    let outdir = PathBuf::from(env::var("OUT_DIR").unwrap());
-
-    #[cfg(feature = "overwrite")]
-    let outdir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("src/sys");
-
-    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
-
     let mut builder = bindgen::Builder::default();
 
     if let Some(path) = env::var("BUILD_IO_URING_INCLUDE_FILE")
@@ -40,7 +32,18 @@ fn build() {
         builder = builder.header_contents("include-file.h", INCLUDE);
     }
 
-    let target_file = outdir.join(format!("sys_{}.rs", target_arch));
+    #[cfg(feature = "overwrite")]
+    fn output_file() -> PathBuf {
+        let outdir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("src/sys");
+        let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+        outdir.join(format!("sys_{}.rs", target_arch))
+    }
+
+    #[cfg(not(feature = "overwrite"))]
+    fn output_file() -> PathBuf {
+        let outdir = PathBuf::from(env::var("OUT_DIR").unwrap());
+        outdir.join("sys.rs")
+    }
 
     builder
         .ctypes_prefix("libc")
@@ -52,6 +55,6 @@ fn build() {
         .allowlist_var("__NR_io_uring.*|IOSQE_.*|IORING_.*|IO_URING_.*|SPLICE_F_FD_IN_FIXED")
         .generate()
         .unwrap()
-        .write_to_file(target_file)
+        .write_to_file(output_file())
         .unwrap();
 }
