@@ -1261,40 +1261,14 @@ pub fn test_tcp_recv_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     send_stream.write_all(&input)?;
     send_stream.shutdown(Shutdown::Write)?;
 
-    let recv_e = opcode::RecvBundle::new(recv_fd, 0xdeff)
-        .build()
-        .user_data(0x30)
-        .into();
-
-    unsafe {
-        ring.submission().push(&recv_e).expect("queue is full");
-    }
-
-    ring.submit_and_wait(1)?;
-
-    let mut cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
-
-    assert_eq!(cqe.user_data(), 0x30);
-    assert!(cqueue::buffer_select(cqe.flags()).is_some());
-    let mut remaining = cqe.result() as usize;
-    let bufs = buf_ring
-        .rc
-        .get_bufs(&buf_ring, remaining as u32, cqe.flags());
-    let mut section;
     let mut input = input.as_slice();
-    for buf in &bufs {
-        // In case of bundled recv first bundle may not be full
-        let to_check = std::cmp::min(256, remaining);
-        (section, input) = input.split_at(to_check);
-        assert_eq!(buf.as_slice(), section);
-        remaining -= to_check;
-    }
-    assert_eq!(remaining, 0);
 
-    // Linux kernel 6.10 packs a single buffer into first recv and remaining buffers into second recv
-    // This behavior may change in the future
-    if !input.is_empty() {
-        assert!(cqueue::sock_nonempty(cqe.flags()));
+    // Multiple receive operations might be needed to receive everything.
+    loop {
+        let recv_e = opcode::RecvBundle::new(recv_fd, 0xdeff)
+            .build()
+            .user_data(0x30)
+            .into();
 
         unsafe {
             ring.submission().push(&recv_e).expect("queue is full");
@@ -1302,23 +1276,29 @@ pub fn test_tcp_recv_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
         ring.submit_and_wait(1)?;
 
-        cqe = ring.completion().next().expect("cqueue is empty").into();
+        let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
 
         assert_eq!(cqe.user_data(), 0x30);
         assert!(cqueue::buffer_select(cqe.flags()).is_some());
-        remaining = cqe.result() as usize;
-        let second_bufs = buf_ring
+        let mut remaining = cqe.result() as usize;
+        let bufs = buf_ring
             .rc
             .get_bufs(&buf_ring, remaining as u32, cqe.flags());
-        for buf in &second_bufs {
+        let mut section;
+        for buf in &bufs {
             let to_check = std::cmp::min(256, remaining);
             (section, input) = input.split_at(to_check);
             assert_eq!(buf.as_slice(), section);
             remaining -= to_check;
         }
         assert_eq!(remaining, 0);
+
+        if input.is_empty() {
+            break;
+        }
+
+        assert!(cqueue::sock_nonempty(cqe.flags()));
     }
-    assert!(input.is_empty());
 
     buf_ring.rc.unregister(ring)?;
 
