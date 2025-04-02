@@ -276,7 +276,7 @@ impl Entry32 {
     /// error is returned.
     #[inline]
     pub fn io_result(&self) -> io::Result<u32> {
-        // See Entry::result() for the justification for this logic.
+        // See Entry::io_result() for the justification for this logic.
         if let Ok(x) = u32::try_from(self.0 .0.res) {
             Ok(x)
         } else {

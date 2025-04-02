@@ -25,7 +25,7 @@ fn main() -> io::Result<()> {
     let cqe = ring.completion().next().expect("completion queue is empty");
 
     assert_eq!(cqe.user_data(), 0x42);
-    assert!(cqe.result() >= 0, "read error: {}", cqe.result());
+    let _bytes_read = cqe.io_result().expect("read error");
 
     Ok(())
 }
