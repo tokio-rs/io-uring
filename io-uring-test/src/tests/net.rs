@@ -159,11 +159,7 @@ pub fn test_tcp_send_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         let mut queue = ring.submission();
-        let send_e = send_e
-            .build()
-            .user_data(0x01)
-            .flags(squeue::Flags::IO_LINK)
-            .into();
+        let send_e = send_e.build().user_data(0x01).into();
         queue.push(&send_e).expect("queue is full");
     }
 
