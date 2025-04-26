@@ -1494,11 +1494,64 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 42);
     assert!(cqes[0].result() >= 0);
-    assert!(cqes[0].result() != plain_fd);
+    let io_uring_socket = unsafe { Socket::from_raw_fd(cqes[0].result()) };
+    assert!(io_uring_socket.as_raw_fd() != plain_fd);
     assert_eq!(cqes[0].flags(), 0);
 
+    // Try a setsockopt.
+    {
+        let mut optval: libc::c_int = 0;
+        let mut optval_size: libc::socklen_t = std::mem::size_of_val(&optval) as libc::socklen_t;
+        // Get value before.
+        let ret = unsafe {
+            libc::getsockopt(
+                io_uring_socket.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_REUSEADDR,
+                &mut optval as *mut _ as *mut libc::c_void,
+                &mut optval_size as *mut _ as *mut libc::socklen_t,
+            )
+        };
+        assert_eq!(ret, 0);
+        assert_eq!(optval, 0);
+
+        // Set value.
+        optval = 1;
+        let op = io_uring::opcode::SetSockOpt::new(
+            io_uring::types::Fd(io_uring_socket.as_raw_fd()),
+            libc::SOL_SOCKET as u32,
+            libc::SO_REUSEADDR as u32,
+            &optval as *const _ as *const libc::c_void,
+            std::mem::size_of_val(&optval) as libc::socklen_t,
+        )
+        .build()
+        .user_data(1234);
+        unsafe {
+            ring.submission().push(&op.into()).expect("queue is full");
+        }
+        ring.submit_and_wait(1)?;
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 1234);
+        assert_eq!(cqes[0].result(), 0);
+        assert_eq!(cqes[0].flags(), 0);
+
+        // Check value actually set.
+        optval = 0;
+        let ret = unsafe {
+            libc::getsockopt(
+                io_uring_socket.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_REUSEADDR,
+                &mut optval as *mut _ as *mut libc::c_void,
+                &mut optval_size as *mut _ as *mut libc::socklen_t,
+            )
+        };
+        assert_eq!(ret, 0);
+        assert_eq!(optval, 1);
+    }
+
     // Close both sockets, to avoid leaking FDs.
-    let io_uring_socket = unsafe { Socket::from_raw_fd(cqes[0].result()) };
     drop(plain_socket);
     drop(io_uring_socket);
 
