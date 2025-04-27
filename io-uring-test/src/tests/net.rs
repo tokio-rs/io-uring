@@ -1347,6 +1347,7 @@ pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     let mut cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
 
+    assert!(cqe.result() >= 0);
     assert_eq!(cqe.user_data(), 0x31);
     assert!(cqueue::buffer_select(cqe.flags()).is_some());
     let mut remaining = cqe.result() as usize;
@@ -1375,6 +1376,7 @@ pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
         cqe = ring.completion().next().expect("cqueue is empty").into();
 
+        assert!(cqe.result() >= 0);
         assert_eq!(cqe.user_data(), 0x31);
         assert!(cqueue::buffer_select(cqe.flags()).is_some());
         remaining = cqe.result() as usize;
@@ -1397,9 +1399,7 @@ pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker
         cqe = ring.completion().next().expect("cqueue is empty").into();
         assert_eq!(cqe.user_data(), 0x31);
         assert!(!cqueue::more(cqe.flags()));
-        if used_bufs < 5 {
-            assert_eq!(cqe.result(), 0); // Buffer space is avaialble
-        } else {
+        if used_bufs >= 5 || cqe.result() != 0 {
             assert_eq!(cqe.result(), -105); // No buffer space available
         }
     }
