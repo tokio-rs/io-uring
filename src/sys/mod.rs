@@ -17,7 +17,11 @@ use libc::*;
 
 #[cfg(all(
     not(feature = "bindgen"),
-    not(any(target_arch = "x86_64", target_arch = "aarch64")),
+    not(any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "riscv64"
+    )),
     not(io_uring_skip_arch_check)
 ))]
 compile_error!(
