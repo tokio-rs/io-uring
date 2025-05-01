@@ -1469,19 +1469,20 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     require!(
         test;
         test.probe.is_supported(opcode::Socket::CODE);
+        test.probe.is_supported(opcode::Bind::CODE);
     );
 
     println!("test socket");
 
     // Open a UDP socket, through old-style `socket(2)` syscall.
     // This is used both as a kernel sanity check, and for comparing the returned io-uring FD.
-    let plain_socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).unwrap();
+    let plain_socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
     let plain_fd = plain_socket.as_raw_fd();
 
     let socket_fd_op = opcode::Socket::new(
         Domain::IPV4.into(),
-        Type::DGRAM.into(),
-        Protocol::UDP.into(),
+        Type::STREAM.into(),
+        Protocol::TCP.into(),
     );
     unsafe {
         ring.submission()
@@ -1549,6 +1550,64 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         };
         assert_eq!(ret, 0);
         assert_eq!(optval, 1);
+    }
+
+    // Try to bind.
+    {
+        let server_addr: std::net::SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let server_addr: socket2::SockAddr = server_addr.into();
+        let op = io_uring::opcode::Bind::new(
+            io_uring::types::Fd(io_uring_socket.as_raw_fd()),
+            server_addr.as_ptr() as *const _,
+            server_addr.len(),
+        )
+        .build()
+        .user_data(2345);
+        unsafe {
+            ring.submission().push(&op.into()).expect("queue is full");
+        }
+        ring.submit_and_wait(1)?;
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 2345);
+        assert_eq!(cqes[0].result(), 0);
+        assert_eq!(cqes[0].flags(), 0);
+
+        assert_eq!(
+            io_uring_socket
+                .local_addr()
+                .expect("no local addr")
+                .as_socket_ipv4()
+                .expect("no IPv4 address")
+                .ip(),
+            server_addr.as_socket_ipv4().unwrap().ip()
+        );
+    }
+
+    // Try to listen.
+    {
+        let op =
+            io_uring::opcode::Listen::new(io_uring::types::Fd(io_uring_socket.as_raw_fd()), 128)
+                .build()
+                .user_data(3456);
+        unsafe {
+            ring.submission().push(&op.into()).expect("queue is full");
+        }
+        ring.submit_and_wait(1)?;
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 3456);
+        assert_eq!(cqes[0].result(), 0);
+        assert_eq!(cqes[0].flags(), 0);
+
+        // Ensure the socket is actually in the listening state.
+        _ = TcpStream::connect(
+            io_uring_socket
+                .local_addr()
+                .unwrap()
+                .as_socket_ipv4()
+                .unwrap(),
+        )?;
     }
 
     // Close both sockets, to avoid leaking FDs.
