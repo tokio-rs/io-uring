@@ -304,7 +304,7 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     }
 
     #[inline]
-    unsafe fn push_unchecked(&mut self, entry: &E) {
+    pub unsafe fn push_unchecked(&mut self, entry: &E) {
         *self
             .queue
             .sqes
