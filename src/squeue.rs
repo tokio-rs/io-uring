@@ -427,10 +427,6 @@ impl Debug for Entry128 {
 #[non_exhaustive]
 pub struct PushError;
 
-impl PushError {
-    pub fn new()
-}
-
 impl Display for PushError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("submission queue is full")
