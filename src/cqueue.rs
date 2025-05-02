@@ -34,6 +34,10 @@ pub struct CompletionQueue<'a, E: EntryMarker = Entry> {
 /// This is implemented for [`Entry`] and [`Entry32`].
 pub trait EntryMarker: Clone + Debug + Into<Entry> + private::Sealed {
     const BUILD_FLAGS: u32;
+
+    fn user_data(&self) -> u64;
+    fn result(&self) -> i32;
+    fn flags(&self) -> u32;
 }
 
 /// A 16-byte completion queue entry (CQE), representing a complete I/O operation.
@@ -191,18 +195,22 @@ impl<E: EntryMarker> ExactSizeIterator for CompletionQueue<'_, E> {
     }
 }
 
-impl Entry {
+impl private::Sealed for Entry {}
+
+impl EntryMarker for Entry {
+    const BUILD_FLAGS: u32 = 0;
+
     /// The operation-specific result code. For example, for a [`Read`](crate::opcode::Read)
     /// operation this is equivalent to the return value of the `read(2)` system call.
     #[inline]
-    pub fn result(&self) -> i32 {
+    fn result(&self) -> i32 {
         self.0.res
     }
 
     /// The user data of the request, as set by
     /// [`Entry::user_data`](crate::squeue::Entry::user_data) on the submission queue event.
     #[inline]
-    pub fn user_data(&self) -> u64 {
+    fn user_data(&self) -> u64 {
         self.0.user_data
     }
 
@@ -212,15 +220,9 @@ impl Entry {
     /// - Storing the selected buffer ID, if one was selected. See
     ///   [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
     #[inline]
-    pub fn flags(&self) -> u32 {
+    fn flags(&self) -> u32 {
         self.0.flags
     }
-}
-
-impl private::Sealed for Entry {}
-
-impl EntryMarker for Entry {
-    const BUILD_FLAGS: u32 = 0;
 }
 
 impl Clone for Entry {
@@ -241,30 +243,6 @@ impl Debug for Entry {
 }
 
 impl Entry32 {
-    /// The operation-specific result code. For example, for a [`Read`](crate::opcode::Read)
-    /// operation this is equivalent to the return value of the `read(2)` system call.
-    #[inline]
-    pub fn result(&self) -> i32 {
-        self.0 .0.res
-    }
-
-    /// The user data of the request, as set by
-    /// [`Entry::user_data`](crate::squeue::Entry::user_data) on the submission queue event.
-    #[inline]
-    pub fn user_data(&self) -> u64 {
-        self.0 .0.user_data
-    }
-
-    /// Metadata related to the operation.
-    ///
-    /// This is currently used for:
-    /// - Storing the selected buffer ID, if one was selected. See
-    ///   [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
-    #[inline]
-    pub fn flags(&self) -> u32 {
-        self.0 .0.flags
-    }
-
     /// Additional data available in 32-byte completion queue entries (CQEs).
     #[inline]
     pub fn big_cqe(&self) -> &[u64; 2] {
@@ -276,6 +254,30 @@ impl private::Sealed for Entry32 {}
 
 impl EntryMarker for Entry32 {
     const BUILD_FLAGS: u32 = sys::IORING_SETUP_CQE32;
+
+    /// The operation-specific result code. For example, for a [`Read`](crate::opcode::Read)
+    /// operation this is equivalent to the return value of the `read(2)` system call.
+    #[inline]
+    fn result(&self) -> i32 {
+        self.0 .0.res
+    }
+
+    /// The user data of the request, as set by
+    /// [`Entry::user_data`](crate::squeue::Entry::user_data) on the submission queue event.
+    #[inline]
+    fn user_data(&self) -> u64 {
+        self.0 .0.user_data
+    }
+
+    /// Metadata related to the operation.
+    ///
+    /// This is currently used for:
+    /// - Storing the selected buffer ID, if one was selected. See
+    ///   [`BUFFER_SELECT`](crate::squeue::Flags::BUFFER_SELECT) for more info.
+    #[inline]
+    fn flags(&self) -> u32 {
+        self.0 .0.flags
+    }
 }
 
 impl From<Entry32> for Entry {
