@@ -1,4 +1,5 @@
 use crate::Test;
+use io_uring::cqueue::EntryMarker;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use std::fs::File;
 use std::io::{self, Write};
@@ -32,7 +33,7 @@ pub fn test_eventfd_poll<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x04).into())
+            .push(poll_e.build().user_data(0x04).into())
             .expect("queue is full");
     }
 
@@ -81,7 +82,7 @@ pub fn test_eventfd_poll_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x05).into())
+            .push(poll_e.build().user_data(0x05).into())
             .expect("queue is full");
     }
 
@@ -94,7 +95,7 @@ pub fn test_eventfd_poll_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x06).into())
+            .push(poll_e.build().user_data(0x06).into())
             .expect("queue is full");
     }
 
@@ -146,7 +147,7 @@ pub fn test_eventfd_poll_remove_failed<S: squeue::EntryMarker, C: cqueue::EntryM
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x07).into())
+            .push(poll_e.build().user_data(0x07).into())
             .expect("queue is full");
     }
 
@@ -161,7 +162,7 @@ pub fn test_eventfd_poll_remove_failed<S: squeue::EntryMarker, C: cqueue::EntryM
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x08).into())
+            .push(poll_e.build().user_data(0x08).into())
             .expect("queue is full");
     }
 
@@ -206,7 +207,7 @@ pub fn test_eventfd_poll_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&poll_e.build().user_data(0x04).into())
+            .push(poll_e.build().user_data(0x04).into())
             .expect("queue is full");
     }
 

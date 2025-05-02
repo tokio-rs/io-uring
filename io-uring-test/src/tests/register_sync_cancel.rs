@@ -4,6 +4,7 @@ use std::os::fd::FromRawFd;
 use std::os::fd::OwnedFd;
 
 use io_uring::cqueue;
+use io_uring::cqueue::EntryMarker;
 use io_uring::opcode;
 use io_uring::squeue;
 use io_uring::types;
@@ -64,7 +65,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
                 .build()
                 .user_data(USER_DATA_4);
         }
-        unsafe { ring.submission().push(&entry.into()).unwrap() };
+        unsafe { ring.submission().push(entry.into()).unwrap() };
         nr_submitted += ring.submit()?;
     }
     // 11 operations should have been submitted.
@@ -147,7 +148,7 @@ pub fn test_register_sync_cancel_any<S: squeue::EntryMarker, C: cqueue::EntryMar
         let entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
             .build()
             .user_data(START_USER_DATA + i);
-        unsafe { ring.submission().push(&entry.into()).unwrap() };
+        unsafe { ring.submission().push(entry.into()).unwrap() };
     }
     // Submit all 3 operations.
     assert_eq!(3, ring.submit()?);
@@ -197,7 +198,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     let entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
         .build()
         .user_data(USER_DATA);
-    unsafe { ring.submission().push(&entry.into()).unwrap() };
+    unsafe { ring.submission().push(entry.into()).unwrap() };
 
     // Cancel the operation by user_data, we haven't submitted anything yet. We should get an error.
     let result = ring

@@ -1,4 +1,5 @@
 use crate::Test;
+use io_uring::cqueue::EntryMarker;
 use io_uring::types::CancelBuilder;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use std::fs::File;
@@ -29,7 +30,7 @@ pub fn test_async_cancel_user_data<S: squeue::EntryMarker, C: cqueue::EntryMarke
         timeout_e.user_data(2003).into(),
         cancel_e.user_data(2004).into(),
     ];
-    for sqe in &entries {
+    for sqe in entries.clone() {
         unsafe {
             ring.submission().push(sqe).expect("queue is full");
         }
@@ -78,7 +79,7 @@ pub fn test_async_cancel_user_data_all<S: squeue::EntryMarker, C: cqueue::EntryM
         timeout_e.user_data(2003).into(),
         cancel_e.user_data(2004).into(),
     ];
-    for sqe in &entries {
+    for sqe in entries.clone() {
         unsafe {
             ring.submission().push(sqe).expect("queue is full");
         }
@@ -129,7 +130,7 @@ pub fn test_async_cancel_any<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         timeout_e.user_data(2004).into(),
         cancel_e.user_data(2005).into(),
     ];
-    for sqe in &entries {
+    for sqe in entries.clone() {
         unsafe {
             ring.submission().push(sqe).expect("queue is full");
         }
@@ -179,7 +180,7 @@ pub fn test_async_cancel_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         poll_e.user_data(2003).into(),
         cancel_e.user_data(2004).into(),
     ];
-    for sqe in &entries {
+    for sqe in entries.clone() {
         unsafe {
             ring.submission().push(sqe).expect("queue is full");
         }
@@ -229,7 +230,7 @@ pub fn test_async_cancel_fd_all<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         poll_e.user_data(2004).into(),
         cancel_e.user_data(2005).into(),
     ];
-    for sqe in &entries {
+    for sqe in entries.clone() {
         unsafe {
             ring.submission().push(sqe).expect("queue is full");
         }

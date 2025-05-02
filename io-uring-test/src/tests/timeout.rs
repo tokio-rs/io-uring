@@ -1,5 +1,5 @@
 use crate::Test;
-use io_uring::{cqueue, opcode, squeue, types, IoUring};
+use io_uring::{cqueue::{self, EntryMarker}, opcode, squeue, types, IoUring};
 use std::time::Instant;
 
 pub fn test_timeout<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
@@ -21,7 +21,7 @@ pub fn test_timeout<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x09).into())
+            .push(timeout_e.build().user_data(0x09).into())
             .expect("queue is full");
     }
 
@@ -45,10 +45,10 @@ pub fn test_timeout<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x0a).into())
+            .push(timeout_e.build().user_data(0x0a).into())
             .expect("queue is full");
         queue
-            .push(&nop_e.build().user_data(0x0b).into())
+            .push(nop_e.build().user_data(0x0b).into())
             .expect("queue is full");
     }
 
@@ -98,10 +98,10 @@ pub fn test_timeout_count<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x0c).into())
+            .push(timeout_e.build().user_data(0x0c).into())
             .expect("queue is full");
         queue
-            .push(&nop_e.build().user_data(0x0d).into())
+            .push(nop_e.build().user_data(0x0d).into())
             .expect("queue is full");
     }
 
@@ -142,7 +142,7 @@ pub fn test_timeout_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x10).into())
+            .push(timeout_e.build().user_data(0x10).into())
             .expect("queue is full");
     }
 
@@ -155,7 +155,7 @@ pub fn test_timeout_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x11).into())
+            .push(timeout_e.build().user_data(0x11).into())
             .expect("queue is full");
     }
 
@@ -196,7 +196,7 @@ pub fn test_timeout_update<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x10).into())
+            .push(timeout_e.build().user_data(0x10).into())
             .expect("queue is full");
     }
 
@@ -211,7 +211,7 @@ pub fn test_timeout_update<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x11).into())
+            .push(timeout_e.build().user_data(0x11).into())
             .expect("queue is full");
     }
 
@@ -252,7 +252,7 @@ pub fn test_timeout_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x10).into())
+            .push(timeout_e.build().user_data(0x10).into())
             .expect("queue is full");
     }
 
@@ -265,7 +265,7 @@ pub fn test_timeout_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x11).into())
+            .push(timeout_e.build().user_data(0x11).into())
             .expect("queue is full");
     }
 
@@ -315,7 +315,7 @@ pub fn test_timeout_abs<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&timeout_e.build().user_data(0x19).into())
+            .push(timeout_e.build().user_data(0x19).into())
             .expect("queue is full");
     }
 
@@ -365,7 +365,7 @@ pub fn test_timeout_submit_args<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&nop_e.build().user_data(0x1c).into())
+            .push(nop_e.build().user_data(0x1c).into())
             .expect("queue is full");
     }
 
