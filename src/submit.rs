@@ -80,7 +80,7 @@ impl<'a> Submitter<'a> {
     ///
     /// # Safety
     ///
-    /// This provides a raw interface so developer must ensure that parameters are correct.
+    /// This provides a raw interface so the developer must ensure that parameters are correct.
     pub unsafe fn enter<T: Sized>(
         &self,
         to_submit: u32,
@@ -271,9 +271,9 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// Registers an empty table of nr fixed buffers buffers.
+    /// Registers an empty table of `nr` fixed buffers.
     ///
-    /// These must be updated before use, using eg.
+    /// These must be updated before use; e.g. using
     /// [`register_buffers_update`](Self::register_buffers_update).
     ///
     /// See [`register_buffers`](Self::register_buffers)
@@ -295,7 +295,7 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// Registers an empty file table of nr_files number of file descriptors. The sparse variant is
+    /// Registers an empty file table with `nr` file descriptors. The sparse variant is
     /// available in kernels 5.19 and later.
     ///
     /// Registering a file table is a prerequisite for using any request that
@@ -320,7 +320,7 @@ impl<'a> Submitter<'a> {
     /// Register files for I/O. You can use the registered files with
     /// [`Fixed`](crate::types::Fixed).
     ///
-    /// Each fd may be -1, in which case it is considered "sparse", and can be filled in later with
+    /// An fd may be -1, in which case it is considered "sparse", and can be filled in later with
     /// [`register_files_update`](Self::register_files_update).
     ///
     /// Note that this will wait for the ring to idle; it will only return once all active requests
@@ -384,7 +384,7 @@ impl<'a> Submitter<'a> {
     /// Fill in the given [`Probe`] with information about the opcodes supported by io_uring on the
     /// running kernel.
     ///
-    /// # Examples
+    /// # Example
     ///
     // This is marked no_run as it is only available from Linux 5.6+, however the latest Ubuntu (on
     // which CI runs) only has Linux 5.4.
@@ -520,7 +520,7 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
-    /// Undoes a CPU mask previously set with register_iowq_aff
+    /// Undoes a CPU mask previously set with [register_iowq_aff](Self::register_iowq_aff)
     pub fn unregister_iowq_aff(&self) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
