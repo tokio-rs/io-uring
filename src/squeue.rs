@@ -273,7 +273,7 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     /// Developers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     #[inline]
-    pub unsafe fn push(&mut self, entry: &E) -> Result<(), PushError> {
+    pub unsafe fn push(&mut self, entry: E) -> Result<(), PushError> {
         if !self.is_full() {
             self.push_unchecked(entry);
             Ok(())
@@ -291,7 +291,7 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     /// will be valid for the entire duration of the operation, otherwise it may cause memory
     /// problems.
     #[inline]
-    pub unsafe fn push_multiple(&mut self, entries: &[E]) -> Result<(), PushError> {
+    pub unsafe fn push_multiple(&mut self, entries: Box<[E]>) -> Result<(), PushError> {
         if self.capacity() - self.len() < entries.len() {
             return Err(PushError);
         }
@@ -304,11 +304,12 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     }
 
     #[inline]
-    pub unsafe fn push_unchecked(&mut self, entry: &E) {
+    pub unsafe fn push_unchecked(&mut self, entry: E) {
         *self
             .queue
             .sqes
-            .add((self.tail & self.queue.ring_mask) as usize) = entry.clone();
+            .add((self.tail & self.queue.ring_mask) as usize) = entry;
+        // entry clone dropped
         self.tail = self.tail.wrapping_add(1);
     }
 }
@@ -425,6 +426,10 @@ impl Debug for Entry128 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct PushError;
+
+impl PushError {
+    pub fn new()
+}
 
 impl Display for PushError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
