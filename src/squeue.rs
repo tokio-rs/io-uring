@@ -33,6 +33,8 @@ pub struct SubmissionQueue<'a, E: EntryMarker = Entry> {
 /// This is implemented for [`Entry`] and [`Entry128`].
 pub trait EntryMarker: Clone + Debug + From<Entry> + private::Sealed {
     const BUILD_FLAGS: u32;
+
+    fn set_user_data(self, user_data: u64) -> Self;
 }
 
 /// A 64-byte submission queue entry (SQE), representing a request for an I/O operation.
@@ -355,6 +357,10 @@ impl private::Sealed for Entry {}
 
 impl EntryMarker for Entry {
     const BUILD_FLAGS: u32 = 0;
+
+    fn set_user_data(self, user_data: u64) -> Self {
+        self.user_data(user_data)
+    }
 }
 
 impl Clone for Entry {
@@ -404,6 +410,10 @@ impl private::Sealed for Entry128 {}
 
 impl EntryMarker for Entry128 {
     const BUILD_FLAGS: u32 = sys::IORING_SETUP_SQE128;
+
+    fn set_user_data(self, user_data: u64) -> Self {
+        self.user_data(user_data)
+    }
 }
 
 impl From<Entry> for Entry128 {
