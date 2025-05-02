@@ -25,7 +25,7 @@ fn bench_normal(c: &mut Criterion) {
                     let mut sq = io_uring.submission();
                     while queue.want() {
                         unsafe {
-                            match sq.push(&black_box(opcode::Nop::new()).build()) {
+                            match sq.push(black_box(opcode::Nop::new()).build()) {
                                 Ok(_) => queue.pop(),
                                 Err(_) => break,
                             }
