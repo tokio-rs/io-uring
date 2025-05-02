@@ -153,7 +153,7 @@ impl<E: EntryMarker> CompletionQueue<'_, E> {
     }
 
     #[inline]
-    unsafe fn pop(&mut self) -> E {
+    pub unsafe fn pop(&mut self) -> E {
         let entry = &*self
             .queue
             .cqes
