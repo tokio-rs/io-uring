@@ -31,7 +31,7 @@ pub struct SubmissionQueue<'a, E: EntryMarker = Entry> {
 /// A submission queue entry (SQE), representing a request for an I/O operation.
 ///
 /// This is implemented for [`Entry`] and [`Entry128`].
-pub trait EntryMarker: Clone + Debug + From<Entry> + private::Sealed {
+pub trait EntryMarker: Send + Sync + Clone + Debug + From<Entry> + private::Sealed {
     const BUILD_FLAGS: u32;
 
     fn set_user_data(self, user_data: u64) -> Self;

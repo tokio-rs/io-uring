@@ -32,7 +32,7 @@ pub struct CompletionQueue<'a, E: EntryMarker = Entry> {
 /// A completion queue entry (CQE), representing a complete I/O operation.
 ///
 /// This is implemented for [`Entry`] and [`Entry32`].
-pub trait EntryMarker: Clone + Debug + Into<Entry> + private::Sealed {
+pub trait EntryMarker: Send + Sync + Clone + Debug + Into<Entry> + private::Sealed {
     const BUILD_FLAGS: u32;
 
     fn user_data(&self) -> u64;
