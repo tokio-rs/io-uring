@@ -44,21 +44,21 @@ pub fn test_batch<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert!(ring.completion().is_empty());
 
     unsafe {
-        let sqes = vec![opcode::Nop::new().build().user_data(0x09).into(); 5];
+        let mut sqes = vec![opcode::Nop::new().build().user_data(0x09).into(); 5];
         let mut sq = ring.submission();
 
         assert_eq!(sq.capacity(), 8);
 
-        sq.push_multiple(sqes.clone().into()).unwrap();
+        sq.push_multiple(sqes.clone()).unwrap();
 
         assert_eq!(sq.len(), 5);
 
-        let ret = sq.push_multiple(sqes.clone().into());
+        let ret = sq.push_multiple(sqes.clone());
         assert!(ret.is_err());
 
         assert_eq!(sq.len(), 5);
 
-        sq.push_multiple(sqes[..3].into()).unwrap();
+        sq.push_multiple(sqes.drain(..3)).unwrap();
     }
 
     ring.submit_and_wait(8)?;

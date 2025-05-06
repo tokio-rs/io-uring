@@ -1819,8 +1819,8 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
                 .user_data(55)
                 .into()
         })
-        .collect::<Vec<_>>();
-    unsafe { ring.submission().push_multiple(send_msgs.into())? };
+        .collect::<Box<[S]>>();
+    unsafe { ring.submission().push_multiple(send_msgs)? };
     ring.submitter().submit().unwrap();
 
     ring.submitter().submit_and_wait(4).unwrap();
@@ -1924,7 +1924,7 @@ pub fn test_udp_send_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         .user_data(3)
         .into();
 
-    unsafe { ring.submission().push_multiple(Box::new([recv, send1, send2]))? };
+    unsafe { ring.submission().push_multiple([recv, send1, send2])? };
     ring.submitter().submit_and_wait(3)?;
 
     let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
