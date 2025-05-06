@@ -293,12 +293,18 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     /// will be valid for the entire duration of the operation, otherwise it may cause memory
     /// problems.
     #[inline]
-    pub unsafe fn push_multiple(&mut self, entries: Box<[E]>) -> Result<(), PushError> {
-        if self.capacity() - self.len() < entries.len() {
+    pub unsafe fn push_multiple<T, I>(&mut self, entries: T) -> Result<(), PushError>
+    where
+        I: ExactSizeIterator<Item = E>,
+        T: IntoIterator<Item = E, IntoIter = I>,
+    {
+        let iter = entries.into_iter();
+
+        if self.capacity() - self.len() < iter.len() {
             return Err(PushError);
         }
 
-        for entry in entries {
+        for entry in iter {
             self.push_unchecked(entry);
         }
 
