@@ -687,7 +687,7 @@ pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes[op1].user_data(), 2002);
     assert_eq!(cqes[op2].user_data(), 2003);
 
-    assert_eq!(cqes[op1].result(), -125); // -ECANCELED
+    assert_eq!(cqes[op1].result(), -libc::ECANCELED);
     assert_eq!(cqes[op2].result(), 0);
 
     Ok(())
@@ -768,7 +768,7 @@ pub fn test_tcp_accept_multi_file_index<S: squeue::EntryMarker, C: cqueue::Entry
     assert_eq!(cqes[op1].user_data(), 2002);
     assert_eq!(cqes[op2].user_data(), 2003);
 
-    assert_eq!(cqes[op1].result(), -125); // -ECANCELED
+    assert_eq!(cqes[op1].result(), -libc::ECANCELED);
     assert_eq!(cqes[op2].result(), 0);
 
     // If the fixed-socket operation worked properly, this must not fail.
@@ -1217,7 +1217,7 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes[2].user_data(), 0x22);
     assert!(!cqueue::more(cqes[2].flags()));
-    assert_eq!(cqes[2].result(), -105); // No buffer space available
+    assert_eq!(cqes[2].result(), -libc::ENOBUFS);
 
     Ok(())
 }
@@ -1400,7 +1400,7 @@ pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker
         assert_eq!(cqe.user_data(), 0x31);
         assert!(!cqueue::more(cqe.flags()));
         if used_bufs >= 5 || cqe.result() != 0 {
-            assert_eq!(cqe.result(), -105); // No buffer space available
+            assert_eq!(cqe.result(), -libc::ENOBUFS);
         }
     }
     buf_ring.rc.unregister(ring)?;
@@ -1837,7 +1837,7 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
             }
             // RecvMsgMulti
             77 => {
-                if cqe.result() == -105 {
+                if cqe.result() == -libc::ENOBUFS {
                     // Ran out of buffers
                     continue;
                 }
