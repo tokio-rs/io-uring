@@ -296,7 +296,7 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     pub unsafe fn push_multiple<T, I>(&mut self, entries: T) -> Result<(), PushError>
     where
         I: ExactSizeIterator<Item = E>,
-        T: IntoIterator<Item = E, IntoIter = I>,
+        T: IntoIterator<IntoIter = I>,
     {
         let iter = entries.into_iter();
 
