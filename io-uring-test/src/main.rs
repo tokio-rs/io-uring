@@ -115,6 +115,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::timeout::test_timeout_cancel(&mut ring, &test)?;
     tests::timeout::test_timeout_abs(&mut ring, &test)?;
     tests::timeout::test_timeout_submit_args(&mut ring, &test)?;
+    tests::timeout::test_timeout_multishot(&mut ring, &test)?;
 
     // net
     tests::net::test_tcp_write_read(&mut ring, &test)?;

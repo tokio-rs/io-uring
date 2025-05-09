@@ -543,9 +543,10 @@ opcode! {
         timespec: { *const types::Timespec },
         ;;
         /// `count` may contain a completion event count.
+        /// If [`TimeoutFlags::TIMEOUT`] is set in `flags`, this is the number of repeats. A value of 0 means the timeout is
+        /// indefinite and can only be stopped by a removal request.
         count: u32 = 0,
 
-        /// `flags` may contain [types::TimeoutFlags::ABS] for an absolute timeout value, or 0 for a relative timeout.
         flags: types::TimeoutFlags = types::TimeoutFlags::empty()
     }
 
