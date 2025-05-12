@@ -2,6 +2,7 @@ pub mod cancel;
 pub mod fs;
 pub mod futex;
 pub mod net;
+pub mod os;
 pub mod poll;
 pub mod queue;
 pub mod register;
