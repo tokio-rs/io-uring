@@ -35,6 +35,7 @@ pub trait EntryMarker: Send + Sync + Clone + Debug + From<Entry> + private::Seal
     const BUILD_FLAGS: u32;
 
     fn set_user_data(self, user_data: u64) -> Self;
+    fn get_user_data(&self) -> u64;
 }
 
 /// A 64-byte submission queue entry (SQE), representing a request for an I/O operation.
@@ -367,6 +368,10 @@ impl EntryMarker for Entry {
     fn set_user_data(self, user_data: u64) -> Self {
         self.user_data(user_data)
     }
+
+    fn get_user_data(&self) -> u64 {
+        self.get_user_data()
+    }
 }
 
 impl Clone for Entry {
@@ -403,6 +408,13 @@ impl Entry128 {
         self
     }
 
+
+    /// Get the previously application-supplied user data.
+    #[inline]
+    pub fn get_user_data(&self) -> u64 {
+        self.0.0.user_data
+    }
+
     /// Set the personality of this event. You can obtain a personality using
     /// [`Submitter::register_personality`](crate::Submitter::register_personality).
     #[inline]
@@ -419,6 +431,10 @@ impl EntryMarker for Entry128 {
 
     fn set_user_data(self, user_data: u64) -> Self {
         self.user_data(user_data)
+    }
+
+    fn get_user_data(&self) -> u64 {
+        self.get_user_data()
     }
 }
 
