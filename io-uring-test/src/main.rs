@@ -156,6 +156,9 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::futex::test_futex_wake(&mut ring, &test)?;
     tests::futex::test_futex_waitv(&mut ring, &test)?;
 
+    // os (process)
+    tests::os::test_waitid(&mut ring, &test)?;
+
     // regression test
     tests::regression::test_issue154(&mut ring, &test)?;
 
