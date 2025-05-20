@@ -1469,20 +1469,19 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     require!(
         test;
         test.probe.is_supported(opcode::Socket::CODE);
-        test.probe.is_supported(opcode::Bind::CODE);
     );
 
     println!("test socket");
 
     // Open a UDP socket, through old-style `socket(2)` syscall.
     // This is used both as a kernel sanity check, and for comparing the returned io-uring FD.
-    let plain_socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
+    let plain_socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).unwrap();
     let plain_fd = plain_socket.as_raw_fd();
 
     let socket_fd_op = opcode::Socket::new(
         Domain::IPV4.into(),
-        Type::STREAM.into(),
-        Protocol::TCP.into(),
+        Type::DGRAM.into(),
+        Protocol::UDP.into(),
     );
     unsafe {
         ring.submission()
@@ -1551,6 +1550,85 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         assert_eq!(ret, 0);
         assert_eq!(optval, 1);
     }
+
+    // Close both sockets, to avoid leaking FDs.
+    drop(plain_socket);
+    drop(io_uring_socket);
+
+    // Cleanup all fixed files (if any), then reserve slot 0.
+    let _ = ring.submitter().unregister_files();
+    ring.submitter().register_files_sparse(1).unwrap();
+
+    let fixed_socket_op = opcode::Socket::new(
+        Domain::IPV4.into(),
+        Type::DGRAM.into(),
+        Protocol::UDP.into(),
+    );
+    let dest_slot = types::DestinationSlot::try_from_slot_target(0).unwrap();
+    unsafe {
+        ring.submission()
+            .push(
+                &fixed_socket_op
+                    .file_index(Some(dest_slot))
+                    .build()
+                    .user_data(55)
+                    .into(),
+            )
+            .expect("queue is full");
+    }
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 55);
+    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(cqes[0].flags(), 0);
+
+    // If the fixed-socket operation worked properly, this must not fail.
+    ring.submitter().unregister_files().unwrap();
+
+    Ok(())
+}
+
+pub fn test_socket_bind_listen<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    use socket2::{Domain, Protocol, Socket, Type};
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::Socket::CODE);
+        test.probe.is_supported(opcode::Bind::CODE);
+        test.probe.is_supported(opcode::Listen::CODE);
+    );
+
+    println!("test socket_bind_listen");
+
+    // Open a TCP socket through old-style `socket(2)` syscall.
+    // This is used both as a kernel sanity check, and for comparing the returned io-uring FD.
+    let plain_socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
+    let plain_fd = plain_socket.as_raw_fd();
+
+    let socket_fd_op = opcode::Socket::new(
+        Domain::IPV4.into(),
+        Type::STREAM.into(),
+        Protocol::TCP.into(),
+    );
+    unsafe {
+        ring.submission()
+            .push(&socket_fd_op.build().user_data(42).into())
+            .expect("queue is full");
+    }
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 42);
+    assert!(cqes[0].result() >= 0);
+    let io_uring_socket = unsafe { Socket::from_raw_fd(cqes[0].result()) };
+    assert!(io_uring_socket.as_raw_fd() != plain_fd);
+    assert_eq!(cqes[0].flags(), 0);
 
     // Try to bind.
     {
