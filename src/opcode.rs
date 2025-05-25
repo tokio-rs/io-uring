@@ -2062,3 +2062,49 @@ opcode! {
         Entry(sqe)
     }
 }
+
+// === 6.11 ===
+
+opcode! {
+    /// Bind a socket, equivalent to `bind(2)`.
+    pub struct Bind {
+        fd: { impl sealed::UseFixed },
+        addr: { *const libc::sockaddr },
+        addrlen: { libc::socklen_t }
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_BIND;
+
+    pub fn build(self) -> Entry {
+        let Bind { fd, addr, addrlen } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = addr as _;
+        sqe.__bindgen_anon_1.off = addrlen as _;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Listen on a socket, equivalent to `listen(2)`.
+    pub struct Listen {
+        fd: { impl sealed::UseFixed },
+        backlog: { i32 },
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_LISTEN;
+
+    pub fn build(self) -> Entry {
+        let Listen { fd, backlog } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.len = backlog as _;
+        Entry(sqe)
+    }
+}

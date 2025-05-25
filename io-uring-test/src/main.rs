@@ -140,6 +140,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     tests::net::test_tcp_shutdown(&mut ring, &test)?;
     tests::net::test_socket(&mut ring, &test)?;
+    tests::net::test_socket_bind_listen(&mut ring, &test)?;
     tests::net::test_udp_recvmsg_multishot(&mut ring, &test)?;
     tests::net::test_udp_recvmsg_multishot_trunc(&mut ring, &test)?;
     tests::net::test_udp_send_with_dest(&mut ring, &test)?;
