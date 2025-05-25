@@ -33,7 +33,7 @@ jobs:
       - name: Bench
         run: cargo bench --package io-uring-bench
 
-  check-vendor:
+  check-tier1:
     runs-on: ubuntu-latest
 
     strategy:
@@ -47,6 +47,28 @@ jobs:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - aarch64-unknown-linux-gnu
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.target }}
+          components: clippy
+          override: true
+      - name: Lint
+        run: cargo clippy --target ${{ matrix.target }}
+
+  check-tier2:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        toolchain:
+          - stable
+        target:
           - riscv64gc-unknown-linux-gnu
 
     steps:
