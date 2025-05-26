@@ -21,7 +21,8 @@ use libc::*;
         target_arch = "x86_64",
         target_arch = "aarch64",
         target_arch = "riscv64",
-        target_arch = "loongarch64"
+        target_arch = "loongarch64",
+        target_arch = "mips64"
     )),
     not(io_uring_skip_arch_check)
 ))]

@@ -71,6 +71,7 @@ jobs:
         target:
           - riscv64gc-unknown-linux-gnu
           - loongarch64-unknown-linux-gnu
+          - mips64el-unknown-linux-gnuabi64
 
     steps:
       - uses: actions/checkout@v4
