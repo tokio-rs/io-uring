@@ -3,6 +3,7 @@ use std::net::TcpListener;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, ptr};
 
+use io_uring::cqueue::EntryMarker;
 use io_uring::{opcode, squeue, types, IoUring, SubmissionQueue};
 use slab::Slab;
 
@@ -42,7 +43,7 @@ impl AcceptCount {
     pub fn push_to(&mut self, sq: &mut SubmissionQueue<'_>) {
         while self.count > 0 {
             unsafe {
-                match sq.push(&self.entry) {
+                match sq.push(self.entry.clone()) {
                     Ok(_) => self.count -= 1,
                     Err(_) => break,
                 }
@@ -91,7 +92,7 @@ fn main() -> anyhow::Result<()> {
 
             match backlog.pop_front() {
                 Some(sqe) => unsafe {
-                    let _ = sq.push(&sqe);
+                    let _ = sq.push(sqe);
                 },
                 None => break,
             }
@@ -127,7 +128,7 @@ fn main() -> anyhow::Result<()> {
                         .user_data(poll_token as _);
 
                     unsafe {
-                        if sq.push(&poll_e).is_err() {
+                        if sq.push(poll_e.clone()).is_err() {
                             backlog.push_back(poll_e);
                         }
                     }
@@ -150,7 +151,7 @@ fn main() -> anyhow::Result<()> {
                         .user_data(token_index as _);
 
                     unsafe {
-                        if sq.push(&read_e).is_err() {
+                        if sq.push(read_e.clone()).is_err() {
                             backlog.push_back(read_e);
                         }
                     }
@@ -181,7 +182,7 @@ fn main() -> anyhow::Result<()> {
                             .user_data(token_index as _);
 
                         unsafe {
-                            if sq.push(&write_e).is_err() {
+                            if sq.push(write_e.clone()).is_err() {
                                 backlog.push_back(write_e);
                             }
                         }
@@ -222,7 +223,7 @@ fn main() -> anyhow::Result<()> {
                     };
 
                     unsafe {
-                        if sq.push(&entry).is_err() {
+                        if sq.push(entry.clone()).is_err() {
                             backlog.push_back(entry);
                         }
                     }
