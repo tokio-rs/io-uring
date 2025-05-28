@@ -932,6 +932,47 @@ opcode! {
 }
 
 opcode! {
+    /// Read multiple times from a file, equivalent to `pread(2)`.
+    ///
+    /// Parameter:
+    ///     buf_group: The id of the provided buffer pool to use for each received chunk.
+    ///
+    /// MSG_WAITALL should not be set in flags.
+    ///
+    /// The multishot version allows the application to issue a single read request, which
+    /// repeatedly posts a CQE when data is available. Each CQE will take a buffer out of a
+    /// provided buffer pool for receiving. The application should check the flags of each CQE,
+    /// regardless of its result. If a posted CQE does not have the IORING_CQE_F_MORE flag set then
+    /// the multishot read will be done and the application should issue a new request.
+    ///
+    /// Multishot read is available since kernel 6.7.
+    /// Multishot read is suggested since kernel 6.7.2, see: https://github.com/axboe/liburing/issues/1041
+
+    pub struct ReadMulti {
+        fd: { impl sealed::UseFixed },
+        buf_group: { u16 },
+        ;;
+        ioprio: u16 = 0,
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_READ_MULTISHOT;
+
+    pub fn build(self) -> Entry {
+        let ReadMulti { fd, buf_group, flags, ioprio } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        sqe.flags |= crate::squeue::Flags::BUFFER_SELECT.bits();
+        sqe.ioprio = ioprio;
+        Entry(sqe)
+    }
+}
+
+opcode! {
     /// Issue the equivalent of a `pread(2)` or `pwrite(2)` system call
     ///
     /// * `fd` is the file descriptor to be operated on,
