@@ -115,15 +115,14 @@ pub fn test_register_files_tags<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         bail!("should not have succeeded twice in a row");
     }
 
+    // Wait for the event fd to complete indicating we have completions.
+    unsafe {
+        let mut value: u64 = 0;
+        let _ = libc::eventfd_read(test.event_fd, (&mut value) as *mut _);
+    }
+
     // Check that we get completion events for unregistering files with non-zero tags.
     completion.sync();
-
-    if completion.is_empty() {
-        submitter
-            .submit_and_wait(1)
-            .context("waiting for ring completions failed")?;
-        completion.sync();
-    }
 
     let cqes = completion.map(Into::into).collect::<Vec<Entry>>();
 
@@ -185,15 +184,14 @@ pub fn test_register_files_update_tag<S: squeue::EntryMarker, C: cqueue::EntryMa
         .unregister_files()
         .context("unregister_files failed")?;
 
+    // Wait for the event fd to complete indicating we have completions.
+    unsafe {
+        let mut value: u64 = 0;
+        let _ = libc::eventfd_read(test.event_fd, (&mut value) as *mut _);
+    }
+
     // Check that we get completion events for unregistering files with non-zero tags.
     completion.sync();
-
-    if completion.is_empty() {
-        submitter
-            .submit_and_wait(1)
-            .context("waiting for ring completions failed")?;
-        completion.sync();
-    }
 
     let cqes = completion.map(Into::into).collect::<Vec<Entry>>();
 

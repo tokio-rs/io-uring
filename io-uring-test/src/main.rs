@@ -2,6 +2,7 @@
 mod utils;
 mod tests;
 
+use anyhow::Context;
 use io_uring::{cqueue, squeue, IoUring, Probe};
 use std::cell::Cell;
 
@@ -9,6 +10,7 @@ pub struct Test {
     probe: Probe,
     target: Option<String>,
     count: Cell<usize>,
+    event_fd: libc::c_int,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -59,8 +61,18 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("probe: {:?}", probe);
     println!();
 
+    // Used for waiting on events, this is more reliable for CI & general use cases
+    // than doing a full event loop.
+    // Since this is just for testing, we don't really need to close the event fd explicitly,
+    // it'll just be cleaned up at the end.
+    let event_fd = unsafe { libc::eventfd(0, 0) };
+    ring.submitter()
+        .register_eventfd(event_fd)
+        .context("register event fd")?;
+
     let test = Test {
         probe,
+        event_fd,
         target: std::env::args().nth(1),
         count: Cell::new(0),
     };
