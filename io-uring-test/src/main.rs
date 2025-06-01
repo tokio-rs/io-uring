@@ -13,6 +13,19 @@ pub struct Test {
     event_fd: libc::c_int,
 }
 
+impl Test {
+    /// Reset the eventfd counter, this can be used to prevent
+    /// previous operations affecting the test.
+    fn reset_eventfd_counter(&self) {
+        // Reset the event fd state without blocking.
+        unsafe {
+            let _ = libc::eventfd_write(self.event_fd, 1);
+            let mut val: u64 = 0;
+            let _ = libc::eventfd_read(self.event_fd, (&mut val) as *mut _);
+        };
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     let entries = 8;
 

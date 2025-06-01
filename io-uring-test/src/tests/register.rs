@@ -84,6 +84,7 @@ pub fn test_register_files_tags<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     );
 
     println!("test register_files_tags");
+    test.reset_eventfd_counter();
 
     let (submitter, _, mut completion) = ring.split();
 
@@ -161,6 +162,7 @@ pub fn test_register_files_update_tag<S: squeue::EntryMarker, C: cqueue::EntryMa
     let (submitter, _, mut completion) = ring.split();
 
     println!("test register_files_update_tag");
+    test.reset_eventfd_counter();
 
     let descriptors = &[-1, -1, -1];
     let flags = &[0, 0, 0];
