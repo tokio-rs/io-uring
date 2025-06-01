@@ -322,12 +322,12 @@ impl<'a> Submitter<'a> {
     ///
     /// Each fd may be -1, in which case it is considered "sparse", and can be filled in later with
     /// [`register_files_update`](Self::register_files_update).
-    /// 
+    ///
     /// Note that before 5.13 registering buffers would wait for the ring to idle.  
-    /// If the application currently has requests in-flight, the registration will 
+    /// If the application currently has requests in-flight, the registration will
     /// wait for those to finish before proceeding.
     ///
-    /// You can use [`register_files_update`](Self::register_files_update) to execute 
+    /// You can use [`register_files_update`](Self::register_files_update) to execute
     /// this operation asynchronously.
     pub fn register_files(&self, fds: &[RawFd]) -> io::Result<()> {
         execute(
@@ -344,7 +344,7 @@ impl<'a> Submitter<'a> {
     ///
     /// Each fd may be -1, in which case it is considered "sparse", and can be filled in later with
     /// [`register_files_update`](Self::register_files_update).
-    /// 
+    ///
     /// `tags` should be the same length as `fds` and contain the
     /// tag value corresponding to the file descriptor at the same index.
     ///
@@ -367,7 +367,7 @@ impl<'a> Submitter<'a> {
         )
         .map(drop)
     }
-    
+
     /// This operation replaces existing files in the registered file set with new ones,
     /// either turning a sparse entry (one where fd is equal to -1) into a real one, removing an existing entry (new one is set to -1),
     /// or replacing an existing entry with a new existing entry. The `offset` parameter specifies
@@ -400,7 +400,12 @@ impl<'a> Submitter<'a> {
     /// for more information about resource tagging.
     ///
     /// Available since Linux 5.13.
-    pub fn register_files_update_tag(&self, offset: u32, fds: &[RawFd], tags: &[u64]) -> io::Result<()> {
+    pub fn register_files_update_tag(
+        &self,
+        offset: u32,
+        fds: &[RawFd],
+        tags: &[u64],
+    ) -> io::Result<()> {
         let rr = sys::io_uring_rsrc_update2 {
             offset,
             nr: fds.len().min(tags.len()) as _,
@@ -416,7 +421,7 @@ impl<'a> Submitter<'a> {
         )
         .map(drop)
     }
-    
+
     /// Register an eventfd created by [`eventfd`](libc::eventfd) with the io_uring instance.
     pub fn register_eventfd(&self, eventfd: RawFd) -> io::Result<()> {
         execute(
