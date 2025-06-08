@@ -4,6 +4,7 @@
 
 use std::convert::TryInto;
 use std::mem;
+use std::mem::size_of;
 use std::os::unix::io::RawFd;
 
 use crate::squeue::Entry;
@@ -1146,7 +1147,7 @@ opcode! {
         sqe.opcode = Self::CODE;
         sqe.fd = dirfd;
         sqe.__bindgen_anon_2.addr = pathname as _;
-        sqe.len = mem::size_of::<sys::open_how>() as _;
+        sqe.len = size_of::<sys::open_how>() as _;
         sqe.__bindgen_anon_1.off = how as _;
         if let Some(dest) = file_index {
             sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
