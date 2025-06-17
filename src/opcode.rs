@@ -1466,6 +1466,114 @@ opcode! {
     }
 }
 
+// === 5.17 ===
+
+opcode! {
+    /// Get extended attribute, equivalent to `getxattr(2)`.
+    pub struct GetXattr {
+        name: { *const libc::c_char },
+        value: { *mut libc::c_void },
+        path: { *const libc::c_char },
+        len: { u32 },
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_GETXATTR;
+
+    pub fn build(self) -> Entry {
+        let GetXattr { name, value, path, len } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.__bindgen_anon_2.addr = name as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_1.off = value as _;
+        unsafe { sqe.__bindgen_anon_6.__bindgen_anon_1.as_mut().addr3 = path as _ };
+        sqe.__bindgen_anon_3.xattr_flags = 0;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Set extended attribute, equivalent to `setxattr(2)`.
+    pub struct SetXattr {
+        name: { *const libc::c_char },
+        value: { *const libc::c_void },
+        path: { *const libc::c_char },
+        len: { u32 },
+        ;;
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_SETXATTR;
+
+    pub fn build(self) -> Entry {
+        let SetXattr { name, value, path, flags, len } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        sqe.__bindgen_anon_2.addr = name as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_1.off = value as _;
+        unsafe { sqe.__bindgen_anon_6.__bindgen_anon_1.as_mut().addr3 = path as _ };
+        sqe.__bindgen_anon_3.xattr_flags = flags as _;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Get extended attribute from a file descriptor, equivalent to `fgetxattr(2)`.
+    pub struct FGetXattr {
+        fd: { impl sealed::UseFixed },
+        name: { *const libc::c_char },
+        value: { *mut libc::c_void },
+        len: { u32 },
+        ;;
+    }
+
+    pub const CODE = sys::IORING_OP_FGETXATTR;
+
+    pub fn build(self) -> Entry {
+        let FGetXattr { fd, name, value, len } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = name as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_1.off = value as _;
+        sqe.__bindgen_anon_3.xattr_flags = 0;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Set extended attribute on a file descriptor, equivalent to `fsetxattr(2)`.
+    pub struct FSetXattr {
+        fd: { impl sealed::UseFixed },
+        name: { *const libc::c_char },
+        value: { *const libc::c_void },
+        len: { u32 },
+        ;;
+        flags: i32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_FSETXATTR;
+
+    pub fn build(self) -> Entry {
+        let FSetXattr { fd, name, value, flags, len } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = name as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_1.off = value as _;
+        sqe.__bindgen_anon_3.xattr_flags = flags as _;
+        Entry(sqe)
+    }
+}
+
 // === 5.18 ===
 
 opcode! {
