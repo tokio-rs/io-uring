@@ -106,6 +106,8 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::fs::test_file_splice(&mut ring, &test)?;
     tests::fs::test_ftruncate(&mut ring, &test)?;
     tests::fs::test_fixed_fd_install(&mut ring, &test)?;
+    tests::fs::test_get_set_xattr(&mut ring, &test)?;
+    tests::fs::test_f_get_set_xattr(&mut ring, &test)?;
 
     // timeout
     tests::timeout::test_timeout(&mut ring, &test)?;
