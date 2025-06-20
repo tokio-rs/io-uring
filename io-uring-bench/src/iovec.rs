@@ -36,7 +36,7 @@ fn bench_iovec(c: &mut Criterion) {
 
             unsafe {
                 ring.submission()
-                    .push(&entry.build())
+                    .push(entry.build())
                     .expect("queue is full");
             }
 
@@ -69,12 +69,12 @@ fn bench_iovec(c: &mut Criterion) {
             unsafe {
                 let mut queue = ring.submission();
                 queue
-                    .push(&entry.build().flags(squeue::Flags::IO_LINK))
+                    .push(entry.build().flags(squeue::Flags::IO_LINK))
                     .expect("queue is full");
                 for _ in 0..4 {
                     let entry = opcode::Nop::new().build();
                     queue
-                        .push(&entry.flags(squeue::Flags::IO_LINK))
+                        .push(entry.flags(squeue::Flags::IO_LINK))
                         .expect("queue is full");
                 }
             }
@@ -97,7 +97,7 @@ fn bench_iovec(c: &mut Criterion) {
 
                 unsafe {
                     queue
-                        .push(&entry.build().flags(squeue::Flags::IO_LINK))
+                        .push(entry.build().flags(squeue::Flags::IO_LINK))
                         .expect("queue is full");
                 }
             }
@@ -121,7 +121,7 @@ fn bench_iovec(c: &mut Criterion) {
 
                 unsafe {
                     ring.submission()
-                        .push(&entry.build())
+                        .push(entry.build())
                         .expect("queue is full");
                 }
 

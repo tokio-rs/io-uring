@@ -1,4 +1,5 @@
 use crate::Test;
+use io_uring::cqueue::EntryMarker;
 use io_uring::types::FutexWaitV;
 use io_uring::{cqueue, opcode, squeue, IoUring};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -60,7 +61,7 @@ pub fn test_futex_wait<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&futex_wait_e.build().user_data(USER_DATA).into())
+            .push(futex_wait_e.build().user_data(USER_DATA).into())
             .expect("queue is full");
     }
 
@@ -122,7 +123,7 @@ pub fn test_futex_wake<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&futex_wake_e.build().user_data(USER_DATA).into())
+            .push(futex_wake_e.build().user_data(USER_DATA).into())
             .expect("queue is full");
     }
     ring.submit_and_wait(1)?;
@@ -165,7 +166,7 @@ pub fn test_futex_waitv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     unsafe {
         let mut queue = ring.submission();
         queue
-            .push(&futex_waitv_e.build().user_data(USER_DATA).into())
+            .push(futex_waitv_e.build().user_data(USER_DATA).into())
             .expect("queue is full");
     }
 
