@@ -27,6 +27,111 @@ pub fn test_file_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_pipe_write_read_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Write::CODE);
+        test.probe.is_supported(opcode::ReadMulti::CODE);
+        test.probe.is_supported(opcode::ProvideBuffers::CODE);
+    );
+
+    println!("test pipe_write_read_multi");
+
+    // Create a pipe for testing
+    let mut pipefds = [0; 2];
+    let res = unsafe { libc::pipe(pipefds.as_mut_ptr()) };
+    if res < 0 {
+        return Err(anyhow::anyhow!("Failed to create pipe"));
+    }
+
+    let read_fd = types::Fd(pipefds[0]);
+    let write_fd = types::Fd(pipefds[1]);
+
+    // Prepare data to write and buffers to read into
+    let mut input = vec![0xde; 1024];
+    input.extend_from_slice(&[0xad; 256]);
+
+    // NOTE: we use 3 buffers for the last EOF is also taking up a buffer
+    let mut bufs = vec![0; 3 * 1024];
+
+    // Provide buffers for multi-shot reads
+    let provide_bufs_e = opcode::ProvideBuffers::new(bufs.as_mut_ptr(), 1024, 3, 0xbeef, 0);
+
+    unsafe {
+        ring.submission()
+            .push(&provide_bufs_e.build().user_data(0x31).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x31);
+    assert_eq!(cqe.result(), 0);
+
+    // Write data to the pipe
+    let write_e = opcode::Write::new(write_fd, input.as_ptr(), input.len() as _);
+
+    unsafe {
+        ring.submission()
+            .push(&write_e.build().user_data(0x32).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x32);
+    assert_eq!(cqe.result(), input.len() as i32);
+
+    // Issue multi-shot read using a buf_group with 1024 length buffers
+    let read_multi_e = opcode::ReadMulti::new(read_fd, 0xbeef)
+        .build()
+        .user_data(0x33)
+        .into();
+
+    unsafe {
+        ring.submission()
+            .push(&read_multi_e)
+            .expect("queue is full");
+    }
+
+    // Close the write end to ensure we get an EOF completion
+    let cres = unsafe { libc::close(write_fd.0) };
+    if cres < 0 {
+        return Err(anyhow::anyhow!("Failed to close file descriptor"));
+    }
+
+    ring.submit_and_wait(3)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 3);
+
+    // First read should get 1024 bytes
+    assert_eq!(cqes[0].user_data(), 0x33);
+    assert_eq!(cqes[0].result(), 1024);
+    assert!(cqueue::more(cqes[0].flags()));
+    assert_eq!(cqueue::buffer_select(cqes[0].flags()), Some(0));
+    assert_eq!(&bufs[..1024], &input[..1024]);
+
+    // Second read should get the remaining 256 bytes
+    assert_eq!(cqes[1].user_data(), 0x33);
+    assert_eq!(cqes[1].result(), 256);
+    assert!(cqueue::more(cqes[1].flags()));
+    assert_eq!(cqueue::buffer_select(cqes[1].flags()), Some(1));
+    assert_eq!(&bufs[1024..][..256], &input[1024..][..256]);
+
+    // Final completion should indicate EOF
+    assert_eq!(cqes[2].user_data(), 0x33);
+    assert!(!cqueue::more(cqes[2].flags()));
+    assert_eq!(cqes[2].result(), 0); // 0 indicates EOF for read operations
+
+    Ok(())
+}
+
 pub fn test_file_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
