@@ -49,6 +49,15 @@ use std::num::NonZeroU32;
 use std::os::unix::io::RawFd;
 
 pub use sys::__kernel_rwf_t as RwFlags;
+pub use sys::{
+    io_uring_region_desc, io_uring_zcrx_area_reg, io_uring_zcrx_cqe, io_uring_zcrx_ifq_reg,
+    io_uring_zcrx_rqe, IORING_MEM_REGION_TYPE_USER, IORING_ZCRX_AREA_SHIFT,
+};
+
+// From linux/io_uring.h
+//
+// NOTE: bindgen skips this due to the expression so we define it manually.
+pub const IORING_ZCRX_AREA_MASK: u64 = !((1u64 << IORING_ZCRX_AREA_SHIFT) - 1);
 
 /// Opaque types, you should use [`statx`](struct@libc::statx) instead.
 #[repr(C)]
