@@ -1891,6 +1891,32 @@ opcode! {
 // === 6.7 ===
 
 opcode! {
+    /// Issue the equivalent of `pread(2)` with multi-shot semantics.
+    pub struct ReadMulti {
+        fd: { impl sealed::UseFixed },
+        len: { u32 },
+        buf_group: { u16 },
+        ;;
+        offset: u64 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_READ_MULTISHOT;
+
+    pub fn build(self) -> Entry {
+        let Self { fd, len, buf_group, offset } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.off = offset;
+        sqe.len = len;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        sqe.flags = crate::squeue::Flags::BUFFER_SELECT.bits();
+        Entry(sqe)
+    }
+}
+
+opcode! {
     /// Wait on a futex, like but not equivalant to `futex(2)`'s `FUTEX_WAIT_BITSET`.
     ///
     /// Wait on a futex at address `futex` and which still has the value `val` and with `futex2(2)`

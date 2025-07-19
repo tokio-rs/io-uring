@@ -91,6 +91,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // fs
     tests::fs::test_file_write_read(&mut ring, &test)?;
+    tests::fs::test_pipe_read_multishot(&mut ring, &test)?;
     tests::fs::test_file_writev_readv(&mut ring, &test)?;
     tests::fs::test_file_cur_pos(&mut ring, &test)?;
     tests::fs::test_file_fsync(&mut ring, &test)?;
