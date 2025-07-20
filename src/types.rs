@@ -80,13 +80,13 @@ bitflags! {
     /// Options for [`Timeout`](super::Timeout).
     ///
     /// The default behavior is to treat the timespec as a relative time interval. `flags` may
-    /// contain [`types::TimeoutFlags::ABS`] to indicate the timespec represents an absolute
+    /// contain [`TimeoutFlags::ABS`] to indicate the timespec represents an absolute
     /// time. When an absolute time is being specified, the kernel will use its monotonic clock
     /// unless one of the following flags is set (they may not both be set):
-    /// [`types::TimeoutFlags::BOOTTIME`] or [`types::TimeoutFlags::REALTIME`].
+    /// [`TimeoutFlags::BOOTTIME`] or [`TimeoutFlags::REALTIME`].
     ///
     /// The default behavior when the timeout expires is to sever dependent links, as a failed
-    /// request normally would. To keep the links untouched include [`types::TimeoutFlags::ETIME_SUCCESS`].
+    /// request normally would. To keep the links untouched include [`TimeoutFlags::ETIME_SUCCESS`].
     /// CQE will still contain -libc::ETIME in the res field
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub struct TimeoutFlags: u32 {
