@@ -267,6 +267,116 @@ pub fn test_file_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_pipe_fixed_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::WritevFixed::CODE);
+        test.probe.is_supported(opcode::ReadvFixed::CODE);
+    );
+
+    println!("test pipe_fixed_writev_readv");
+
+    const REQ_TYPE_WRITEV_FIXED: u64 = 1;
+    const REQ_TYPE_READV_FIXED: u64 = 2;
+
+    ring.submitter().unregister_buffers()?;
+
+    let (rx, tx) = ::std::io::pipe()?;
+
+    const BYTES0: &[u8] = "The quick brown fox jumps over the lazy dog.".as_bytes();
+    const BYTES1: &[u8] = "我能吞下玻璃而不伤身体。".as_bytes();
+
+    let mut src = Vec::with_capacity(BYTES0.len() + BYTES1.len());
+    src.extend_from_slice(BYTES0);
+    src.extend_from_slice(BYTES1);
+
+    let mut dst = vec![0u8; BYTES0.len() + BYTES1.len()];
+
+    unsafe {
+        ring.submitter().register_buffers(&[
+            ::libc::iovec {
+                iov_base: src.as_mut_ptr() as *mut _,
+                iov_len: src.len(),
+            },
+            ::libc::iovec {
+                iov_base: dst.as_mut_ptr() as *mut _,
+                iov_len: dst.len(),
+            },
+        ])?;
+    }
+
+    let src_parts = [
+        ::libc::iovec {
+            iov_base: src.as_ptr() as *mut _,
+            iov_len: BYTES0.len(),
+        },
+        ::libc::iovec {
+            iov_base: unsafe { src.as_ptr().add(BYTES0.len()) } as *mut _,
+            iov_len: BYTES1.len(),
+        },
+    ];
+    unsafe {
+        ring.submission().push(
+            &opcode::WritevFixed::new(
+                types::Fd(tx.as_raw_fd()),
+                src_parts.as_ptr().cast(),
+                src_parts.len() as u32,
+                0,
+            )
+            .build()
+            .user_data(REQ_TYPE_WRITEV_FIXED)
+            .into(),
+        )?;
+    }
+    ring.submit_and_wait(1)?;
+    for cqe in ring.completion().map(Into::<cqueue::Entry>::into) {
+        assert_eq!(cqe.user_data(), REQ_TYPE_WRITEV_FIXED);
+        assert!(cqe.result() >= 0);
+        let len = cqe.result();
+        assert_eq!(len, src.len() as _);
+    }
+
+    let dst_parts = [
+        ::libc::iovec {
+            iov_base: dst.as_ptr() as *mut _,
+            iov_len: BYTES0.len(),
+        },
+        ::libc::iovec {
+            iov_base: unsafe { dst.as_ptr().add(BYTES0.len()) } as *mut _,
+            iov_len: BYTES1.len(),
+        },
+    ];
+    unsafe {
+        ring.submission().push(
+            &opcode::ReadvFixed::new(
+                types::Fd(rx.as_raw_fd()),
+                dst_parts.as_ptr().cast(),
+                dst_parts.len() as u32,
+                1,
+            )
+            .build()
+            .user_data(REQ_TYPE_READV_FIXED)
+            .into(),
+        )?;
+    }
+    ring.submit_and_wait(1)?;
+    for cqe in ring.completion().map(Into::<cqueue::Entry>::into) {
+        assert_eq!(cqe.user_data(), REQ_TYPE_READV_FIXED);
+        assert!(cqe.result() >= 0);
+        let len = cqe.result();
+        assert_eq!(len, src.len() as _);
+    }
+
+    ring.submitter().unregister_buffers()?;
+
+    assert_eq!(src, dst);
+
+    Ok(())
+}
+
 pub fn test_file_fsync<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
