@@ -89,6 +89,13 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::cancel::test_async_cancel_fd(&mut ring, &test)?;
     tests::cancel::test_async_cancel_fd_all(&mut ring, &test)?;
 
+    // epoll
+    tests::epoll::test_ready(&mut ring, &test)?;
+    tests::epoll::test_not_ready(&mut ring, &test)?;
+    tests::epoll::test_delete(&mut ring, &test)?;
+    tests::epoll::test_remove(&mut ring, &test)?;
+    tests::epoll::test_race(&mut ring, &test)?;
+
     // fs
     tests::fs::test_file_write_read(&mut ring, &test)?;
     tests::fs::test_pipe_read_multishot(&mut ring, &test)?;
