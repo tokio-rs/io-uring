@@ -253,6 +253,9 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     }
 
     #[inline]
+    /// Signals to mask during waiting for the result
+    ///
+    /// Masked signals will be restored after submit operation returns
     pub fn sigmask<'new>(mut self, sigmask: &'new libc::sigset_t) -> SubmitArgs<'now, 'new> {
         self.args.sigmask = cast_ptr(sigmask) as _;
         self.args.sigmask_sz = std::mem::size_of::<libc::sigset_t>() as _;
@@ -265,6 +268,7 @@ impl<'prev, 'now> SubmitArgs<'prev, 'now> {
     }
 
     #[inline]
+    /// Timeout for submit operation
     pub fn timespec<'new>(mut self, timespec: &'new Timespec) -> SubmitArgs<'now, 'new> {
         self.args.ts = cast_ptr(timespec) as _;
 
