@@ -149,6 +149,9 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::net::test_udp_send_with_dest(&mut ring, &test)?;
     tests::net::test_udp_sendzc_with_dest(&mut ring, &test)?;
 
+    // NOTE: `cqueue::Entry32` required for RecvZC.
+    tests::net::test_tcp_recvzc::<S>(&test)?;
+
     // queue
     tests::poll::test_eventfd_poll(&mut ring, &test)?;
     tests::poll::test_eventfd_poll_remove(&mut ring, &test)?;

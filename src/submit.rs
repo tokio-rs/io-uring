@@ -660,4 +660,17 @@ impl<'a> Submitter<'a> {
         )
         .map(drop)
     }
+
+    /// Register a netdev hw rx queue for zerocopy.
+    ///
+    /// Available since 6.15.
+    pub fn register_ifq(&self, reg: &sys::io_uring_zcrx_ifq_reg) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_ZCRX_IFQ,
+            cast_ptr::<sys::io_uring_zcrx_ifq_reg>(reg) as _,
+            1,
+        )
+        .map(drop)
+    }
 }
