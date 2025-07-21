@@ -142,6 +142,11 @@ impl<'a> Submitter<'a> {
         unsafe { self.enter::<libc::sigset_t>(len as _, want as _, flags, None) }
     }
 
+    /// Submit all queued submission queue events to the kernel and wait for at least `want`
+    /// completion events to complete with additional options
+    ///
+    /// You can specify a set of signals to mask and a timeout for operation, see
+    /// [`SubmitArgs`](types::SubmitArgs) for more details
     pub fn submit_with_args(
         &self,
         want: usize,
