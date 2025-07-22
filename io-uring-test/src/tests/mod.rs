@@ -1,4 +1,5 @@
 pub mod cancel;
+pub mod epoll;
 pub mod fs;
 pub mod futex;
 pub mod net;

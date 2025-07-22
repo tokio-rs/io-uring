@@ -89,9 +89,18 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::cancel::test_async_cancel_fd(&mut ring, &test)?;
     tests::cancel::test_async_cancel_fd_all(&mut ring, &test)?;
 
+    // epoll
+    tests::epoll::test_ready(&mut ring, &test)?;
+    tests::epoll::test_not_ready(&mut ring, &test)?;
+    tests::epoll::test_delete(&mut ring, &test)?;
+    tests::epoll::test_remove(&mut ring, &test)?;
+    tests::epoll::test_race(&mut ring, &test)?;
+
     // fs
     tests::fs::test_file_write_read(&mut ring, &test)?;
+    tests::fs::test_pipe_read_multishot(&mut ring, &test)?;
     tests::fs::test_file_writev_readv(&mut ring, &test)?;
+    tests::fs::test_pipe_fixed_writev_readv(&mut ring, &test)?;
     tests::fs::test_file_cur_pos(&mut ring, &test)?;
     tests::fs::test_file_fsync(&mut ring, &test)?;
     tests::fs::test_file_fsync_file_range(&mut ring, &test)?;
@@ -147,6 +156,9 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::net::test_udp_recvmsg_multishot_trunc(&mut ring, &test)?;
     tests::net::test_udp_send_with_dest(&mut ring, &test)?;
     tests::net::test_udp_sendzc_with_dest(&mut ring, &test)?;
+
+    // NOTE: `cqueue::Entry32` required for RecvZC.
+    tests::net::test_tcp_recvzc::<S>(&test)?;
 
     // queue
     tests::poll::test_eventfd_poll(&mut ring, &test)?;

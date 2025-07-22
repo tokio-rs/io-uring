@@ -158,6 +158,7 @@ pub const IORING_ENTER_EXT_ARG: u32 = 8;
 pub const IORING_ENTER_REGISTERED_RING: u32 = 16;
 pub const IORING_ENTER_ABS_TIMER: u32 = 32;
 pub const IORING_ENTER_EXT_ARG_REG: u32 = 64;
+pub const IORING_ENTER_NO_IOWAIT: u32 = 128;
 pub const IORING_FEAT_SINGLE_MMAP: u32 = 1;
 pub const IORING_FEAT_NODROP: u32 = 2;
 pub const IORING_FEAT_SUBMIT_STABLE: u32 = 4;
@@ -175,9 +176,11 @@ pub const IORING_FEAT_REG_REG_RING: u32 = 8192;
 pub const IORING_FEAT_RECVSEND_BUNDLE: u32 = 16384;
 pub const IORING_FEAT_MIN_TIMEOUT: u32 = 32768;
 pub const IORING_FEAT_RW_ATTR: u32 = 65536;
+pub const IORING_FEAT_NO_IOWAIT: u32 = 131072;
 pub const IORING_RSRC_REGISTER_SPARSE: u32 = 1;
 pub const IORING_REGISTER_FILES_SKIP: i32 = -2;
 pub const IO_URING_OP_SUPPORTED: u32 = 1;
+pub const IORING_ZCRX_AREA_SHIFT: u32 = 48;
 pub type __u8 = libc::c_uchar;
 pub type __u16 = libc::c_ushort;
 pub type __s32 = libc::c_int;
@@ -832,6 +835,7 @@ impl Default for io_uring_sqe__bindgen_ty_4 {
 pub union io_uring_sqe__bindgen_ty_5 {
     pub splice_fd_in: __s32,
     pub file_index: __u32,
+    pub zcrx_ifq_idx: __u32,
     pub optlen: __u32,
     pub __bindgen_anon_1: io_uring_sqe__bindgen_ty_5__bindgen_ty_1,
 }
@@ -916,6 +920,16 @@ fn bindgen_test_layout_io_uring_sqe__bindgen_ty_5() {
             stringify!(io_uring_sqe__bindgen_ty_5),
             "::",
             stringify!(file_index)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).zcrx_ifq_idx) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_sqe__bindgen_ty_5),
+            "::",
+            stringify!(zcrx_ifq_idx)
         )
     );
     assert_eq!(
@@ -1332,7 +1346,11 @@ pub const IORING_OP_FIXED_FD_INSTALL: io_uring_op = 54;
 pub const IORING_OP_FTRUNCATE: io_uring_op = 55;
 pub const IORING_OP_BIND: io_uring_op = 56;
 pub const IORING_OP_LISTEN: io_uring_op = 57;
-pub const IORING_OP_LAST: io_uring_op = 58;
+pub const IORING_OP_RECV_ZC: io_uring_op = 58;
+pub const IORING_OP_EPOLL_WAIT: io_uring_op = 59;
+pub const IORING_OP_READV_FIXED: io_uring_op = 60;
+pub const IORING_OP_WRITEV_FIXED: io_uring_op = 61;
+pub const IORING_OP_LAST: io_uring_op = 62;
 pub type io_uring_op = libc::c_uint;
 pub const IORING_MSG_DATA: io_uring_msg_ring_flags = 0;
 pub const IORING_MSG_SEND_FD: io_uring_msg_ring_flags = 1;
@@ -1797,6 +1815,7 @@ pub const IORING_UNREGISTER_NAPI: io_uring_register_op = 28;
 pub const IORING_REGISTER_CLOCK: io_uring_register_op = 29;
 pub const IORING_REGISTER_CLONE_BUFFERS: io_uring_register_op = 30;
 pub const IORING_REGISTER_SEND_MSG_RING: io_uring_register_op = 31;
+pub const IORING_REGISTER_ZCRX_IFQ: io_uring_register_op = 32;
 pub const IORING_REGISTER_RESIZE_RINGS: io_uring_register_op = 33;
 pub const IORING_REGISTER_MEM_REGION: io_uring_register_op = 34;
 pub const IORING_REGISTER_LAST: io_uring_register_op = 35;
@@ -3475,6 +3494,390 @@ pub const SOCKET_URING_OP_SIOCOUTQ: io_uring_socket_op = 1;
 pub const SOCKET_URING_OP_GETSOCKOPT: io_uring_socket_op = 2;
 pub const SOCKET_URING_OP_SETSOCKOPT: io_uring_socket_op = 3;
 pub type io_uring_socket_op = libc::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct io_uring_zcrx_rqe {
+    pub off: __u64,
+    pub len: __u32,
+    pub __pad: __u32,
+}
+#[test]
+fn bindgen_test_layout_io_uring_zcrx_rqe() {
+    const UNINIT: ::core::mem::MaybeUninit<io_uring_zcrx_rqe> = ::core::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_zcrx_rqe>(),
+        16usize,
+        concat!("Size of: ", stringify!(io_uring_zcrx_rqe))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_zcrx_rqe>(),
+        8usize,
+        concat!("Alignment of ", stringify!(io_uring_zcrx_rqe))
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).off) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_rqe),
+            "::",
+            stringify!(off)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).len) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_rqe),
+            "::",
+            stringify!(len)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).__pad) as usize - ptr as usize },
+        12usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_rqe),
+            "::",
+            stringify!(__pad)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct io_uring_zcrx_cqe {
+    pub off: __u64,
+    pub __pad: __u64,
+}
+#[test]
+fn bindgen_test_layout_io_uring_zcrx_cqe() {
+    const UNINIT: ::core::mem::MaybeUninit<io_uring_zcrx_cqe> = ::core::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_zcrx_cqe>(),
+        16usize,
+        concat!("Size of: ", stringify!(io_uring_zcrx_cqe))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_zcrx_cqe>(),
+        8usize,
+        concat!("Alignment of ", stringify!(io_uring_zcrx_cqe))
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).off) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_cqe),
+            "::",
+            stringify!(off)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).__pad) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_cqe),
+            "::",
+            stringify!(__pad)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct io_uring_zcrx_offsets {
+    pub head: __u32,
+    pub tail: __u32,
+    pub rqes: __u32,
+    pub __resv2: __u32,
+    pub __resv: [__u64; 2usize],
+}
+#[test]
+fn bindgen_test_layout_io_uring_zcrx_offsets() {
+    const UNINIT: ::core::mem::MaybeUninit<io_uring_zcrx_offsets> =
+        ::core::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_zcrx_offsets>(),
+        32usize,
+        concat!("Size of: ", stringify!(io_uring_zcrx_offsets))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_zcrx_offsets>(),
+        8usize,
+        concat!("Alignment of ", stringify!(io_uring_zcrx_offsets))
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).head) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_offsets),
+            "::",
+            stringify!(head)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).tail) as usize - ptr as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_offsets),
+            "::",
+            stringify!(tail)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).rqes) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_offsets),
+            "::",
+            stringify!(rqes)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).__resv2) as usize - ptr as usize },
+        12usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_offsets),
+            "::",
+            stringify!(__resv2)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).__resv) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_offsets),
+            "::",
+            stringify!(__resv)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct io_uring_zcrx_area_reg {
+    pub addr: __u64,
+    pub len: __u64,
+    pub rq_area_token: __u64,
+    pub flags: __u32,
+    pub __resv1: __u32,
+    pub __resv2: [__u64; 2usize],
+}
+#[test]
+fn bindgen_test_layout_io_uring_zcrx_area_reg() {
+    const UNINIT: ::core::mem::MaybeUninit<io_uring_zcrx_area_reg> =
+        ::core::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_zcrx_area_reg>(),
+        48usize,
+        concat!("Size of: ", stringify!(io_uring_zcrx_area_reg))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_zcrx_area_reg>(),
+        8usize,
+        concat!("Alignment of ", stringify!(io_uring_zcrx_area_reg))
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).addr) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_area_reg),
+            "::",
+            stringify!(addr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).len) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_area_reg),
+            "::",
+            stringify!(len)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).rq_area_token) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_area_reg),
+            "::",
+            stringify!(rq_area_token)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_area_reg),
+            "::",
+            stringify!(flags)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).__resv1) as usize - ptr as usize },
+        28usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_area_reg),
+            "::",
+            stringify!(__resv1)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).__resv2) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_area_reg),
+            "::",
+            stringify!(__resv2)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct io_uring_zcrx_ifq_reg {
+    pub if_idx: __u32,
+    pub if_rxq: __u32,
+    pub rq_entries: __u32,
+    pub flags: __u32,
+    pub area_ptr: __u64,
+    pub region_ptr: __u64,
+    pub offsets: io_uring_zcrx_offsets,
+    pub zcrx_id: __u32,
+    pub __resv2: __u32,
+    pub __resv: [__u64; 3usize],
+}
+#[test]
+fn bindgen_test_layout_io_uring_zcrx_ifq_reg() {
+    const UNINIT: ::core::mem::MaybeUninit<io_uring_zcrx_ifq_reg> =
+        ::core::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::core::mem::size_of::<io_uring_zcrx_ifq_reg>(),
+        96usize,
+        concat!("Size of: ", stringify!(io_uring_zcrx_ifq_reg))
+    );
+    assert_eq!(
+        ::core::mem::align_of::<io_uring_zcrx_ifq_reg>(),
+        8usize,
+        concat!("Alignment of ", stringify!(io_uring_zcrx_ifq_reg))
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).if_idx) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(if_idx)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).if_rxq) as usize - ptr as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(if_rxq)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).rq_entries) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(rq_entries)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        12usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(flags)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).area_ptr) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(area_ptr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).region_ptr) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(region_ptr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).offsets) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(offsets)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).zcrx_id) as usize - ptr as usize },
+        64usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(zcrx_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).__resv2) as usize - ptr as usize },
+        68usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(__resv2)
+        )
+    );
+    assert_eq!(
+        unsafe { ::core::ptr::addr_of!((*ptr).__resv) as usize - ptr as usize },
+        72usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(io_uring_zcrx_ifq_reg),
+            "::",
+            stringify!(__resv)
+        )
+    );
+}
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct futex_waitv {

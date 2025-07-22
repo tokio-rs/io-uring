@@ -1891,6 +1891,32 @@ opcode! {
 // === 6.7 ===
 
 opcode! {
+    /// Issue the equivalent of `pread(2)` with multi-shot semantics.
+    pub struct ReadMulti {
+        fd: { impl sealed::UseFixed },
+        len: { u32 },
+        buf_group: { u16 },
+        ;;
+        offset: u64 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_READ_MULTISHOT;
+
+    pub fn build(self) -> Entry {
+        let Self { fd, len, buf_group, offset } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.off = offset;
+        sqe.len = len;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
+        sqe.flags = crate::squeue::Flags::BUFFER_SELECT.bits();
+        Entry(sqe)
+    }
+}
+
+opcode! {
     /// Wait on a futex, like but not equivalant to `futex(2)`'s `FUTEX_WAIT_BITSET`.
     ///
     /// Wait on a futex at address `futex` and which still has the value `val` and with `futex2(2)`
@@ -2213,6 +2239,120 @@ opcode! {
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.len = backlog as _;
+        Entry(sqe)
+    }
+}
+
+// === 6.15 ===
+
+opcode! {
+    /// Issue the zerocopy equivalent of a `recv(2)` system call.
+    pub struct RecvZc {
+        fd: { impl sealed::UseFixed },
+        len: { u32 },
+        ;;
+        ifq: u32 = 0,
+        ioprio: u16 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_RECV_ZC;
+
+    pub fn build(self) -> Entry {
+        let Self { fd, len, ifq, ioprio } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.len = len;
+        sqe.ioprio = ioprio | sys::IORING_RECV_MULTISHOT as u16;
+        sqe.__bindgen_anon_5.zcrx_ifq_idx = ifq;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Issue the equivalent of a `epoll_wait(2)` system call.
+    pub struct EpollWait {
+        fd: { impl sealed::UseFixed },
+        events: { *mut types::epoll_event },
+        max_events: { u32 },
+        ;;
+        flags: u32 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_EPOLL_WAIT;
+
+    pub fn build(self) -> Entry {
+        let Self { fd, events, max_events, flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_2.addr = events as u64;
+        sqe.len = max_events;
+        sqe.__bindgen_anon_3.poll32_events = flags;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Vectored read into a fixed buffer, equivalent to `preadv2(2)`.
+    pub struct ReadvFixed {
+        fd: { impl sealed::UseFixed },
+        iovec: { *const ::libc::iovec },
+        len: { u32 },
+        buf_index: { u16 },
+        ;;
+        ioprio: u16 = 0,
+        offset: u64 = 0,
+        rw_flags: i32 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_READV_FIXED;
+
+    pub fn build(self) -> Entry {
+        let Self { fd, iovec, len, buf_index, offset, ioprio, rw_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.addr = iovec as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_4.buf_index = buf_index;
+        sqe.ioprio = ioprio;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        Entry(sqe)
+    }
+}
+
+opcode! {
+    /// Vectored write from a fixed buffer, equivalent to `pwritev2(2)`.
+    pub struct WritevFixed {
+        fd: { impl sealed::UseFixed },
+        iovec: { *const ::libc::iovec },
+        len: { u32 },
+        buf_index: { u16 },
+        ;;
+        ioprio: u16 = 0,
+        offset: u64 = 0,
+        rw_flags: i32 = 0,
+    }
+
+    pub const CODE = sys::IORING_OP_WRITEV_FIXED;
+
+    pub fn build(self) -> Entry {
+        let Self { fd, iovec, len, buf_index, offset, ioprio, rw_flags } = self;
+
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.off = offset as _;
+        sqe.__bindgen_anon_2.addr = iovec as _;
+        sqe.len = len;
+        sqe.__bindgen_anon_4.buf_index = buf_index;
+        sqe.ioprio = ioprio;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags;
         Entry(sqe)
     }
 }

@@ -2192,3 +2192,292 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
 
     Ok(())
 }
+
+// NOTE: This test has some very specific requirements in order to work.
+//
+// First, it requires a NIC with `io_uring` zero-copy receive support. Currently
+// (mid-2025) the only drivers and cards that support this are:
+//
+// * `bnxt` (Broadcom BCM9575*, Thor chipset or newer)
+// * `gve`  (Google)
+// * `mlx5` (NVIDIA ConnectX-7 or newer)
+//
+// Second, the NIC must be configured for `io_uring` zero-copy receive.
+//
+// See https://docs.kernel.org/networking/iou-zcrx.html#setup-nic.
+//
+// These hardware features must be enabled:
+//
+// 1. receive queues:
+//   * `ethtool -L <iface> combined <num>`
+// 2. header/data split:
+//   * `ethtool -G <iface> tcp-data-split on`
+//
+// Third, the `io_uring` must be created with these flags:
+//
+// * IORING_SETUP_SINGLE_ISSUER
+// * IORING_SETUP_DEFER_TASKRUN
+// * IORING_SETUP_CQE32
+//
+// Fourth, for this test specifically, the user must indicate the zero-copy
+// capable network interface and receive queue through environment variables:
+//
+// * IO_URING_ZCRX_IF_NAME
+// * IO_URING_ZCRX_IF_RXQ
+//
+// Finally, the test must be run as super-user or the test binary must have
+// `CAP_NET_ADMIN` set, otherwise ifq registration will fail with EPERM.
+//
+// # Configuration Details
+//
+// This test was verified to work with an NVIDIA ConnectX-7 with firmware:
+//
+//   FW Version:            28.45.1200
+//   FW Release Date:       12.5.2025
+//   Product Version:       28.45.1200
+//
+// The mlx5 driver was used with Linux 6.16 kernel from net-next branch commit:
+//
+//   https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/commit/?id=8152c4028cb8b69933ebb93e7b0cc58bc47dfb2e
+//
+// The ConnectX-7 NIC was configured with the following:
+//
+//   $ ethtool --set-priv-flags enp3s0f0np0 rx_cqe_compress off      # must be off for `rx-gro-hw`
+//   $ ethtool --features enp3s0f0np0 rx-gro-hw on
+//   $ ethtool --set-ring enp3s0f0np0 tcp-data-split on
+//   $ ethtool --set-channels enp3s0f0np0 combined 32
+//   $ ethtool --set-rxfh-indir enp3s0f0np0 equal 16                 # assign 0-15 to normal traffic
+//   $ ethtool --config-nfc enp25s0f0np0 flow-type tcp4 \
+//       dst-ip 127.0.0.1 \
+//       dst-port 9999 \
+//       action 16
+//
+// The test was invoked with:
+//
+//   $ cargo build --package io-uring-test
+//   $ sudo env IO_URING_ZCRX_IF_NAME="enp25s0f0np0" IO_URING_ZCRX_IF_RXQ="16" ./target/debug/io-uring-test
+pub fn test_tcp_recvzc<S: squeue::EntryMarker>(test: &Test) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::RecvZc::CODE);
+    );
+
+    use ::anyhow::anyhow;
+    use ::core::sync::atomic::{self, AtomicU32};
+    use ::std::convert::TryFrom;
+
+    #[allow(missing_docs)]
+    #[repr(C)]
+    #[derive(Debug, Copy, Clone, Default)]
+    #[non_exhaustive]
+    struct io_uring_zcrx_rq {
+        khead: *mut u32,
+        ktail: *mut u32,
+        rq_tail: u32,
+        ring_entries: ::core::ffi::c_uint,
+        rqes: *mut types::io_uring_zcrx_rqe,
+        ring_ptr: *mut ::core::ffi::c_void,
+    }
+
+    const REQ_TYPE_ACCEPT: u64 = 1;
+    const REQ_TYPE_RX: u64 = 2;
+    const DATA: &[u8; 26] = b"abcdefghijklmnopqrstuvwxyz";
+    const STREAM_SIZE: u32 = 26 * 1024;
+
+    println!("test tcp_recvzc");
+
+    // Check for environment variables and skip test if missing.
+    let Ok(if_name) = ::std::env::var("IO_URING_ZCRX_IF_NAME") else {
+        eprintln!("test_tcp_recvzc: skipping; expected IO_URING_ZCRX_IF_NAME env var");
+        return Ok(());
+    };
+    let if_name = ::std::ffi::CString::new(if_name)?;
+    let Ok(if_rxq) = ::std::env::var("IO_URING_ZCRX_IF_RXQ")?.parse::<u32>() else {
+        eprintln!("test_tcp_recvzc: skipping; expected IO_URING_ZCRX_IF_RXQ env var");
+        return Ok(());
+    };
+
+    // Create test-specific ring as we need special flags for zcrx.
+    let mut ring = io_uring::IoUring::<S, cqueue::Entry32>::builder()
+        .setup_defer_taskrun()
+        .setup_single_issuer()
+        .build(8)?;
+
+    // Create socket.
+    let socket = ::std::net::TcpListener::bind("127.0.0.1:9999")?;
+    let if_idx = unsafe { ::libc::if_nametoindex(if_name.as_ptr()) };
+
+    let rq_entries = 4096u32;
+    let page_size = usize::try_from(unsafe { ::libc::sysconf(::libc::_SC_PAGESIZE) })?;
+
+    // Create area pointer.
+    let area_size = 8192 * page_size;
+    let area_ptr = unsafe {
+        ::libc::mmap(
+            ::core::ptr::null_mut(),
+            area_size,
+            ::libc::PROT_READ | ::libc::PROT_WRITE,
+            ::libc::MAP_PRIVATE | ::libc::MAP_ANONYMOUS,
+            0,
+            0,
+        )
+    };
+    let area_ptr = ::core::ptr::NonNull::new(area_ptr).ok_or_else(|| anyhow!("null pointer"))?;
+
+    // Create ring pointer.
+    let mut ring_size = usize::try_from(rq_entries)? * size_of::<types::io_uring_zcrx_rqe>();
+    ring_size += page_size;
+    ring_size = (ring_size + page_size - 1) & !(page_size - 1);
+    let ring_ptr = unsafe {
+        ::libc::mmap(
+            ::core::ptr::null_mut(),
+            area_size,
+            ::libc::PROT_READ | ::libc::PROT_WRITE,
+            ::libc::MAP_PRIVATE | ::libc::MAP_ANONYMOUS,
+            0,
+            0,
+        )
+    };
+    let ring_ptr = ::core::ptr::NonNull::new(ring_ptr).ok_or_else(|| anyhow!("null pointer"))?;
+
+    // Create region desc.
+    let mut region_reg = types::io_uring_region_desc::default();
+    region_reg.size = u64::try_from(ring_size)?;
+    region_reg.user_addr = ring_ptr.addr().get() as _;
+    region_reg.flags = types::IORING_MEM_REGION_TYPE_USER;
+
+    // Create area reg.
+    let mut area_reg = types::io_uring_zcrx_area_reg::default();
+    area_reg.addr = area_ptr.addr().get() as _;
+    area_reg.len = u64::try_from(area_size)?;
+
+    // Create ifq reg.
+    let mut reg = types::io_uring_zcrx_ifq_reg::default();
+    reg.if_idx = if_idx;
+    reg.if_rxq = if_rxq;
+    reg.rq_entries = rq_entries;
+    reg.area_ptr = ::core::ptr::from_mut(&mut area_reg).addr().try_into()?;
+    reg.region_ptr = ::core::ptr::from_mut(&mut region_reg).addr().try_into()?;
+
+    // Register ifq.
+    ring.submitter().register_ifq(&reg)?;
+
+    // Configure the rq.
+    let mut rq_ring = io_uring_zcrx_rq::default();
+    rq_ring.khead = unsafe { ring_ptr.add(usize::try_from(reg.offsets.head)?) }
+        .cast()
+        .as_ptr();
+    rq_ring.ktail = unsafe { ring_ptr.add(usize::try_from(reg.offsets.tail)?) }
+        .cast()
+        .as_ptr();
+    rq_ring.rqes = unsafe { ring_ptr.add(usize::try_from(reg.offsets.rqes)?) }
+        .cast()
+        .as_ptr();
+    rq_ring.rq_tail = 0;
+    rq_ring.ring_entries = reg.rq_entries;
+
+    let rq_mask = rq_ring.ring_entries - 1;
+    let area_token = area_reg.rq_area_token;
+
+    // Submit the accept op.
+    let sqe = opcode::Accept::new(
+        types::Fd(socket.as_raw_fd()),
+        ::core::ptr::null_mut(),
+        ::core::ptr::null_mut(),
+    )
+    .build()
+    .user_data(REQ_TYPE_ACCEPT)
+    .into();
+    unsafe { ring.submission().push(&sqe) }?;
+
+    // Spawn the send thread.
+    let conn = ::std::thread::spawn(|| loop {
+        if let Ok(mut stream) = ::std::net::TcpStream::connect("127.0.0.1:9999") {
+            let mut buf = vec![];
+            for slice in std::iter::repeat_n(DATA, 64) {
+                buf.extend(slice);
+            }
+            let mut written = 0u32;
+            while written < STREAM_SIZE {
+                // We park here and wait for the receiver to unpark us so that
+                // we don't overwhelm the receive queue and cause the device to
+                // run out of memory.
+                ::std::thread::park();
+                stream.write_all(&buf).unwrap();
+                written += u32::try_from(buf.len()).unwrap();
+            }
+            stream.shutdown(Shutdown::Write).unwrap();
+            break;
+        }
+        ::core::hint::spin_loop();
+    });
+
+    // Submit and wait for the accept cqe to process.
+    ring.submit_and_wait(1)?;
+    let cqe = unsafe { ring.completion_shared() }.next().unwrap();
+    assert_eq!(cqe.user_data(), REQ_TYPE_ACCEPT);
+
+    {
+        assert!(cqe.result() >= 0);
+        let fd = cqe.result();
+        let mut squeue = unsafe { ring.submission_shared() };
+        let sqe = opcode::RecvZc::new(types::Fd(fd), STREAM_SIZE)
+            .ifq(reg.zcrx_id)
+            .build()
+            .user_data(REQ_TYPE_RX)
+            .into();
+        unsafe { squeue.push(&sqe) }?;
+    }
+
+    // Now process the received bytes.
+    let mut received = 0u32;
+    while received < STREAM_SIZE {
+        // Unpark the sender so we can receive more data.
+        conn.thread().unpark();
+
+        ring.submit_and_wait(1)?;
+
+        // Process the RecvZc cqe.
+        let cqe = unsafe { ring.completion_shared() }.next().unwrap();
+        assert_eq!(cqe.user_data(), REQ_TYPE_RX);
+        assert!(cqe.result() >= 0);
+        let len = cqe.result().cast_unsigned();
+
+        received += len;
+
+        // Get the rcqe from the extended cqe.
+        let rcqe = cqe.big_cqe().as_ptr().cast::<types::io_uring_zcrx_cqe>();
+        let rcqe = unsafe { &*rcqe };
+        let mask = (1 << types::IORING_ZCRX_AREA_SHIFT) - 1;
+
+        // Get the received data.
+        let data = unsafe { area_ptr.add(usize::try_from(rcqe.off & mask)?) };
+        let data = unsafe {
+            ::core::slice::from_raw_parts::<u8>(data.cast().as_ptr(), usize::try_from(len)?)
+        };
+
+        // Verify that the data matches what we expected.
+        for chunk in data.as_chunks().0 {
+            assert_eq!(chunk, DATA);
+        }
+
+        // Get the rqe and update its fields.
+        let rqe = {
+            let offset = usize::try_from(rq_ring.rq_tail & rq_mask)?;
+            let offset = unsafe { rq_ring.rqes.add(offset) };
+            unsafe { &mut *offset }
+        };
+        rqe.off = (rcqe.off & !types::IORING_ZCRX_AREA_MASK) | area_token;
+        rqe.len = len;
+
+        // Update and recycle rq ring buffers.
+        rq_ring.rq_tail += 1;
+        let ktail = rq_ring.ktail.cast::<AtomicU32>();
+        let ktail = unsafe { &*ktail };
+        ktail.store(rq_ring.rq_tail, atomic::Ordering::Release);
+    }
+
+    conn.join().unwrap();
+
+    Ok(())
+}
