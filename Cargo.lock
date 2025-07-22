@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "io-uring"
-version = "0.7.8"
+version = "0.7.9"
 dependencies = [
  "anyhow",
  "bindgen",
