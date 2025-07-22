@@ -1750,7 +1750,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     // Each one is 512 bytes large.
     const BUF_GROUP: u16 = 33;
     const SIZE: usize = 512;
-    let mut buffers = [[0u8; SIZE]; 3];
+    let mut buffers = [[0u8; SIZE]; 2];
     for (index, buf) in buffers.iter_mut().enumerate() {
         let provide_bufs_e = io_uring::opcode::ProvideBuffers::new(
             buf.as_mut_ptr(),
@@ -1828,9 +1828,9 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     // Check the completion events for the two UDP messages, plus a trailing
     // CQE signaling that we ran out of buffers.
-    ring.submitter().submit_and_wait(5).unwrap();
+    ring.submitter().submit_and_wait(6).unwrap();
     let cqes: Vec<io_uring::cqueue::Entry> = ring.completion().map(Into::into).collect();
-    assert_eq!(cqes.len(), 5);
+    assert_eq!(cqes.len(), 6);
     for cqe in cqes {
         let is_more = io_uring::cqueue::more(cqe.flags());
         match cqe.user_data() {
@@ -1848,9 +1848,8 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
                 }
             }
             // RecvMsgMulti
-            77 => {
-                assert!(cqe.result() > 0);
-                assert!(is_more);
+            77 if is_more => {
+                assert!(cqe.result() > 0, "{:?}", cqe.result());
                 let buf_id = io_uring::cqueue::buffer_select(cqe.flags()).unwrap();
                 let tmp_buf = &buffers[buf_id as usize];
                 let msg = types::RecvMsgOut::parse(tmp_buf, &msghdr).unwrap();
@@ -1871,6 +1870,10 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
                 let addr = addr.as_socket_ipv4().unwrap();
                 assert_eq!(addr.ip(), client_addr.ip());
                 assert_eq!(addr.port(), client_addr.port());
+            }
+            // RecvMsgMulti
+            77 => {
+                assert_eq!(cqe.result(), -105);
             }
             _ => {
                 unreachable!()
@@ -2262,11 +2265,12 @@ pub fn test_tcp_recvzc<S: squeue::EntryMarker>(test: &Test) -> anyhow::Result<()
         test.probe.is_supported(opcode::RecvZc::CODE);
     );
 
-    use ::anyhow::anyhow;
-    use ::core::sync::atomic::{self, AtomicU32};
-    use ::std::convert::TryFrom;
+    use anyhow::anyhow;
+    use std::convert::TryFrom;
+    use std::ptr::{self, NonNull};
+    use std::sync::atomic::{self, AtomicU32};
 
-    #[allow(missing_docs)]
+    #[allow(non_camel_case_types)]
     #[repr(C)]
     #[derive(Debug, Copy, Clone, Default)]
     #[non_exhaustive]
@@ -2304,41 +2308,41 @@ pub fn test_tcp_recvzc<S: squeue::EntryMarker>(test: &Test) -> anyhow::Result<()
         .build(8)?;
 
     // Create socket.
-    let socket = ::std::net::TcpListener::bind("127.0.0.1:9999")?;
-    let if_idx = unsafe { ::libc::if_nametoindex(if_name.as_ptr()) };
+    let socket = std::net::TcpListener::bind("127.0.0.1:9999")?;
+    let if_idx = unsafe { libc::if_nametoindex(if_name.as_ptr()) };
 
     let rq_entries = 4096u32;
-    let page_size = usize::try_from(unsafe { ::libc::sysconf(::libc::_SC_PAGESIZE) })?;
+    let page_size = usize::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?;
 
     // Create area pointer.
     let area_size = 8192 * page_size;
     let area_ptr = unsafe {
-        ::libc::mmap(
-            ::core::ptr::null_mut(),
+        libc::mmap(
+            ptr::null_mut(),
             area_size,
-            ::libc::PROT_READ | ::libc::PROT_WRITE,
-            ::libc::MAP_PRIVATE | ::libc::MAP_ANONYMOUS,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
             0,
             0,
         )
     };
-    let area_ptr = ::core::ptr::NonNull::new(area_ptr).ok_or_else(|| anyhow!("null pointer"))?;
+    let area_ptr = NonNull::new(area_ptr).ok_or_else(|| anyhow!("null pointer"))?;
 
     // Create ring pointer.
     let mut ring_size = usize::try_from(rq_entries)? * size_of::<types::io_uring_zcrx_rqe>();
     ring_size += page_size;
     ring_size = (ring_size + page_size - 1) & !(page_size - 1);
     let ring_ptr = unsafe {
-        ::libc::mmap(
-            ::core::ptr::null_mut(),
+        libc::mmap(
+            ptr::null_mut(),
             area_size,
-            ::libc::PROT_READ | ::libc::PROT_WRITE,
-            ::libc::MAP_PRIVATE | ::libc::MAP_ANONYMOUS,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
             0,
             0,
         )
     };
-    let ring_ptr = ::core::ptr::NonNull::new(ring_ptr).ok_or_else(|| anyhow!("null pointer"))?;
+    let ring_ptr = NonNull::new(ring_ptr).ok_or_else(|| anyhow!("null pointer"))?;
 
     // Create region desc.
     let mut region_reg = types::io_uring_region_desc::default();
@@ -2356,8 +2360,8 @@ pub fn test_tcp_recvzc<S: squeue::EntryMarker>(test: &Test) -> anyhow::Result<()
     reg.if_idx = if_idx;
     reg.if_rxq = if_rxq;
     reg.rq_entries = rq_entries;
-    reg.area_ptr = ::core::ptr::from_mut(&mut area_reg).addr().try_into()?;
-    reg.region_ptr = ::core::ptr::from_mut(&mut region_reg).addr().try_into()?;
+    reg.area_ptr = ptr::from_mut(&mut area_reg).addr().try_into()?;
+    reg.region_ptr = ptr::from_mut(&mut region_reg).addr().try_into()?;
 
     // Register ifq.
     ring.submitter().register_ifq(&reg)?;
@@ -2382,8 +2386,8 @@ pub fn test_tcp_recvzc<S: squeue::EntryMarker>(test: &Test) -> anyhow::Result<()
     // Submit the accept op.
     let sqe = opcode::Accept::new(
         types::Fd(socket.as_raw_fd()),
-        ::core::ptr::null_mut(),
-        ::core::ptr::null_mut(),
+        ptr::null_mut(),
+        ptr::null_mut(),
     )
     .build()
     .user_data(REQ_TYPE_ACCEPT)
@@ -2392,24 +2396,24 @@ pub fn test_tcp_recvzc<S: squeue::EntryMarker>(test: &Test) -> anyhow::Result<()
 
     // Spawn the send thread.
     let conn = ::std::thread::spawn(|| loop {
-        if let Ok(mut stream) = ::std::net::TcpStream::connect("127.0.0.1:9999") {
+        if let Ok(mut stream) = std::net::TcpStream::connect("127.0.0.1:9999") {
             let mut buf = vec![];
-            for slice in std::iter::repeat_n(DATA, 64) {
-                buf.extend(slice);
+            for _ in 0..64 {
+                buf.extend(DATA);
             }
             let mut written = 0u32;
             while written < STREAM_SIZE {
                 // We park here and wait for the receiver to unpark us so that
                 // we don't overwhelm the receive queue and cause the device to
                 // run out of memory.
-                ::std::thread::park();
+                std::thread::park();
                 stream.write_all(&buf).unwrap();
                 written += u32::try_from(buf.len()).unwrap();
             }
             stream.shutdown(Shutdown::Write).unwrap();
             break;
         }
-        ::core::hint::spin_loop();
+        core::hint::spin_loop();
     });
 
     // Submit and wait for the accept cqe to process.
@@ -2453,7 +2457,7 @@ pub fn test_tcp_recvzc<S: squeue::EntryMarker>(test: &Test) -> anyhow::Result<()
         // Get the received data.
         let data = unsafe { area_ptr.add(usize::try_from(rcqe.off & mask)?) };
         let data = unsafe {
-            ::core::slice::from_raw_parts::<u8>(data.cast().as_ptr(), usize::try_from(len)?)
+            core::slice::from_raw_parts::<u8>(data.cast().as_ptr(), usize::try_from(len)?)
         };
 
         // Verify that the data matches what we expected.
