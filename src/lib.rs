@@ -602,6 +602,11 @@ impl Parameters {
         self.0.sq_entries
     }
 
+    /// The idle time of the SQ poll thread in milliseconds.
+    pub fn sq_thread_idle(&self) -> u32 {
+        self.0.sq_thread_idle
+    }
+
     /// The number of completion queue entries allocated.
     pub fn cq_entries(&self) -> u32 {
         self.0.cq_entries

@@ -286,6 +286,7 @@ dependencies = [
  "sc",
  "slab",
  "socket2",
+ "tempfile",
 ]
 
 [[package]]
