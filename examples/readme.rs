@@ -1,3 +1,4 @@
+use io_uring::cqueue::EntryMarker;
 use io_uring::{opcode, types, IoUring};
 use std::os::unix::io::AsRawFd;
 use std::{fs, io};
@@ -16,7 +17,7 @@ fn main() -> io::Result<()> {
     // that the entry pushed into submission queue is valid (e.g. fd, buffer).
     unsafe {
         ring.submission()
-            .push(&read_e)
+            .push(read_e)
             .expect("submission queue is full");
     }
 
