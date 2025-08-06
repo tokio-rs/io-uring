@@ -38,20 +38,24 @@ pub fn test_sqpoll_cq_overflow<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // Create test files for I/O operations
     let test_files = create_test_files(test_dir, num_requests);
-
-    let mut buf = vec![0u8; 1024];
+    let mut bufs = (0..num_requests)
+        .map(|_| vec![0u8; 1024])
+        .collect::<Vec<_>>();
 
     let start = std::time::Instant::now();
 
-    test_files.iter().for_each(|file| {
-        let fd = file.as_raw_fd();
-        let entry = opcode::Read::new(types::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
-            .build()
-            .into();
-        while unsafe { ring.submission().push(&entry).is_err() } {
-            ring.submit().expect("Failed to submit");
-        }
-    });
+    test_files
+        .iter()
+        .zip(bufs.iter_mut())
+        .for_each(|(file, buf)| {
+            let fd = file.as_raw_fd();
+            let entry = opcode::Read::new(types::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
+                .build()
+                .into();
+            while unsafe { ring.submission().push(&entry).is_err() } {
+                ring.submit().expect("Failed to submit");
+            }
+        });
 
     let mut completed_count = 0;
     // Try to collect all completions
