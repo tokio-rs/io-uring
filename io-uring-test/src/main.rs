@@ -171,6 +171,9 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::poll::test_eventfd_poll_remove_failed(&mut ring, &test)?;
     tests::poll::test_eventfd_poll_multi(&mut ring, &test)?;
 
+    // pipe
+    tests::pipe::test_pipe(&mut ring, &test)?;
+
     // futex
     tests::futex::test_futex_wait(&mut ring, &test)?;
     tests::futex::test_futex_wake(&mut ring, &test)?;
