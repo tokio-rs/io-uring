@@ -123,7 +123,18 @@ impl<'a> Submitter<'a> {
         // the IORING_ENTER_SQ_WAKEUP bit is required in all paths where sqpoll
         // is setup when consolidating the reads.
 
-        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow() {
+        let sq_cq_overflow = self.sq_cq_overflow();
+
+        // When IORING_FEAT_NODROP is enabled and CQ overflows, the kernel buffers
+        // completion events internally but doesn't automatically flush them when
+        // CQ space becomes available. We must explicitly call io_uring_enter()
+        // to flush these buffered events, even with SQPOLL enabled.
+        //
+        // Without this, completions remain stuck in kernel's internal buffer
+        // after draining CQ, causing missing completion notifications.
+        let need_syscall_for_overflow = sq_cq_overflow && self.params.is_feature_nodrop();
+
+        if want > 0 || self.params.is_setup_iopoll() || sq_cq_overflow {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
@@ -132,9 +143,12 @@ impl<'a> Submitter<'a> {
             atomic::fence(atomic::Ordering::SeqCst);
             if self.sq_need_wakeup() {
                 flags |= sys::IORING_ENTER_SQ_WAKEUP;
-            } else if want == 0 {
+            } else if want == 0 && !need_syscall_for_overflow {
                 // The kernel thread is polling and hasn't fallen asleep, so we don't need to tell
                 // it to process events or wake it up
+
+                // However, if the CQ ring is overflown, we need to tell the kernel to process events
+                // by calling io_uring_enter with the IORING_ENTER_GETEVENTS flag.
                 return Ok(len);
             }
         }
@@ -155,7 +169,10 @@ impl<'a> Submitter<'a> {
         let len = self.sq_len();
         let mut flags = sys::IORING_ENTER_EXT_ARG;
 
-        if want > 0 || self.params.is_setup_iopoll() || self.sq_cq_overflow() {
+        let sq_cq_overflow = self.sq_cq_overflow();
+        let need_syscall = sq_cq_overflow & self.params.is_feature_nodrop();
+
+        if want > 0 || self.params.is_setup_iopoll() || sq_cq_overflow {
             flags |= sys::IORING_ENTER_GETEVENTS;
         }
 
@@ -164,7 +181,7 @@ impl<'a> Submitter<'a> {
             atomic::fence(atomic::Ordering::SeqCst);
             if self.sq_need_wakeup() {
                 flags |= sys::IORING_ENTER_SQ_WAKEUP;
-            } else if want == 0 {
+            } else if want == 0 && !need_syscall {
                 // The kernel thread is polling and hasn't fallen asleep, so we don't need to tell
                 // it to process events or wake it up
                 return Ok(len);
