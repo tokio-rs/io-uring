@@ -36,4 +36,3 @@ bindgen = { version = "0.69", optional = true }
 anyhow = "1"
 socket2 = "0.5"
 slab = "0.4"
-tempfile = "3"
