@@ -2,6 +2,7 @@
 mod utils;
 mod tests;
 
+use anyhow::Context;
 use io_uring::{cqueue, squeue, IoUring, Probe};
 use std::cell::Cell;
 
@@ -9,6 +10,20 @@ pub struct Test {
     probe: Probe,
     target: Option<String>,
     count: Cell<usize>,
+    event_fd: libc::c_int,
+}
+
+impl Test {
+    /// Reset the eventfd counter, this can be used to prevent
+    /// previous operations affecting the test.
+    fn reset_eventfd_counter(&self) {
+        // Reset the event fd state without blocking.
+        unsafe {
+            let _ = libc::eventfd_write(self.event_fd, 1);
+            let mut val: u64 = 0;
+            let _ = libc::eventfd_read(self.event_fd, (&mut val) as *mut _);
+        };
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -64,8 +79,18 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("probe: {:?}", probe);
     println!();
 
+    // Used for waiting on events, this is more reliable for CI & general use cases
+    // than doing a full event loop.
+    // Since this is just for testing, we don't really need to close the event fd explicitly,
+    // it'll just be cleaned up at the end.
+    let event_fd = unsafe { libc::eventfd(0, 0) };
+    ring.submitter()
+        .register_eventfd(event_fd)
+        .context("register event fd")?;
+
     let test = Test {
         probe,
+        event_fd,
         target: std::env::args().nth(1),
         count: Cell::new(0),
     };
@@ -80,6 +105,8 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // register
     tests::register::test_register_files_sparse(&mut ring, &test)?;
+    tests::register::test_register_files_tags(&mut ring, &test)?;
+    tests::register::test_register_files_update_tag(&mut ring, &test)?;
     tests::register_buffers::test_register_buffers(&mut ring, &test)?;
     tests::register_buffers::test_register_buffers_update(&mut ring, &test)?;
     tests::register_buf_ring::test_register_buf_ring(&mut ring, &test)?;
