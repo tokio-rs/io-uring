@@ -589,6 +589,7 @@ impl<'a> Submitter<'a> {
         ring_addr: u64,
         ring_entries: u16,
         bgid: u16,
+        flags: u16,
     ) -> io::Result<()> {
         // The interface type for ring_entries is u32 but the same interface only allows a u16 for
         // the tail to be specified, so to try and avoid further confusion, we limit the
@@ -598,6 +599,7 @@ impl<'a> Submitter<'a> {
             ring_addr,
             ring_entries: ring_entries as _,
             bgid,
+            flags,
             ..Default::default()
         };
         execute(

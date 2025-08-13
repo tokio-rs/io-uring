@@ -16,6 +16,7 @@ use std::sync::atomic::{self, AtomicU16};
 
 type Bgid = u16; // Buffer group id
 type Bid = u16; // Buffer id
+type RegisterFlags = u16; // Buffer register flags
 
 /// An anonymous region of memory mapped using `mmap(2)`, not backed by a file
 /// but that is guaranteed to be page-aligned and zero-filled.
@@ -114,6 +115,9 @@ pub(crate) struct InnerBufRing {
     // value from time to time. The address could be computed from ring_start when needed. This
     // might be here for no good reason any more.
     shared_tail: *const AtomicU16,
+
+    // Buffer register flags
+    flags: RegisterFlags,
 }
 
 impl InnerBufRing {
@@ -122,6 +126,7 @@ impl InnerBufRing {
         ring_entries: u16,
         buf_cnt: u16,
         buf_len: usize,
+        flags: RegisterFlags,
     ) -> io::Result<InnerBufRing> {
         // Check that none of the important args are zero and the ring_entries is at least large
         // enough to hold all the buffers and that ring_entries is a power of 2.
@@ -169,6 +174,7 @@ impl InnerBufRing {
             buf_list,
             local_tail: Cell::new(0),
             shared_tail,
+            flags,
         };
 
         Ok(buf_ring)
@@ -184,6 +190,7 @@ impl InnerBufRing {
         C: cqueue::EntryMarker,
     {
         let bgid = self.bgid;
+        let flags = self.flags;
 
         // Safety: The ring, represented by the ring_start and the ring_entries remains valid until
         // it is unregistered. The backing store is an AnonymousMmap which remains valid until it
@@ -193,6 +200,7 @@ impl InnerBufRing {
                 self.ring_start.as_ptr() as _,
                 self.ring_entries(),
                 bgid,
+                flags,
             )
         };
 
@@ -367,6 +375,7 @@ pub(crate) struct Builder {
     ring_entries: u16,
     buf_cnt: u16,
     buf_len: usize,
+    flags: RegisterFlags,
 }
 
 impl Builder {
@@ -383,7 +392,13 @@ impl Builder {
             ring_entries: 128,
             buf_cnt: 0, // 0 indicates buf_cnt is taken from ring_entries
             buf_len: 4096,
+            flags: 0,
         }
+    }
+    // Set the flags to use when registering the buffer ring
+    pub(crate) fn register_flags(mut self, flags: RegisterFlags) -> Builder {
+        self.flags = flags;
+        self
     }
 
     // The number of ring entries to create for the buffer ring.
@@ -433,7 +448,7 @@ impl Builder {
         // wrap calculation trivial.
         b.ring_entries = b.ring_entries.next_power_of_two();
 
-        let inner = InnerBufRing::new(b.bgid, b.ring_entries, b.buf_cnt, b.buf_len)?;
+        let inner = InnerBufRing::new(b.bgid, b.ring_entries, b.buf_cnt, b.buf_len, b.flags)?;
         Ok(FixedSizeBufRing::new(inner))
     }
 }
