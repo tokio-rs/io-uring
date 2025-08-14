@@ -584,7 +584,31 @@ impl<'a> Submitter<'a> {
     /// Developers must ensure that the `ring_addr` and its length represented by `ring_entries`
     /// are valid and will be valid until the bgid is unregistered or the ring destroyed,
     /// otherwise undefined behaviour may occur.
+    #[deprecated(note = "please use `register_buf_ring_with_flags` instead")]
     pub unsafe fn register_buf_ring(
+        &self,
+        ring_addr: u64,
+        ring_entries: u16,
+        bgid: u16,
+    ) -> io::Result<()> {
+        self.register_buf_ring_with_flags(ring_addr, ring_entries, bgid, 0)
+    }
+
+    /// Register buffer ring for provided buffers.
+    ///
+    /// Details can be found in the io_uring_register_buf_ring.3 man page.
+    ///
+    /// If the register command is not supported, or the ring_entries value exceeds
+    /// 32768, the InvalidInput error is returned.
+    ///
+    /// Available since 5.19.
+    ///
+    /// # Safety
+    ///
+    /// Developers must ensure that the `ring_addr` and its length represented by `ring_entries`
+    /// are valid and will be valid until the bgid is unregistered or the ring destroyed,
+    /// otherwise undefined behaviour may occur.
+    pub unsafe fn register_buf_ring_with_flags(
         &self,
         ring_addr: u64,
         ring_entries: u16,
