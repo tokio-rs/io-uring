@@ -26,6 +26,13 @@ pub struct Submitter<'a> {
     sq_flags: *const atomic::AtomicU32,
 }
 
+/// SAFETY: there isn't anyhting thread-local about submission that would make Send memory unsafe.
+/// (We do not attempt to model `IORING_SETUP_SINGLE_ISSUER` in the type system.)
+unsafe impl<'a> Send for Submitter<'a> {}
+/// SAFETY: [`Submitter`] methods do not manipulate any state themselves (the kernel might do that,
+/// during io_uring_enter, but that's orthogonal to this unsafe impl).
+unsafe impl<'a> Sync for Submitter<'a> {}
+
 impl<'a> Submitter<'a> {
     #[inline]
     pub(crate) const fn new(
