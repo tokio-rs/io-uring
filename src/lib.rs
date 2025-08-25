@@ -2,6 +2,46 @@
 //!
 //! The crate only provides a summary of the parameters.
 //! For more detailed documentation, see manpage.
+//!
+//! ## Supported Architectures
+//!
+//! ### Default Support
+//!
+//! The following architectures are supported by default with prebuilt bindings:
+//!
+//! * `x86_64`
+//! * `aarch64`
+//! * `riscv64`
+//! * `loongarch64`
+//! * `powerpc64`
+//!
+//! ### Custom Bindings for Unsupported Architectures
+//!
+//! If you need to build for a target architecture that is not supported by default, you have two options:
+//!
+//! **Option 1: Use the `bindgen` feature**
+//!
+//! ```toml
+//! [dependencies]
+//! io-uring = { version = "0.7", features = ["bindgen"] }
+//! ```
+//!
+//! This will generate bindings at build time for your specific architecture.
+//!
+//! **Option 2: Use your own bindings with `io_uring_use_own_sys`**
+//!
+//! If you have custom bindings that you want to use:
+//!
+//! 1. Generate or obtain the appropriate `sys.rs` bindings for your target architecture
+//! 2. Set the `IO_URING_OWN_SYS_BINDING` environment variable to point to your binding file
+//! 3. Build with the `io_uring_use_own_sys` cfg flag:
+//!
+//! ```bash
+//! export IO_URING_OWN_SYS_BINDING=/path/to/your/custom/sys.rs
+//! cargo build --cfg io_uring_use_own_sys
+//! ```
+//!
+//! This approach allows you to provide your own bindings without relying on bindgen or the prebuilt bindings.
 
 #[macro_use]
 mod util;
