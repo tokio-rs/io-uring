@@ -178,7 +178,7 @@ pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     .user_data(REQ_TYPE_WRITE_BYTES1)
     .into();
     unsafe { ring.submission().push_multiple(&[sqe_write0, sqe_write1]) }?;
-    ring.submit_and_wait(1)?;
+    ring.submit_and_wait(4)?;
 
     // Process two write/read pairs. Fills the first and second buffer in the ring.
 
