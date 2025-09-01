@@ -18,11 +18,15 @@ use libc::*;
 #[cfg(all(
     not(feature = "bindgen"),
     not(any(
-        target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "riscv64",
+        target_arch = "arm",
         target_arch = "loongarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc",
+        target_arch = "powerpc64",
+        target_arch = "riscv64",
+        target_arch = "s390x",
+        target_arch = "x86_64",
+        target_arch = "x86",
     )),
     not(io_uring_skip_arch_check)
 ))]

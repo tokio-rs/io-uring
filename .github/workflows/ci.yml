@@ -69,9 +69,15 @@ jobs:
         toolchain:
           - stable
         target:
-          - riscv64gc-unknown-linux-gnu
+          - arm-unknown-linux-gnueabi
+          - arm-unknown-linux-gnueabihf
+          - armv7-unknown-linux-gnueabihf
           - loongarch64-unknown-linux-gnu
+          - powerpc-unknown-linux-gnu
           - powerpc64-unknown-linux-gnu
+          - powerpc64le-unknown-linux-gnu
+          - riscv64gc-unknown-linux-gnu
+          - s390x-unknown-linux-gnu
 
     steps:
       - uses: actions/checkout@v4
@@ -106,8 +112,6 @@ jobs:
           components: clippy
           override: true
       - name: Lint
-        env:
-          RUSTFLAGS: --cfg=io_uring_skip_arch_check
         run: cargo clippy --target ${{ matrix.target }}
 
   check-own:
