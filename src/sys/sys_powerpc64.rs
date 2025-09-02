@@ -280,7 +280,6 @@ fn bindgen_test_layout_open_how() {
         )
     );
 }
-pub type __kernel_rwf_t = libc::c_int;
 #[repr(C)]
 pub struct io_uring_sqe {
     pub opcode: __u8,
@@ -500,7 +499,7 @@ impl Default for io_uring_sqe__bindgen_ty_2 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union io_uring_sqe__bindgen_ty_3 {
-    pub rw_flags: __kernel_rwf_t,
+    pub rw_flags: __u32,
     pub fsync_flags: __u32,
     pub poll_events: __u16,
     pub poll32_events: __u32,
