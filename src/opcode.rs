@@ -131,7 +131,7 @@ opcode! {
         offset: u64 = 0,
         /// specified for read operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
-        rw_flags: types::RwFlags = 0,
+        rw_flags: i32 = 0,
         buf_group: u16 = 0
     }
 
@@ -152,7 +152,7 @@ opcode! {
         sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset;
-        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
@@ -170,7 +170,7 @@ opcode! {
         offset: u64 = 0,
         /// specified for write operations, contains a bitwise OR of per-I/O flags,
         /// as described in the `preadv2(2)` man page.
-        rw_flags: types::RwFlags = 0
+        rw_flags: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_WRITEV;
@@ -189,7 +189,7 @@ opcode! {
         sqe.__bindgen_anon_2.addr = iovec as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset;
-        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
         Entry(sqe)
     }
 }
@@ -243,7 +243,7 @@ opcode! {
         offset: u64 = 0,
         /// Specified for read operations, contains a bitwise OR of per-I/O flags, as described in
         /// the `preadv2(2)` man page.
-        rw_flags: types::RwFlags = 0
+        rw_flags: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_READ_FIXED;
@@ -263,7 +263,7 @@ opcode! {
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset;
-        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
@@ -286,7 +286,7 @@ opcode! {
         offset: u64 = 0,
         /// Specified for write operations, contains a bitwise OR of per-I/O flags, as described in
         /// the `pwritev2(2)` man page.
-        rw_flags: types::RwFlags = 0
+        rw_flags: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_WRITE_FIXED;
@@ -306,7 +306,7 @@ opcode! {
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset;
-        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         Entry(sqe)
     }
@@ -904,7 +904,7 @@ opcode! {
         /// like the `read(2)` and `write(2)` system calls.
         offset: u64 = 0,
         ioprio: u16 = 0,
-        rw_flags: types::RwFlags = 0,
+        rw_flags: i32 = 0,
         buf_group: u16 = 0
     }
 
@@ -925,7 +925,7 @@ opcode! {
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset;
-        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
@@ -954,7 +954,7 @@ opcode! {
         /// like the `read(2)` and `write(2)` system calls.
         offset: u64 = 0,
         ioprio: u16 = 0,
-        rw_flags: types::RwFlags = 0
+        rw_flags: i32 = 0
     }
 
     pub const CODE = sys::IORING_OP_WRITE;
@@ -973,7 +973,7 @@ opcode! {
         sqe.__bindgen_anon_2.addr = buf as _;
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset;
-        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
         Entry(sqe)
     }
 }
@@ -1717,7 +1717,7 @@ opcode! {
         protocol: { i32 },
         ;;
         file_index: Option<types::DestinationSlot> = None,
-        flags: types::RwFlags = 0,
+        flags: i32 = 0,
     }
 
     pub const CODE = sys::IORING_OP_SOCKET;
@@ -1730,7 +1730,7 @@ opcode! {
         sqe.fd = domain as _;
         sqe.__bindgen_anon_1.off = socket_type as _;
         sqe.len = protocol as _;
-        sqe.__bindgen_anon_3.rw_flags = flags;
+        sqe.__bindgen_anon_3.rw_flags = flags as _;
         if let Some(dest) = file_index {
             sqe.__bindgen_anon_5.file_index = dest.kernel_index_arg();
         }
@@ -2321,7 +2321,7 @@ opcode! {
         sqe.len = len;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         sqe.ioprio = ioprio;
-        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
         Entry(sqe)
     }
 }
@@ -2352,7 +2352,7 @@ opcode! {
         sqe.len = len;
         sqe.__bindgen_anon_4.buf_index = buf_index;
         sqe.ioprio = ioprio;
-        sqe.__bindgen_anon_3.rw_flags = rw_flags;
+        sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
         Entry(sqe)
     }
 }
