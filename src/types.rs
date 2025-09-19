@@ -239,6 +239,7 @@ impl From<std::time::Duration> for Timespec {
 ///
 /// drop(args);
 /// ```
+#[repr(transparent)]
 #[derive(Default, Debug, Clone, Copy)]
 pub struct SubmitArgs<'prev: 'now, 'now> {
     pub(crate) args: sys::io_uring_getevents_arg,
