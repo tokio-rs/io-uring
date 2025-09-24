@@ -220,7 +220,7 @@ impl<'a> Submitter<'a> {
             }
         }
 
-        unsafe { self.enter(len as _, want as _, flags.bits(), Some(&args.args)) }
+        unsafe { self.enter(len as _, want as _, flags.bits(), Some(args)) }
     }
 
     /// Wait for the submission queue to have free entries.
