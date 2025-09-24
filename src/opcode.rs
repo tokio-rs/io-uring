@@ -2023,7 +2023,7 @@ opcode! {
         id: { libc::id_t },
         options: { libc::c_int },
         ;;
-        infop: *const libc::siginfo_t = std::ptr::null(),
+        infop: *mut libc::siginfo_t = std::ptr::null_mut(),
         flags: libc::c_uint = 0,
     }
 
