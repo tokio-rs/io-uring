@@ -19,7 +19,11 @@ pub fn test_waitid<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         .stderr(Stdio::null())
         .spawn()?;
 
-    let waitid_e = opcode::WaitId::new(libc::P_PID, child.id(), libc::WEXITED);
+    let infop_default = unsafe { core::mem::zeroed::<libc::siginfo_t>() };
+    let mut infop = infop_default;
+
+    let waitid_e =
+        opcode::WaitId::new(libc::P_PID, child.id(), libc::WEXITED).infop(&raw mut infop);
 
     unsafe {
         let mut sq = ring.submission();
@@ -41,6 +45,7 @@ pub fn test_waitid<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x110);
     assert_eq!(cqes[0].result(), 0);
+    assert_ne!(infop, infop_default);
 
     Ok(())
 }
