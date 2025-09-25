@@ -7,10 +7,42 @@ use crate::sys;
 use crate::types::{CancelBuilder, Timespec};
 use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
+use bitflags::bitflags;
 
 use crate::register::Restriction;
 
 use crate::types;
+
+bitflags!(
+    /// See man page for complete description:
+    /// https://man7.org/linux/man-pages/man2/io_uring_enter.2.html
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct EnterFlags: u32 {
+        /// Wait for at least `min_complete` events to complete.
+        const GETEVENTS = sys::IORING_ENTER_GETEVENTS;
+
+        /// If the kernel thread is sleeping, wake it up.
+        const SQ_WAKEUP = sys::IORING_ENTER_SQ_WAKEUP;
+
+        /// Wait for at least one submission queue entry to be available.
+        const SQ_WAIT = sys::IORING_ENTER_SQ_WAIT;
+
+        /// Use the extended argument structure.
+        const EXT_ARG = sys::IORING_ENTER_EXT_ARG;
+
+        /// Submit using registered submission queue ring.
+        const REGISTERED_RING = sys::IORING_ENTER_REGISTERED_RING;
+
+        /// Timeout argument interpreted as absolute time.
+        const ABS_TIMER = sys::IORING_ENTER_ABS_TIMER;
+
+        /// Arg is offset into an area of wait regions previously registered.
+        const EXT_ARG_REG = sys::IORING_ENTER_EXT_ARG_REG;
+
+        /// Don't mark waiting task as being in iowait in certain cases.
+        const NO_IOWAIT = sys::IORING_ENTER_NO_IOWAIT;
+    }
+);
 
 /// Interface for submitting submission queue events in an io_uring instance to the kernel for
 /// executing and registering files or buffers with the instance.
@@ -113,7 +145,7 @@ impl<'a> Submitter<'a> {
     /// completion events to complete.
     pub fn submit_and_wait(&self, want: usize) -> io::Result<usize> {
         let len = self.sq_len();
-        let mut flags = 0;
+        let mut flags = EnterFlags::empty();
 
         // This logic suffers from the fact the sq_cq_overflow and sq_need_wakeup
         // each cause an atomic load of the same variable, self.sq_flags.
@@ -135,14 +167,14 @@ impl<'a> Submitter<'a> {
         let need_syscall_for_overflow = sq_cq_overflow && self.params.is_feature_nodrop();
 
         if want > 0 || self.params.is_setup_iopoll() || sq_cq_overflow {
-            flags |= sys::IORING_ENTER_GETEVENTS;
+            flags.insert(EnterFlags::GETEVENTS);
         }
 
         if self.params.is_setup_sqpoll() {
             // See discussion in [`SubmissionQueue::need_wakeup`].
             atomic::fence(atomic::Ordering::SeqCst);
             if self.sq_need_wakeup() {
-                flags |= sys::IORING_ENTER_SQ_WAKEUP;
+                flags.insert(EnterFlags::SQ_WAKEUP);
             } else if want == 0 && !need_syscall_for_overflow {
                 // The kernel thread is polling and hasn't fallen asleep, so we don't need to tell
                 // it to process events or wake it up
@@ -153,7 +185,7 @@ impl<'a> Submitter<'a> {
             }
         }
 
-        unsafe { self.enter::<libc::sigset_t>(len as _, want as _, flags, None) }
+        unsafe { self.enter::<libc::sigset_t>(len as _, want as _, flags.bits(), None) }
     }
 
     /// Submit all queued submission queue events to the kernel and wait for at least `want`
@@ -167,20 +199,20 @@ impl<'a> Submitter<'a> {
         args: &types::SubmitArgs<'_, '_>,
     ) -> io::Result<usize> {
         let len = self.sq_len();
-        let mut flags = sys::IORING_ENTER_EXT_ARG;
+        let mut flags = EnterFlags::EXT_ARG;
 
         let sq_cq_overflow = self.sq_cq_overflow();
         let need_syscall = sq_cq_overflow & self.params.is_feature_nodrop();
 
         if want > 0 || self.params.is_setup_iopoll() || sq_cq_overflow {
-            flags |= sys::IORING_ENTER_GETEVENTS;
+            flags.insert(EnterFlags::GETEVENTS);
         }
 
         if self.params.is_setup_sqpoll() {
             // See discussion in [`SubmissionQueue::need_wakeup`].
             atomic::fence(atomic::Ordering::SeqCst);
             if self.sq_need_wakeup() {
-                flags |= sys::IORING_ENTER_SQ_WAKEUP;
+                flags.insert(EnterFlags::SQ_WAKEUP);
             } else if want == 0 && !need_syscall {
                 // The kernel thread is polling and hasn't fallen asleep, so we don't need to tell
                 // it to process events or wake it up
@@ -188,12 +220,12 @@ impl<'a> Submitter<'a> {
             }
         }
 
-        unsafe { self.enter(len as _, want as _, flags, Some(args)) }
+        unsafe { self.enter(len as _, want as _, flags.bits(), Some(args)) }
     }
 
     /// Wait for the submission queue to have free entries.
     pub fn squeue_wait(&self) -> io::Result<usize> {
-        unsafe { self.enter::<libc::sigset_t>(0, 0, sys::IORING_ENTER_SQ_WAIT, None) }
+        unsafe { self.enter::<libc::sigset_t>(0, 0, EnterFlags::SQ_WAIT.bits(), None) }
     }
 
     /// Register in-memory fixed buffers for I/O with the kernel. You can use these buffers with the
