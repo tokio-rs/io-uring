@@ -64,6 +64,7 @@ use std::os::unix::io::{AsFd, BorrowedFd};
 pub use cqueue::CompletionQueue;
 pub use register::Probe;
 pub use squeue::SubmissionQueue;
+pub use submit::EnterFlags;
 pub use submit::Submitter;
 use util::{Mmap, OwnedFd};
 
