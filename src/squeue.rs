@@ -328,6 +328,13 @@ impl Entry {
         self
     }
 
+    /// Clear the submission event's [flags](Flags).
+    #[inline]
+    pub fn clear_flags(mut self) -> Entry {
+        self.0.flags = 0;
+        self
+    }
+
     /// Set the user data. This is an application-supplied value that will be passed straight
     /// through into the [completion queue entry](crate::cqueue::Entry::user_data).
     #[inline]
@@ -379,6 +386,13 @@ impl Entry128 {
     #[inline]
     pub fn flags(mut self, flags: Flags) -> Entry128 {
         self.0 .0.flags |= flags.bits();
+        self
+    }
+
+    /// Clear the submission event's [flags](Flags).
+    #[inline]
+    pub fn clear_flags(mut self) -> Entry128 {
+        self.0 .0.flags = 0;
         self
     }
 
