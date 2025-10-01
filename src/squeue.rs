@@ -342,6 +342,12 @@ impl Entry {
         self.0.user_data
     }
 
+    /// Get the opcode associated with this entry.
+    #[inline]
+    pub fn get_opcode(&self) -> u32 {
+        self.0.opcode.into()
+    }
+
     /// Set the personality of this event. You can obtain a personality using
     /// [`Submitter::register_personality`](crate::Submitter::register_personality).
     pub fn personality(mut self, personality: u16) -> Entry {
@@ -396,6 +402,12 @@ impl Entry128 {
     pub fn personality(mut self, personality: u16) -> Entry128 {
         self.0 .0.personality = personality;
         self
+    }
+
+    /// Get the opcode associated with this entry.
+    #[inline]
+    pub fn get_opcode(&self) -> u32 {
+        self.0 .0.opcode.into()
     }
 }
 
