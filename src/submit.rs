@@ -377,14 +377,47 @@ impl<'a> Submitter<'a> {
     /// Each fd may be -1, in which case it is considered "sparse", and can be filled in later with
     /// [`register_files_update`](Self::register_files_update).
     ///
-    /// Note that this will wait for the ring to idle; it will only return once all active requests
-    /// are complete. Use [`register_files_update`](Self::register_files_update) to avoid this.
+    /// Note that before 5.13 registering buffers would wait for the ring to idle.  
+    /// If the application currently has requests in-flight, the registration will
+    /// wait for those to finish before proceeding.
+    ///
+    /// You can use [`register_files_update`](Self::register_files_update) to execute
+    /// this operation asynchronously.
     pub fn register_files(&self, fds: &[RawFd]) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
             sys::IORING_REGISTER_FILES,
             fds.as_ptr().cast(),
             fds.len() as _,
+        )
+        .map(drop)
+    }
+
+    /// Variant of [`register_files`](Self::register_files)
+    /// with resource tagging.
+    ///
+    /// Each fd may be -1, in which case it is considered "sparse", and can be filled in later with
+    /// [`register_files_update`](Self::register_files_update).
+    ///
+    /// `tags` should be the same length as `fds` and contain the
+    /// tag value corresponding to the file descriptor at the same index.
+    ///
+    /// See [`register_buffers2`](Self::register_buffers2)
+    /// for more information about resource tagging.
+    ///
+    /// Available since Linux 5.13.
+    pub fn register_files_tags(&self, fds: &[RawFd], tags: &[u64]) -> io::Result<()> {
+        let rr = sys::io_uring_rsrc_register {
+            nr: fds.len().min(tags.len()) as _,
+            data: fds.as_ptr() as _,
+            tags: tags.as_ptr() as _,
+            ..Default::default()
+        };
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_FILES2,
+            cast_ptr::<sys::io_uring_rsrc_register>(&rr).cast(),
+            mem::size_of::<sys::io_uring_rsrc_register>() as _,
         )
         .map(drop)
     }
@@ -409,6 +442,38 @@ impl<'a> Submitter<'a> {
             fds.len() as _,
         )?;
         Ok(ret as _)
+    }
+
+    /// Variant of [`register_files_update`](Self::register_files_update)
+    /// with resource tagging.
+    ///
+    /// `tags` should be the same length as `fds` and contain the
+    /// tag value corresponding to the file descriptor at the same index.
+    ///
+    /// See [`register_buffers2`](Self::register_buffers2)
+    /// for more information about resource tagging.
+    ///
+    /// Available since Linux 5.13.
+    pub fn register_files_update_tag(
+        &self,
+        offset: u32,
+        fds: &[RawFd],
+        tags: &[u64],
+    ) -> io::Result<()> {
+        let rr = sys::io_uring_rsrc_update2 {
+            offset,
+            nr: fds.len().min(tags.len()) as _,
+            data: fds.as_ptr() as _,
+            tags: tags.as_ptr() as _,
+            ..Default::default()
+        };
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_FILES_UPDATE2,
+            cast_ptr::<sys::io_uring_rsrc_update2>(&rr).cast(),
+            mem::size_of::<sys::io_uring_rsrc_update2>() as _,
+        )
+        .map(drop)
     }
 
     /// Register an eventfd created by [`eventfd`](libc::eventfd) with the io_uring instance.
