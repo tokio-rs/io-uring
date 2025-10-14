@@ -1,6 +1,6 @@
 use crate::Test;
 use io_uring::{
-    cqueue,
+    cqueue::{self, EntryMarker},
     opcode::{ReadFixed, WriteFixed},
     squeue,
     types::Fd,
@@ -121,7 +121,7 @@ fn _test_register_buffers<
         // Safety: We have guaranteed that the buffers in `slices` are all valid for the entire
         // duration of this function
         unsafe {
-            submission_queue.push(&write_entry.into()).unwrap();
+            submission_queue.push(write_entry.into()).unwrap();
         }
     });
 
@@ -159,7 +159,7 @@ fn _test_register_buffers<
         // Safety: We have guaranteed that the buffers in `slices` are all valid for the entire
         // duration of this function
         unsafe {
-            submission_queue.push(&read_entry.into()).unwrap();
+            submission_queue.push(read_entry.into()).unwrap();
         }
     });
 
@@ -213,8 +213,8 @@ pub fn test_register_buffers_update<S: squeue::EntryMarker, C: cqueue::EntryMark
     let timeout = types::Timespec::new().nsec(50 * 1_000_000);
     let timeout = opcode::Timeout::new(&timeout as _)
         .build()
-        .user_data(TIMEOUT_TAG)
-        .into();
+        .user_data(TIMEOUT_TAG);
+        // .into();
     let read_sqe = opcode::ReadFixed::new(
         types::Fd(read.as_raw_fd()),
         buf.as_mut_ptr(),
@@ -222,15 +222,14 @@ pub fn test_register_buffers_update<S: squeue::EntryMarker, C: cqueue::EntryMark
         5,
     )
     .build()
-    .user_data(42)
-    .into();
+    .user_data(42);
 
     // Register a buffer table and then immediately unregister it
     ring.submitter().register_buffers_sparse(1)?;
     ring.submitter().unregister_buffers()?;
 
     // Push a timeout of 50ms
-    unsafe { ring.submission().push(&timeout).unwrap() };
+    unsafe { ring.submission().push(timeout.clone().into()).unwrap() };
 
     // We should not receive any other entries than the timeout
     check_only_timeout(ring)?;
@@ -242,7 +241,7 @@ pub fn test_register_buffers_update<S: squeue::EntryMarker, C: cqueue::EntryMark
     let cqe = {
         write.write("yo".as_bytes())?;
 
-        unsafe { ring.submission().push(&read_sqe).unwrap() };
+        unsafe { ring.submission().push(read_sqe.clone().into()).unwrap() };
 
         ring.submit_and_wait(1)?;
 
@@ -265,7 +264,7 @@ pub fn test_register_buffers_update<S: squeue::EntryMarker, C: cqueue::EntryMark
             .register_buffers_update(5, &iovecs, Some(&tags))?;
 
         // Push a timeout of 50ms
-        ring.submission().push(&timeout).unwrap();
+        ring.submission().push(timeout.into()).unwrap();
     }
 
     // We should not receive any other entries than the timeout
@@ -295,7 +294,7 @@ pub fn test_register_buffers_update<S: squeue::EntryMarker, C: cqueue::EntryMark
     // Try reading now that the buffer is registered at index 5
     let cqe = {
         unsafe {
-            ring.submission().push(&read_sqe).unwrap();
+            ring.submission().push(read_sqe.into()).unwrap();
         }
 
         ring.submit_and_wait(1)?;

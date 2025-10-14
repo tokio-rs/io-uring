@@ -1,4 +1,4 @@
-use io_uring::{cqueue, opcode, squeue, types, IoUring};
+use io_uring::{cqueue::{self, EntryMarker}, opcode, squeue, types, IoUring};
 use std::io::{IoSlice, IoSliceMut};
 
 macro_rules! require {
@@ -71,9 +71,9 @@ pub fn write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
             .user_data(0x01)
             .flags(squeue::Flags::IO_LINK)
             .into();
-        queue.push(&write_e).expect("queue is full");
+        queue.push(write_e).expect("queue is full");
         queue
-            .push(&read_e.build().user_data(0x02).into())
+            .push(read_e.build().user_data(0x02).into())
             .expect("queue is full");
     }
 
@@ -115,9 +115,9 @@ pub fn writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
             .user_data(0x01)
             .flags(squeue::Flags::IO_LINK)
             .into();
-        queue.push(&write_e).expect("queue is full");
+        queue.push(write_e).expect("queue is full");
         queue
-            .push(&read_e.build().user_data(0x02).into())
+            .push(read_e.build().user_data(0x02).into())
             .expect("queue is full");
     }
 

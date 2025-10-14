@@ -1,5 +1,6 @@
 use crate::utils;
 use crate::Test;
+use io_uring::cqueue::EntryMarker;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use std::ffi::CString;
 use std::fs;
@@ -398,7 +399,7 @@ pub fn test_file_fsync<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&fsync_e.build().user_data(0x03).into())
+            .push(fsync_e.build().user_data(0x03).into())
             .expect("queue is full");
     }
 
@@ -436,7 +437,7 @@ pub fn test_file_fsync_file_range<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     unsafe {
         ring.submission()
-            .push(&fsync_e.build().user_data(0x04).into())
+            .push(fsync_e.build().user_data(0x04).into())
             .expect("queue is full");
     }
 
@@ -469,7 +470,7 @@ pub fn test_file_fallocate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&falloc_e.build().user_data(0x10).into())
+            .push(falloc_e.build().user_data(0x10).into())
             .expect("queue is full");
     }
 
@@ -508,7 +509,7 @@ pub fn test_file_openat2<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&open_e.build().user_data(0x11).into())
+            .push(open_e.build().user_data(0x11).into())
             .expect("queue is full");
     }
 
@@ -568,7 +569,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x11).into())
+                .push(op.build().user_data(0x11).into())
                 .expect("queue is full");
         }
 
@@ -591,7 +592,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x12).into())
+                .push(ild().user_data(0x12).into())
                 .expect("queue is full");
         }
 
@@ -626,7 +627,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x11).into())
+                .push(op.build().user_data(0x11).into())
                 .expect("queue is full");
         }
 
@@ -649,7 +650,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x12).into())
+                .push(op.build().user_data(0x12).into())
                 .expect("queue is full");
         }
 
@@ -707,7 +708,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x11).into())
+                .push(op.build().user_data(0x11).into())
                 .expect("queue is full");
         }
 
@@ -730,7 +731,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x12).into())
+                .push(op.build().user_data(0x12).into())
                 .expect("queue is full");
         }
 
@@ -763,7 +764,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x11).into())
+                .push(op.build().user_data(0x11).into())
                 .expect("queue is full");
         }
 
@@ -786,7 +787,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
 
         unsafe {
             ring.submission()
-                .push(&op.build().user_data(0x12).into())
+                .push(op.build().user_data(0x12).into())
                 .expect("queue is full");
         }
 
@@ -822,7 +823,7 @@ pub fn test_file_close<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&close_e.build().user_data(0x12).into())
+            .push(close_e.build().user_data(0x12).into())
             .expect("queue is full");
     }
 
@@ -863,7 +864,7 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         .into();
 
     unsafe {
-        ring.submission().push(&write_e).expect("queue is full");
+        ring.submission().push(write_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
@@ -875,7 +876,7 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         .into();
 
     unsafe {
-        ring.submission().push(&write_e).expect("queue is full");
+        ring.submission().push(write_e).expect("queue is full");
     }
 
     ring.submit_and_wait(2)?;
@@ -884,7 +885,7 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x03).into())
+            .push(read_e.build().user_data(0x03).into())
             .expect("queue is full");
     }
 
@@ -935,7 +936,7 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     .into();
 
     unsafe {
-        ring.submission().push(&statx_e).expect("queue is full");
+        ring.submission().push(statx_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
@@ -977,7 +978,7 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     .into();
 
     unsafe {
-        ring.submission().push(&statx_e).expect("queue is full");
+        ring.submission().push(statx_e).expect("queue is full");
     }
 
     ring.submit_and_wait(1)?;
@@ -1030,7 +1031,7 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
 
     unsafe {
         ring.submission()
-            .push(&write_e.build().user_data(0x01).into())
+            .push(write_e.build().user_data(0x01).into())
             .expect("queue is full");
     }
 
@@ -1038,7 +1039,7 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
 
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x02).into())
+            .push(read_e.build().user_data(0x02).into())
             .expect("queue is full");
     }
 
@@ -1064,7 +1065,7 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
 
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x03).into())
+            .push(read_e.build().user_data(0x03).into())
             .expect("queue is full");
     }
 
@@ -1121,7 +1122,7 @@ pub fn test_file_splice<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&splice_e.build().user_data(0x33).into())
+            .push(splice_e.build().user_data(0x33).into())
             .expect("queue is full");
     }
 
@@ -1165,7 +1166,7 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&ftruncate_e.build().user_data(0x33).into())
+            .push(ftruncate_e.build().user_data(0x33).into())
             .expect("queue is full");
     }
 
@@ -1185,7 +1186,7 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&ftruncate_e.build().user_data(0x34).into())
+            .push(ftruncate_e.build().user_data(0x34).into())
             .expect("queue is full");
     }
 
@@ -1234,7 +1235,7 @@ pub fn test_fixed_fd_install<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let read_e = opcode::Read::new(fd, output.as_mut_ptr(), output.len() as _);
     unsafe {
         ring.submission()
-            .push(&read_e.build().user_data(0x01).into())
+            .push(read_e.build().user_data(0x01).into())
             .expect("queue is full");
     }
 
@@ -1249,7 +1250,7 @@ pub fn test_fixed_fd_install<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     unsafe {
         ring.submission()
-            .push(&fixed_fd_install_e.build().user_data(0x02).into())
+            .push(fixed_fd_install_e.build().user_data(0x02).into())
             .expect("queue is full");
     }
 

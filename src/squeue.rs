@@ -31,8 +31,11 @@ pub struct SubmissionQueue<'a, E: EntryMarker = Entry> {
 /// A submission queue entry (SQE), representing a request for an I/O operation.
 ///
 /// This is implemented for [`Entry`] and [`Entry128`].
-pub trait EntryMarker: Clone + Debug + From<Entry> + private::Sealed {
+pub trait EntryMarker: Send + Sync + Clone + Debug + From<Entry> + private::Sealed {
     const BUILD_FLAGS: u32;
+
+    fn set_user_data(self, user_data: u64) -> Self;
+    fn get_user_data(&self) -> u64;
 }
 
 /// A 64-byte submission queue entry (SQE), representing a request for an I/O operation.
@@ -273,7 +276,7 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     /// Developers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     #[inline]
-    pub unsafe fn push(&mut self, entry: &E) -> Result<(), PushError> {
+    pub unsafe fn push(&mut self, entry: E) -> Result<(), PushError> {
         if !self.is_full() {
             self.push_unchecked(entry);
             Ok(())
@@ -291,12 +294,18 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     /// will be valid for the entire duration of the operation, otherwise it may cause memory
     /// problems.
     #[inline]
-    pub unsafe fn push_multiple(&mut self, entries: &[E]) -> Result<(), PushError> {
-        if self.capacity() - self.len() < entries.len() {
+    pub unsafe fn push_multiple<T, I>(&mut self, entries: T) -> Result<(), PushError>
+    where
+        I: ExactSizeIterator<Item = E>,
+        T: IntoIterator<IntoIter = I>,
+    {
+        let iter = entries.into_iter();
+
+        if self.capacity() - self.len() < iter.len() {
             return Err(PushError);
         }
 
-        for entry in entries {
+        for entry in iter {
             self.push_unchecked(entry);
         }
 
@@ -304,11 +313,12 @@ impl<E: EntryMarker> SubmissionQueue<'_, E> {
     }
 
     #[inline]
-    unsafe fn push_unchecked(&mut self, entry: &E) {
+    pub unsafe fn push_unchecked(&mut self, entry: E) {
         *self
             .queue
             .sqes
-            .add((self.tail & self.queue.ring_mask) as usize) = entry.clone();
+            .add((self.tail & self.queue.ring_mask) as usize) = entry;
+        // entry clone dropped
         self.tail = self.tail.wrapping_add(1);
     }
 }
@@ -354,6 +364,14 @@ impl private::Sealed for Entry {}
 
 impl EntryMarker for Entry {
     const BUILD_FLAGS: u32 = 0;
+
+    fn set_user_data(self, user_data: u64) -> Self {
+        self.user_data(user_data)
+    }
+
+    fn get_user_data(&self) -> u64 {
+        self.get_user_data()
+    }
 }
 
 impl Clone for Entry {
@@ -390,6 +408,13 @@ impl Entry128 {
         self
     }
 
+
+    /// Get the previously application-supplied user data.
+    #[inline]
+    pub fn get_user_data(&self) -> u64 {
+        self.0.0.user_data
+    }
+
     /// Set the personality of this event. You can obtain a personality using
     /// [`Submitter::register_personality`](crate::Submitter::register_personality).
     #[inline]
@@ -403,6 +428,14 @@ impl private::Sealed for Entry128 {}
 
 impl EntryMarker for Entry128 {
     const BUILD_FLAGS: u32 = sys::IORING_SETUP_SQE128;
+
+    fn set_user_data(self, user_data: u64) -> Self {
+        self.user_data(user_data)
+    }
+
+    fn get_user_data(&self) -> u64 {
+        self.get_user_data()
+    }
 }
 
 impl From<Entry> for Entry128 {

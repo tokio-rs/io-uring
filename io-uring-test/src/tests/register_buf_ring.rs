@@ -2,6 +2,7 @@
 // The entry point in this file can be found by searching for 'pub'.
 
 use crate::Test;
+use io_uring::cqueue::EntryMarker;
 use io_uring::types;
 use io_uring::types::BufRingEntry;
 use io_uring::{cqueue, opcode, squeue, IoUring};
@@ -566,7 +567,7 @@ where
             .user_data(0x01)
             .flags(squeue::Flags::IO_LINK)
             .into();
-        queue.push(&write_e).expect("queue is full");
+        queue.push(write_e).expect("queue is full");
     }
     assert_eq!(ring.submit_and_wait(1)?, 1);
 
@@ -596,7 +597,7 @@ where
         let mut queue = ring.submission();
         queue
             .push(
-                &read_e
+                read_e
                     .build()
                     .user_data(0x02)
                     .flags(squeue::Flags::BUFFER_SELECT)

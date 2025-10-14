@@ -131,7 +131,7 @@ impl IoUring<squeue::Entry, cqueue::Entry> {
     /// # Safety
     ///
     /// The caller must uphold that the file descriptor is owned and refers to a uring. The
-    /// `params` argument must be equivalent to the those previously filled in by the kernel when
+    /// `params` argument must be equivalent to those previously filled in by the kernel when
     /// the provided ring was created.
     pub unsafe fn from_fd(fd: RawFd, params: Parameters) -> io::Result<Self> {
         Self::with_fd_and_params(OwnedFd::from_raw_fd(fd), params.0)
@@ -141,9 +141,9 @@ impl IoUring<squeue::Entry, cqueue::Entry> {
 impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
     /// Create a [`Builder`] for an `IoUring` instance.
     ///
-    /// This allows for further customization than [`new`](Self::new).
+    /// This allows for more customization than [`new`](Self::new).
     ///
-    /// Unlike [`IoUring::new`], this function is available for any combination of submission
+    /// Unlike [`new`](Self::new), this function is available for any combination of submission
     /// queue entry (SQE) and completion queue entry (CQE) types.
     #[must_use]
     pub fn builder() -> Builder<S, C> {
@@ -256,7 +256,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
     /// be used to operate on the different parts of the io_uring instance independently.
     ///
     /// If you use this method to obtain `sq` and `cq`,
-    /// please note that you need to `drop` or `sync` the queue before and after submit,
+    /// please note that you need to `drop` or `sync` the queue before and after each submit,
     /// otherwise the queue will not be updated.
     #[inline]
     pub fn split(
@@ -443,7 +443,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
     /// thread interrupt. This can delay the application from making other progress. Setting this
     /// flag will hint to io_uring that it should defer work until an io_uring_enter(2) call with
     /// the IORING_ENTER_GETEVENTS flag set. This allows the application to request work to run
-    /// just just before it wants to process completions. This flag requires the
+    /// just before it wants to process completions. This flag requires the
     /// IORING_SETUP_SINGLE_ISSUER flag to be set, and also enforces that the call to
     /// io_uring_enter(2) is called from the same thread that submitted requests. Note that if this
     /// flag is set then it is the application's responsibility to periodically trigger work (for
