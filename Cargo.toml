@@ -1,6 +1,6 @@
 [package]
 name = "io-uring"
-version = "0.7.10"
+version = "0.7.11"
 authors = ["quininer <quininer@live.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
