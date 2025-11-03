@@ -54,9 +54,10 @@ mod sys;
 pub mod types;
 
 use std::marker::PhantomData;
+use std::mem::size_of;
 use std::mem::ManuallyDrop;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::{cmp, io, mem};
+use std::{cmp, io};
 
 #[cfg(feature = "io_safety")]
 use std::os::unix::io::{AsFd, BorrowedFd};
@@ -175,9 +176,9 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
             fd: &OwnedFd,
             p: &sys::io_uring_params,
         ) -> io::Result<(MemoryMap, squeue::Inner<S>, cqueue::Inner<C>)> {
-            let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
-            let cq_len = p.cq_off.cqes as usize + p.cq_entries as usize * mem::size_of::<C>();
-            let sqe_len = p.sq_entries as usize * mem::size_of::<S>();
+            let sq_len = p.sq_off.array as usize + p.sq_entries as usize * size_of::<u32>();
+            let cq_len = p.cq_off.cqes as usize + p.cq_entries as usize * size_of::<C>();
+            let sqe_len = p.sq_entries as usize * size_of::<S>();
             let sqe_mmap = Mmap::new(fd, sys::IORING_OFF_SQES as _, sqe_len)?;
 
             if p.features & sys::IORING_FEAT_SINGLE_MMAP != 0 {
