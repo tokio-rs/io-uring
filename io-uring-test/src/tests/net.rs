@@ -941,7 +941,7 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     match bid {
         0 => assert_eq!(&buf0[..256], &input[1024..]),
         1 => assert_eq!(&buf1[..256], &input[1024..]),
-        _ => panic!("{}", cqe.flags()),
+        _ => panic!("{}", cqe.flags().bits()),
     }
 
     // remove one remaining buf
@@ -1496,7 +1496,7 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert!(cqes[0].result() >= 0);
     let io_uring_socket = unsafe { Socket::from_raw_fd(cqes[0].result()) };
     assert!(io_uring_socket.as_raw_fd() != plain_fd);
-    assert_eq!(cqes[0].flags(), 0);
+    assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
 
     // Try a setsockopt.
     {
@@ -1534,7 +1534,7 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         assert_eq!(cqes.len(), 1);
         assert_eq!(cqes[0].user_data(), 1234);
         assert_eq!(cqes[0].result(), 0);
-        assert_eq!(cqes[0].flags(), 0);
+        assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
 
         // Check value actually set.
         optval = 0;
@@ -1582,7 +1582,7 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 55);
     assert_eq!(cqes[0].result(), 0);
-    assert_eq!(cqes[0].flags(), 0);
+    assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
 
     // If the fixed-socket operation worked properly, this must not fail.
     ring.submitter().unregister_files().unwrap();
@@ -1628,7 +1628,7 @@ pub fn test_socket_bind_listen<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert!(cqes[0].result() >= 0);
     let io_uring_socket = unsafe { Socket::from_raw_fd(cqes[0].result()) };
     assert!(io_uring_socket.as_raw_fd() != plain_fd);
-    assert_eq!(cqes[0].flags(), 0);
+    assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
 
     // Try to bind.
     {
@@ -1649,7 +1649,7 @@ pub fn test_socket_bind_listen<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         assert_eq!(cqes.len(), 1);
         assert_eq!(cqes[0].user_data(), 2345);
         assert_eq!(cqes[0].result(), 0);
-        assert_eq!(cqes[0].flags(), 0);
+        assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
 
         assert_eq!(
             io_uring_socket
@@ -1676,7 +1676,7 @@ pub fn test_socket_bind_listen<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         assert_eq!(cqes.len(), 1);
         assert_eq!(cqes[0].user_data(), 3456);
         assert_eq!(cqes[0].result(), 0);
-        assert_eq!(cqes[0].flags(), 0);
+        assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
 
         // Ensure the socket is actually in the listening state.
         _ = TcpStream::connect(
@@ -1719,7 +1719,7 @@ pub fn test_socket_bind_listen<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 55);
     assert_eq!(cqes[0].result(), 0);
-    assert_eq!(cqes[0].flags(), 0);
+    assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
 
     // If the fixed-socket operation worked properly, this must not fail.
     ring.submitter().unregister_files().unwrap();
@@ -1768,7 +1768,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
         assert_eq!(cqes.len(), 1);
         assert_eq!(cqes[0].user_data(), 11);
         assert_eq!(cqes[0].result(), 0);
-        assert_eq!(cqes[0].flags(), 0);
+        assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
     }
 
     // This structure is actually only used for input arguments to the kernel
@@ -1922,7 +1922,7 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
         assert_eq!(cqes.len(), 1);
         assert_eq!(cqes[0].user_data(), 11);
         assert_eq!(cqes[0].result(), 0);
-        assert_eq!(cqes[0].flags(), 0);
+        assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
     }
 
     // This structure is actually only used for input arguments to the kernel
@@ -2133,7 +2133,7 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         assert_eq!(cqes.len(), 1);
         assert_eq!(cqes[0].user_data(), 11);
         assert_eq!(cqes[0].result(), 0);
-        assert_eq!(cqes[0].flags(), 0);
+        assert_eq!(cqes[0].flags(), cqueue::CompletionFlags::empty());
     }
 
     let recvmsg_e = opcode::RecvMulti::new(Fd(server_socket.as_raw_fd()), BUF_GROUP)

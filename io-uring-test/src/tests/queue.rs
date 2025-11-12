@@ -187,13 +187,13 @@ pub fn test_msg_ring_data<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(source_cqes.len(), 1);
     assert_eq!(source_cqes[0].user_data(), 0);
     assert_eq!(source_cqes[0].result(), 0);
-    assert_eq!(source_cqes[0].flags(), 0);
+    assert_eq!(source_cqes[0].flags(), cqueue::CompletionFlags::empty());
 
     let dest_cqes: Vec<cqueue::Entry> = dest_ring.completion().map(Into::into).collect();
     assert_eq!(dest_cqes.len(), 1);
     assert_eq!(dest_cqes[0].user_data(), user_data);
     assert_eq!(dest_cqes[0].result(), result);
-    assert_eq!(dest_cqes[0].flags(), 0);
+    assert_eq!(dest_cqes[0].flags(), cqueue::CompletionFlags::empty());
 
     Ok(())
 }
@@ -254,13 +254,13 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         assert_eq!(source_cqes.len(), 1);
         assert_eq!(source_cqes[0].user_data(), 0);
         assert_eq!(source_cqes[0].result(), 0);
-        assert_eq!(source_cqes[0].flags(), 0);
+        assert_eq!(source_cqes[0].flags(), cqueue::CompletionFlags::empty());
 
         let dest_cqes: Vec<cqueue::Entry> = temp_ring.completion().map(Into::into).collect();
         assert_eq!(dest_cqes.len(), 1);
         assert_eq!(dest_cqes[0].user_data(), 22);
         assert_eq!(dest_cqes[0].result(), 0);
-        assert_eq!(dest_cqes[0].flags(), 0);
+        assert_eq!(dest_cqes[0].flags(), cqueue::CompletionFlags::empty());
     }
 
     // Unregister the fixed files from the source ring, then reserve some empty slots
@@ -285,13 +285,13 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         assert_eq!(source_cqes.len(), 1);
         assert_eq!(source_cqes[0].user_data(), 0);
         assert_eq!(source_cqes[0].result(), 0);
-        assert_eq!(source_cqes[0].flags(), 0);
+        assert_eq!(source_cqes[0].flags(), cqueue::CompletionFlags::empty());
 
         let dest_cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
         assert_eq!(dest_cqes.len(), 1);
         assert_eq!(dest_cqes[0].user_data(), 44);
         assert_eq!(dest_cqes[0].result(), 0);
-        assert_eq!(dest_cqes[0].flags(), 0);
+        assert_eq!(dest_cqes[0].flags(), cqueue::CompletionFlags::empty());
     }
 
     // Unregister the fixed files from both rings, then repeat again to
