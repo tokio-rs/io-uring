@@ -40,7 +40,7 @@ pub fn test_waitid<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x110);
-    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(cqes[0].io_result().unwrap(), 0);
 
     Ok(())
 }

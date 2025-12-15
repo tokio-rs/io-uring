@@ -84,10 +84,10 @@ pub fn write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
     assert_eq!(cqes[1].user_data(), 0x02);
-    assert_eq!(cqes[0].result(), text.len() as i32);
-    assert_eq!(cqes[1].result(), text.len() as i32);
+    assert_eq!(cqes[0].io_result().unwrap(), text.len() as u32);
+    assert_eq!(cqes[1].io_result().unwrap(), text.len() as u32);
 
-    assert_eq!(&output[..cqes[1].result() as usize], text);
+    assert_eq!(&output[..cqes[1].io_result().unwrap() as usize], text);
 
     Ok(())
 }
@@ -128,8 +128,8 @@ pub fn writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x01);
     assert_eq!(cqes[1].user_data(), 0x02);
-    assert_eq!(cqes[0].result(), (text.len() + text2.len()) as i32);
-    assert_eq!(cqes[1].result(), (text.len() + text2.len()) as i32);
+    assert_eq!(cqes[0].io_result().unwrap(), (text.len() + text2.len()) as u32);
+    assert_eq!(cqes[1].io_result().unwrap(), (text.len() + text2.len()) as u32);
 
     assert_eq!(&output, text);
     assert_eq!(&output2[..], text2);

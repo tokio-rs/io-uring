@@ -61,7 +61,7 @@ pub fn test_ready<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         .next()
         .unwrap();
     assert_eq!(cqe.user_data(), REQ_TYPE_EPOLL_WAIT);
-    assert_eq!(cqe.result(), 2);
+    assert_eq!(cqe.io_result().unwrap(), 2);
 
     // read
 
@@ -114,8 +114,8 @@ pub fn test_not_ready<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring.submit_and_wait(1)?;
     for cqe in ring.completion().map(Into::<cqueue::Entry>::into).take(1) {
         assert_eq!(cqe.user_data(), REQ_TYPE_EPOLL_WAIT);
-        assert!(0 <= cqe.result() && cqe.result() <= 2);
-        nr = cqe.result();
+        assert!(cqe.io_result().unwrap() <= 2);
+        nr = cqe.io_result().unwrap();
     }
 
     // read
@@ -186,7 +186,7 @@ pub fn test_delete<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     for cqe in ring.completion().map(Into::<cqueue::Entry>::into).take(1) {
         assert_eq!(cqe.user_data(), REQ_TYPE_EPOLL_WAIT);
         // check for only one event
-        assert!(cqe.result() == 1);
+        assert_eq!(cqe.io_result().unwrap(), 1);
     }
 
     // check that both writes still happened
@@ -261,9 +261,9 @@ pub fn test_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring.submit_and_wait(1)?;
     for cqe in ring.completion().map(Into::<cqueue::Entry>::into).take(1) {
         assert_eq!(cqe.user_data(), REQ_TYPE_EPOLL_WAIT);
-        let err = cqe.result();
+        let err = cqe.io_result().unwrap_err().raw_os_error().unwrap();
         // check that we got the expected errors
-        assert!([-::libc::EAGAIN, -::libc::EBADF].contains(&err));
+        assert!([libc::EAGAIN, libc::EBADF].contains(&err));
     }
 
     Ok(())
@@ -342,8 +342,7 @@ pub fn test_race<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
                 .map(Into::<cqueue::Entry>::into)
                 .unwrap();
             assert_eq!(cqe.user_data(), REQ_TYPE_EPOLL_WAIT);
-            assert!(cqe.result() >= 0);
-            let nr = cqe.result();
+            let nr = cqe.io_result().unwrap();
 
             // process the events
             prune_read(&mut readers, &events, nr as _)?;
