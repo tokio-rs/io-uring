@@ -1642,13 +1642,18 @@ opcode! {
         /// and is only valid if fixed buffers were registered.
         buf_index: Option<u16> = None,
         /// Arbitrary command data.
-        cmd: [u8; 16] = [0u8; 16]
+        cmd: [u8; 16] = [0u8; 16],
+        /// The `addr` is typically a pointer to buffer or iovecs,
+        /// but some file/device command also need to pass an addr.
+        /// For example, the [ublk](https://docs.kernel.org/block/ublk.html#usage-requirements)
+        /// needs to set `addr` to some special value.
+        addr: Option<u64> = None,
     }
 
     pub const CODE = sys::IORING_OP_URING_CMD;
 
     pub fn build(self) -> Entry {
-        let UringCmd16 { fd, cmd_op, cmd, buf_index } = self;
+        let UringCmd16 { fd, cmd_op, cmd, buf_index, addr } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -1660,6 +1665,9 @@ opcode! {
             unsafe {
                 sqe.__bindgen_anon_3.uring_cmd_flags |= sys::IORING_URING_CMD_FIXED;
             }
+        }
+        if let Some(addr) = addr {
+            sqe.__bindgen_anon_2.addr = addr;
         }
         Entry(sqe)
     }
@@ -1675,13 +1683,18 @@ opcode! {
         /// and is only valid if fixed buffers were registered.
         buf_index: Option<u16> = None,
         /// Arbitrary command data.
-        cmd: [u8; 80] = [0u8; 80]
+        cmd: [u8; 80] = [0u8; 80],
+        /// The `addr` is typically a pointer to buffer or iovecs,
+        /// but some file/device command also need to pass an addr.
+        /// For example, the [ublk](https://docs.kernel.org/block/ublk.html#usage-requirements)
+        /// needs to set `addr` to some special value.
+        addr: Option<u64> = None,
     }
 
     pub const CODE = sys::IORING_OP_URING_CMD;
 
     pub fn build(self) -> Entry128 {
-        let UringCmd80 { fd, cmd_op, cmd, buf_index } = self;
+        let UringCmd80 { fd, cmd_op, cmd, buf_index, addr } = self;
 
         let cmd1 = cmd[..16].try_into().unwrap();
         let cmd2 = cmd[16..].try_into().unwrap();
@@ -1696,6 +1709,9 @@ opcode! {
             unsafe {
                 sqe.__bindgen_anon_3.uring_cmd_flags |= sys::IORING_URING_CMD_FIXED;
             }
+        }
+        if let Some(addr) = addr {
+            sqe.__bindgen_anon_2.addr = addr;
         }
         Entry128(Entry(sqe), cmd2)
     }
