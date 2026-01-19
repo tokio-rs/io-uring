@@ -17,3 +17,5 @@ socket2 = "0.5"
 [features]
 direct-syscall = [ "io-uring/direct-syscall" ]
 ci = []
+io_safety = ["io-uring/io_safety"]
+

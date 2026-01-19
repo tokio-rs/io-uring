@@ -396,6 +396,7 @@ impl Builder {
         }
     }
     // Set the flags to use when registering the buffer ring
+    #[allow(dead_code)]
     pub(crate) fn register_flags(mut self, flags: RegisterFlags) -> Builder {
         self.flags = flags;
         self
@@ -667,7 +668,7 @@ fn buf_ring_play<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // Create a temporary file with a short sample text we will be reading multiple times.
 
     let fd = tempfile::tempfile()?;
-    let fd = types::Fd(fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(fd.as_raw_fd());
     write_text_to_file(ring, fd, text)?;
 
     // Use the uring buf_ring feature to have two buffers taken from the buf_ring and read into,

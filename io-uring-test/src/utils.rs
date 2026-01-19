@@ -1,4 +1,11 @@
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
+use std::os::unix::io::RawFd;
+
+#[cfg(feature = "io_safety")]
+use std::os::fd::{AsFd, BorrowedFd};
+
+#[cfg(not(feature = "io_safety"))]
+use std::os::unix::io::AsRawFd;
 use std::io::{IoSlice, IoSliceMut};
 
 macro_rules! require {
@@ -51,6 +58,33 @@ macro_rules! function_name {
 
 pub fn type_name_of<T>(_f: T) -> &'static str {
     std::any::type_name::<T>()
+}
+
+#[cfg(feature = "io_safety")]
+pub fn fd_raw(fd: RawFd) -> types::Fd {
+    // SAFETY: caller ensures fd remains valid for the duration of submitted ops.
+    unsafe { BorrowedFd::borrow_raw(fd) }.into()
+}
+
+#[cfg(not(feature = "io_safety"))]
+pub fn fd_raw(fd: RawFd) -> types::Fd {
+    types::Fd(fd)
+}
+
+#[cfg(feature = "io_safety")]
+pub type RegisterFd = io_uring::register::RegisterFd;
+
+#[cfg(not(feature = "io_safety"))]
+pub type RegisterFd = RawFd;
+
+#[cfg(feature = "io_safety")]
+pub fn reg_fd<T: AsFd>(fd: &T) -> RegisterFd {
+    RegisterFd::from_borrowed_fd(fd.as_fd())
+}
+
+#[cfg(not(feature = "io_safety"))]
+pub fn reg_fd<T: AsRawFd>(fd: &T) -> RegisterFd {
+    fd.as_raw_fd()
 }
 
 pub fn write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(

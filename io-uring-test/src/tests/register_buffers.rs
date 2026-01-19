@@ -3,7 +3,6 @@ use io_uring::{
     cqueue,
     opcode::{ReadFixed, WriteFixed},
     squeue,
-    types::Fd,
     IoUring,
 };
 use libc::iovec;
@@ -77,7 +76,7 @@ fn _test_register_buffers<
     const BUFFERS: usize = 8; // The maximum number of squeue entries (in main.rs)
 
     let file = tempfile::tempfile()?;
-    let fd = Fd(file.as_raw_fd());
+    let fd = crate::utils::fd_raw(file.as_raw_fd());
 
     // Create the buffers
     let mut bufs = (0..BUFFERS)
@@ -216,7 +215,7 @@ pub fn test_register_buffers_update<S: squeue::EntryMarker, C: cqueue::EntryMark
         .user_data(TIMEOUT_TAG)
         .into();
     let read_sqe = opcode::ReadFixed::new(
-        types::Fd(read.as_raw_fd()),
+        crate::utils::fd_raw(read.as_raw_fd()),
         buf.as_mut_ptr(),
         buf.len() as _,
         5,

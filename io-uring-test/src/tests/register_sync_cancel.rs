@@ -24,8 +24,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     let fd_2 = get_eventfd();
     let fixed_fd_3 = get_eventfd();
 
-    let mut registered_files = [0; 1];
-    registered_files[0] = fixed_fd_3.as_raw_fd();
+    let registered_files = [crate::utils::reg_fd(&fixed_fd_3)];
     ring.submitter().register_files(&registered_files)?;
 
     // Single op, canceled by the user_data. Reads from fd_1
@@ -44,15 +43,15 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     for i in 0..11 {
         let entry;
         if i == 0 {
-            entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
+            entry = opcode::Read::new(crate::utils::fd_raw(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
                 .build()
                 .user_data(USER_DATA_0);
         } else if (1..3).contains(&i) {
-            entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
+            entry = opcode::Read::new(crate::utils::fd_raw(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
                 .build()
                 .user_data(USER_DATA_1);
         } else if (3..5).contains(&i) {
-            entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
+            entry = opcode::Read::new(crate::utils::fd_raw(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
                 .build()
                 .user_data(USER_DATA_2);
         } else if (5..8).contains(&i) {
@@ -60,7 +59,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
                 .build()
                 .user_data(USER_DATA_3);
         } else {
-            entry = opcode::Read::new(types::Fd(fd_2.as_raw_fd()), buf.as_mut_ptr(), 32)
+            entry = opcode::Read::new(crate::utils::fd_raw(fd_2.as_raw_fd()), buf.as_mut_ptr(), 32)
                 .build()
                 .user_data(USER_DATA_4);
         }
@@ -90,7 +89,7 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
 
     // Cancel the fourth and fifth operation by fd.
     ring.submitter()
-        .register_sync_cancel(None, CancelBuilder::fd(types::Fd(fd_1.as_raw_fd())).all())?;
+        .register_sync_cancel(None, CancelBuilder::fd(crate::utils::fd_raw(fd_1.as_raw_fd())).all())?;
     let completions = wait_get_completions(ring, 2).unwrap();
     assert_eq!(completions.len(), 2);
     for completion in completions {
@@ -144,7 +143,7 @@ pub fn test_register_sync_cancel_any<S: squeue::EntryMarker, C: cqueue::EntryMar
     let mut buf = [0u8; 32];
 
     for i in 0..3 {
-        let entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
+        let entry = opcode::Read::new(crate::utils::fd_raw(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
             .build()
             .user_data(START_USER_DATA + i);
         unsafe { ring.submission().push(&entry.into()).unwrap() };
@@ -194,7 +193,7 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     const USER_DATA: u64 = 47u64;
 
     let mut buf = [0u8; 32];
-    let entry = opcode::Read::new(types::Fd(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
+    let entry = opcode::Read::new(crate::utils::fd_raw(fd_1.as_raw_fd()), buf.as_mut_ptr(), 32)
         .build()
         .user_data(USER_DATA);
     unsafe { ring.submission().push(&entry.into()).unwrap() };

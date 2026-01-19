@@ -1,4 +1,4 @@
-use io_uring::{cqueue, opcode, squeue, types, IoUring};
+use io_uring::{cqueue, opcode, squeue, IoUring};
 use std::fs::File;
 use std::io::Write;
 use std::os::unix::io::AsRawFd;
@@ -49,7 +49,7 @@ pub fn test_sqpoll_cq_overflow<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         .zip(bufs.iter_mut())
         .for_each(|(file, buf)| {
             let fd = file.as_raw_fd();
-            let entry = opcode::Read::new(types::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
+            let entry = opcode::Read::new(crate::utils::fd_raw(fd), buf.as_mut_ptr(), buf.len() as _)
                 .build()
                 .into();
             while unsafe { ring.submission().push(&entry).is_err() } {

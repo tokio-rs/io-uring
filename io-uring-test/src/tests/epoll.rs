@@ -5,7 +5,7 @@ use ::std::{
     os::fd::{AsFd, FromRawFd, RawFd},
     thread,
 };
-use io_uring::{cqueue, opcode, squeue, types, IoUring};
+use io_uring::{cqueue, opcode, squeue, IoUring};
 use std::os::unix::io::AsRawFd;
 
 // Tests translated from liburing/test/epwait.c.
@@ -43,7 +43,7 @@ pub fn test_ready<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // submit epoll_wait
 
     let sqe = opcode::EpollWait::new(
-        types::Fd(epfd.as_raw_fd()),
+        crate::utils::fd_raw(epfd.as_raw_fd()),
         events.as_mut_ptr().cast(),
         NPIPES as _,
     )
@@ -92,7 +92,7 @@ pub fn test_not_ready<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // submit epoll_wait
 
     let sqe = opcode::EpollWait::new(
-        types::Fd(epfd.as_raw_fd()),
+        crate::utils::fd_raw(epfd.as_raw_fd()),
         events.as_mut_ptr().cast(),
         NPIPES as _,
     )
@@ -147,7 +147,7 @@ pub fn test_delete<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // submit epoll_wait
 
     let sqe = opcode::EpollWait::new(
-        types::Fd(epfd.as_raw_fd()),
+        crate::utils::fd_raw(epfd.as_raw_fd()),
         events.as_mut_ptr().cast(),
         NPIPES as _,
     )
@@ -235,7 +235,7 @@ pub fn test_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // submit epoll_wait
 
     let sqe = opcode::EpollWait::new(
-        types::Fd(epfd.as_raw_fd()),
+        crate::utils::fd_raw(epfd.as_raw_fd()),
         events.as_mut_ptr().cast(),
         NPIPES as _,
     )
@@ -326,7 +326,7 @@ pub fn test_race<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         // repeatedly submit epoll_wait and process completions
         for _ in 0..LOOPS {
             let sqe = opcode::EpollWait::new(
-                types::Fd(efd.as_raw_fd()),
+                crate::utils::fd_raw(efd.as_raw_fd()),
                 events.as_mut_ptr().cast(),
                 NPIPES as _,
             )

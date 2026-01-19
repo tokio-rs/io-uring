@@ -20,7 +20,7 @@ pub fn test_file_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("test file_write_read");
 
     let fd = tempfile::tempfile()?;
-    let fd = types::Fd(fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(fd.as_raw_fd());
 
     utils::write_read(ring, fd, fd)?;
 
@@ -63,7 +63,7 @@ pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // Prepare multishot read
 
-    let sqe_read = opcode::ReadMulti::new(types::Fd(rx.as_raw_fd()), 0, 0xcafe)
+    let sqe_read = opcode::ReadMulti::new(crate::utils::fd_raw(rx.as_raw_fd()), 0, 0xcafe)
         .build()
         .user_data(REQ_TYPE_READ)
         .into();
@@ -72,7 +72,7 @@ pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // Write BYTES0
 
     let sqe_write0 = opcode::Write::new(
-        types::Fd(tx.as_raw_fd()),
+        crate::utils::fd_raw(tx.as_raw_fd()),
         BYTES0.as_ptr(),
         BYTES0.len() as _,
     )
@@ -116,7 +116,7 @@ pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // Write BYTES1
 
     let sqe_write1 = opcode::Write::new(
-        types::Fd(tx.as_raw_fd()),
+        crate::utils::fd_raw(tx.as_raw_fd()),
         BYTES1.as_ptr(),
         BYTES1.len() as _,
     )
@@ -160,7 +160,7 @@ pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // Write BYTES0 and BYTES1
 
     let sqe_write0 = opcode::Write::new(
-        types::Fd(tx.as_raw_fd()),
+        crate::utils::fd_raw(tx.as_raw_fd()),
         BYTES0.as_ptr(),
         BYTES0.len() as _,
     )
@@ -169,7 +169,7 @@ pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     .user_data(REQ_TYPE_WRITE_BYTES0)
     .into();
     let sqe_write1 = opcode::Write::new(
-        types::Fd(tx.as_raw_fd()),
+        crate::utils::fd_raw(tx.as_raw_fd()),
         BYTES1.as_ptr(),
         BYTES1.len() as _,
     )
@@ -260,7 +260,7 @@ pub fn test_file_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("test file_writev_readv");
 
     let fd = tempfile::tempfile()?;
-    let fd = types::Fd(fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(fd.as_raw_fd());
 
     utils::writev_readv(ring, fd, fd)?;
 
@@ -321,7 +321,7 @@ pub fn test_pipe_fixed_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMark
     unsafe {
         ring.submission().push(
             &opcode::WritevFixed::new(
-                types::Fd(tx.as_raw_fd()),
+                crate::utils::fd_raw(tx.as_raw_fd()),
                 src_parts.as_ptr().cast(),
                 src_parts.len() as u32,
                 0,
@@ -352,7 +352,7 @@ pub fn test_pipe_fixed_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMark
     unsafe {
         ring.submission().push(
             &opcode::ReadvFixed::new(
-                types::Fd(rx.as_raw_fd()),
+                crate::utils::fd_raw(rx.as_raw_fd()),
                 dst_parts.as_ptr().cast(),
                 dst_parts.len() as u32,
                 1,
@@ -392,7 +392,7 @@ pub fn test_file_fsync<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let n = fd.write(&[0x1])?;
     assert_eq!(n, 1);
 
-    let fd = types::Fd(fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(fd.as_raw_fd());
 
     let fsync_e = opcode::Fsync::new(fd);
 
@@ -430,7 +430,7 @@ pub fn test_file_fsync_file_range<S: squeue::EntryMarker, C: cqueue::EntryMarker
     let n = fd.write(&[0x3; 1024])?;
     assert_eq!(n, 1024);
 
-    let fd = types::Fd(fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(fd.as_raw_fd());
 
     let fsync_e = opcode::SyncFileRange::new(fd, 1024).offset(3 * 1024);
 
@@ -463,7 +463,7 @@ pub fn test_file_fallocate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("test file_fallocate");
 
     let fd = tempfile::tempfile()?;
-    let fd = types::Fd(fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(fd.as_raw_fd());
 
     let falloc_e = opcode::Fallocate::new(fd, 1024);
 
@@ -498,7 +498,7 @@ pub fn test_file_openat2<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("test file_openat2");
 
     let dir = tempdir()?;
-    let dirfd = types::Fd(libc::AT_FDCWD);
+    let dirfd = crate::utils::fd_raw(libc::AT_FDCWD);
 
     let path = dir.path().join("test-io-uring-openat2");
     let path = CString::new(path.as_os_str().as_bytes())?;
@@ -549,7 +549,7 @@ pub fn test_file_openat2_close_file_index<S: squeue::EntryMarker, C: cqueue::Ent
     println!("test file_openat2_close_file_index");
 
     let dir = tempdir()?;
-    let dirfd = types::Fd(libc::AT_FDCWD);
+    let dirfd = crate::utils::fd_raw(libc::AT_FDCWD);
 
     // One more round than table size.
     for round in 0..3 {
@@ -690,7 +690,7 @@ pub fn test_file_openat_close_file_index<S: squeue::EntryMarker, C: cqueue::Entr
     println!("test file_openat_close_file_index");
 
     let dir = tempdir()?;
-    let dirfd = types::Fd(libc::AT_FDCWD);
+    let dirfd = crate::utils::fd_raw(libc::AT_FDCWD);
 
     // One more round than table size.
     for round in 0..3 {
@@ -816,7 +816,7 @@ pub fn test_file_close<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("test file_cloes");
 
     let fd = tempfile::tempfile()?;
-    let fd = types::Fd(fd.into_raw_fd());
+    let fd = crate::utils::fd_raw(fd.into_raw_fd());
 
     let close_e = opcode::Close::new(fd);
 
@@ -851,7 +851,7 @@ pub fn test_file_cur_pos<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("test file_cur_pos");
 
     let fd = tempfile::tempfile()?;
-    let fd = types::Fd(fd.into_raw_fd());
+    let fd = crate::utils::fd_raw(fd.into_raw_fd());
 
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut output = vec![0; text.len()];
@@ -925,7 +925,7 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let mut statxbuf: libc::statx = unsafe { std::mem::zeroed() };
 
     let statx_e = opcode::Statx::new(
-        types::Fd(libc::AT_FDCWD),
+        crate::utils::fd_raw(libc::AT_FDCWD),
         pathbuf.as_ptr(),
         &mut statxbuf as *mut libc::statx as *mut _,
     )
@@ -966,7 +966,7 @@ pub fn test_statx<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let mut statxbuf3: libc::statx = unsafe { std::mem::zeroed() };
 
     let statx_e = opcode::Statx::new(
-        types::Fd(fd.as_raw_fd()),
+        crate::utils::fd_raw(fd.as_raw_fd()),
         b"\0".as_ptr().cast(),
         &mut statxbuf3 as *mut libc::statx as *mut _,
     )
@@ -1018,7 +1018,7 @@ pub fn test_file_direct_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarke
         .create_new(true)
         .custom_flags(libc::O_DIRECT)
         .open(dir.path().join("io-uring-test-file"))?;
-    let fd = types::Fd(fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(fd.as_raw_fd());
 
     // ok
 
@@ -1112,9 +1112,9 @@ pub fn test_file_splice<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let fd = fs::File::open(dir.join("io-uring-test-file-input"))?;
 
     let splice_e = opcode::Splice::new(
-        types::Fd(fd.as_raw_fd()),
+        crate::utils::fd_raw(fd.as_raw_fd()),
         0,
-        types::Fd(pipe_in.as_raw_fd()),
+        crate::utils::fd_raw(pipe_in.as_raw_fd()),
         -1,
         1024,
     );
@@ -1160,7 +1160,7 @@ pub fn test_ftruncate<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     fs::write(&file, input)?;
     let fd = fs::OpenOptions::new().write(true).open(&file)?;
-    let fd = types::Fd(fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(fd.as_raw_fd());
     let ftruncate_e = opcode::Ftruncate::new(fd, 512);
 
     unsafe {
@@ -1227,8 +1227,8 @@ pub fn test_fixed_fd_install<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     fs::write(&file, input)?;
     let fd = fs::OpenOptions::new().read(true).open(&file)?;
-    let fd = types::Fd(fd.as_raw_fd());
-    ring.submitter().register_files(&[fd.0])?;
+    ring.submitter()
+        .register_files(&[crate::utils::reg_fd(&fd)])?;
     let fd = types::Fixed(0);
 
     let read_e = opcode::Read::new(fd, output.as_mut_ptr(), output.len() as _);
@@ -1354,7 +1354,7 @@ pub fn test_f_get_set_xattr<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("test f_get_set_xattr");
 
     let file = tempfile::tempfile()?;
-    let fd = types::Fd(file.as_raw_fd());
+    let fd = crate::utils::fd_raw(file.as_raw_fd());
 
     let attr_name = CString::new("user.test_attr")?;
     let attr_value = CString::new("test_value")?;

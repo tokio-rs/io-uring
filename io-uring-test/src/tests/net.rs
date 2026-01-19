@@ -2,7 +2,7 @@ use crate::tests::register_buf_ring;
 use crate::utils;
 use crate::Test;
 use io_uring::squeue::Flags;
-use io_uring::types::{BufRingEntry, Fd};
+use io_uring::types::BufRingEntry;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
 use once_cell::sync::OnceCell;
 use std::convert::TryInto;
@@ -38,8 +38,8 @@ pub fn test_tcp_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let (send_stream, recv_stream) = tcp_pair()?;
 
-    let send_fd = types::Fd(send_stream.as_raw_fd());
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let send_fd = crate::utils::fd_raw(send_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     utils::write_read(ring, send_fd, recv_fd)?;
 
@@ -60,8 +60,8 @@ pub fn test_tcp_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let (send_stream, recv_stream) = tcp_pair()?;
 
-    let send_fd = types::Fd(send_stream.as_raw_fd());
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let send_fd = crate::utils::fd_raw(send_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     utils::writev_readv(ring, send_fd, recv_fd)?;
 
@@ -82,8 +82,8 @@ pub fn test_tcp_send_recv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let (send_stream, recv_stream) = tcp_pair()?;
 
-    let send_fd = types::Fd(send_stream.as_raw_fd());
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let send_fd = crate::utils::fd_raw(send_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut output = vec![0; text.len()];
@@ -133,7 +133,7 @@ pub fn test_tcp_send_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let (send_stream, mut recv_stream) = tcp_pair()?;
 
-    let send_fd = types::Fd(send_stream.as_raw_fd());
+    let send_fd = crate::utils::fd_raw(send_stream.as_raw_fd());
 
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut output = vec![0; text.len()];
@@ -197,8 +197,8 @@ pub fn test_tcp_zero_copy_send_recv<S: squeue::EntryMarker, C: cqueue::EntryMark
 
     let (send_stream, recv_stream) = tcp_pair()?;
 
-    let send_fd = types::Fd(send_stream.as_raw_fd());
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let send_fd = crate::utils::fd_raw(send_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut output = vec![0; text.len()];
@@ -260,8 +260,8 @@ pub fn test_tcp_zero_copy_send_fixed<S: squeue::EntryMarker, C: cqueue::EntryMar
 
     let (send_stream, recv_stream) = tcp_pair()?;
 
-    let send_fd = types::Fd(send_stream.as_raw_fd());
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let send_fd = crate::utils::fd_raw(send_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut output = vec![0; text.len()];
@@ -350,8 +350,8 @@ pub fn test_tcp_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let addr = recv_stream.local_addr()?;
     let sockaddr = socket2::SockAddr::from(addr);
-    let send_fd = types::Fd(send_stream.as_raw_fd());
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let send_fd = crate::utils::fd_raw(send_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut buf2 = vec![0; text.len()];
@@ -435,8 +435,8 @@ pub fn test_tcp_zero_copy_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::Ent
 
     let addr = recv_stream.local_addr()?;
     let sockaddr = socket2::SockAddr::from(addr);
-    let send_fd = types::Fd(send_stream.as_raw_fd());
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let send_fd = crate::utils::fd_raw(send_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     let text = b"The quick brown fox jumps over the lazy dog.";
     let mut buf2 = vec![0; text.len()];
@@ -528,7 +528,7 @@ pub fn test_tcp_accept<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("127.0.0.1:0"))?;
     let addr = listener.local_addr()?;
-    let fd = types::Fd(listener.as_raw_fd());
+    let fd = crate::utils::fd_raw(listener.as_raw_fd());
 
     let _stream = TcpStream::connect(addr)?;
 
@@ -580,7 +580,7 @@ pub fn test_tcp_accept_file_index<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("127.0.0.1:0"))?;
     let addr = listener.local_addr()?;
-    let fd = types::Fd(listener.as_raw_fd());
+    let fd = crate::utils::fd_raw(listener.as_raw_fd());
 
     let _stream = TcpStream::connect(addr)?;
 
@@ -630,7 +630,7 @@ pub fn test_tcp_accept_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("127.0.0.1:0"))?;
     let addr = listener.local_addr()?;
-    let fd = types::Fd(listener.as_raw_fd());
+    let fd = crate::utils::fd_raw(listener.as_raw_fd());
 
     // 2 streams
 
@@ -707,7 +707,7 @@ pub fn test_tcp_accept_multi_file_index<S: squeue::EntryMarker, C: cqueue::Entry
 
     let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("127.0.0.1:0"))?;
     let addr = listener.local_addr()?;
-    let fd = types::Fd(listener.as_raw_fd());
+    let fd = crate::utils::fd_raw(listener.as_raw_fd());
 
     // 2 streams
 
@@ -797,7 +797,7 @@ pub fn test_tcp_connect<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let stream = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
 
     let connect_e = opcode::Connect::new(
-        types::Fd(stream.as_raw_fd()),
+        crate::utils::fd_raw(stream.as_raw_fd()),
         sockaddr.as_ptr() as *const _,
         sockaddr.len(),
     );
@@ -839,7 +839,7 @@ pub fn test_tcp_buffer_select<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let (mut send_stream, recv_stream) = tcp_pair()?;
 
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     let mut input = vec![0xde; 1024];
     input.extend_from_slice(&[0xad; 256]);
@@ -995,7 +995,7 @@ pub fn test_tcp_buffer_select_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMa
 
     let (mut send_stream, recv_stream) = tcp_pair()?;
 
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     const BGID: u16 = 0xdeaf;
     const INPUT_BID: u16 = 100;
@@ -1085,7 +1085,7 @@ pub fn test_tcp_buffer_select_readv<S: squeue::EntryMarker, C: cqueue::EntryMark
 
     let (mut send_stream, recv_stream) = tcp_pair()?;
 
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     const BGID: u16 = 0xdeb0;
     const INPUT_BID: u16 = 200;
@@ -1161,7 +1161,7 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let (mut send_stream, recv_stream) = tcp_pair()?;
 
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     // Send one package made of two segments, and receive as two buffers, each max length 1024
     // so the first buffer received should be length 1024 and the second length 256.
@@ -1238,7 +1238,7 @@ pub fn test_tcp_recv_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let (mut send_stream, recv_stream) = tcp_pair()?;
 
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     // Send one package made of four segments, and receive as up to two buffer bundles
     let mut input = vec![0x0d; 256];
@@ -1315,7 +1315,7 @@ pub fn test_tcp_recv_multi_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     let (mut send_stream, recv_stream) = tcp_pair()?;
 
-    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+    let recv_fd = crate::utils::fd_raw(recv_stream.as_raw_fd());
 
     // Send one package made of four segments, and receive as up to two buffer bundles
     let mut input = vec![0x0d; 256];
@@ -1423,7 +1423,7 @@ pub fn test_tcp_shutdown<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     const SHUT_WR: i32 = 1;
 
     let listener = TCP_LISTENER.get_or_try_init(|| TcpListener::bind("127.0.0.1:0"))?;
-    let sock_fd = types::Fd(listener.as_raw_fd());
+    let sock_fd = crate::utils::fd_raw(listener.as_raw_fd());
 
     let shutdown_e = opcode::Shutdown::new(sock_fd, SHUT_WR);
 
@@ -1518,7 +1518,7 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         // Set value.
         optval = 1;
         let op = io_uring::opcode::SetSockOpt::new(
-            io_uring::types::Fd(io_uring_socket.as_raw_fd()),
+            crate::utils::fd_raw(io_uring_socket.as_raw_fd()),
             libc::SOL_SOCKET as u32,
             libc::SO_REUSEADDR as u32,
             &optval as *const _ as *const libc::c_void,
@@ -1635,7 +1635,7 @@ pub fn test_socket_bind_listen<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         let server_addr: std::net::SocketAddr = "127.0.0.1:0".parse().unwrap();
         let server_addr: socket2::SockAddr = server_addr.into();
         let op = io_uring::opcode::Bind::new(
-            io_uring::types::Fd(io_uring_socket.as_raw_fd()),
+            crate::utils::fd_raw(io_uring_socket.as_raw_fd()),
             server_addr.as_ptr() as *const _,
             server_addr.len(),
         )
@@ -1665,7 +1665,7 @@ pub fn test_socket_bind_listen<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // Try to listen.
     {
         let op =
-            io_uring::opcode::Listen::new(io_uring::types::Fd(io_uring_socket.as_raw_fd()), 128)
+            io_uring::opcode::Listen::new(crate::utils::fd_raw(io_uring_socket.as_raw_fd()), 128)
                 .build()
                 .user_data(3456);
         unsafe {
@@ -1778,7 +1778,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     msghdr.msg_controllen = 0;
 
     let recvmsg_e = opcode::RecvMsgMulti::new(
-        Fd(server_socket.as_raw_fd()),
+        crate::utils::fd_raw(server_socket.as_raw_fd()),
         &msghdr as *const _,
         BUF_GROUP,
     )
@@ -1805,7 +1805,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     msghdr1.msg_iovlen = 1;
 
     // Non ZeroCopy
-    let send_msg_1 = opcode::SendMsg::new(Fd(client_socket.as_raw_fd()), &msghdr1 as *const _)
+    let send_msg_1 = opcode::SendMsg::new(crate::utils::fd_raw(client_socket.as_raw_fd()), &msghdr1 as *const _)
         .build()
         .user_data(55)
         .into();
@@ -1819,7 +1819,7 @@ pub fn test_udp_recvmsg_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker
     msghdr2.msg_iovlen = 1;
 
     // ZeroCopy
-    let send_msg_2 = opcode::SendMsgZc::new(Fd(client_socket.as_raw_fd()), &msghdr2 as *const _)
+    let send_msg_2 = opcode::SendMsgZc::new(crate::utils::fd_raw(client_socket.as_raw_fd()), &msghdr2 as *const _)
         .build()
         .user_data(66)
         .into();
@@ -1931,7 +1931,7 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
     msghdr.msg_namelen = 4;
 
     let recvmsg_e = opcode::RecvMsgMulti::new(
-        Fd(server_socket.as_raw_fd()),
+        crate::utils::fd_raw(server_socket.as_raw_fd()),
         &msghdr as *const _,
         BUF_GROUP,
     )
@@ -1953,7 +1953,7 @@ pub fn test_udp_recvmsg_multishot_trunc<S: squeue::EntryMarker, C: cqueue::Entry
 
     let send_msgs = (0..2)
         .map(|_| {
-            opcode::SendMsg::new(Fd(client_socket.as_raw_fd()), &msghdr1 as *const _)
+            opcode::SendMsg::new(crate::utils::fd_raw(client_socket.as_raw_fd()), &msghdr1 as *const _)
                 .build()
                 .user_data(55)
                 .into()
@@ -2035,7 +2035,7 @@ pub fn test_udp_send_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     let socket: socket2::Socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into();
     let addr = socket.local_addr()?;
-    let fd = Fd(socket.as_raw_fd());
+    let fd = crate::utils::fd_raw(socket.as_raw_fd());
 
     // We are going to do a send below. To confirm that it works, start a
     // recv to receive the data sent by the send.
@@ -2136,7 +2136,7 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         assert_eq!(cqes[0].flags(), 0);
     }
 
-    let recvmsg_e = opcode::RecvMulti::new(Fd(server_socket.as_raw_fd()), BUF_GROUP)
+    let recvmsg_e = opcode::RecvMulti::new(crate::utils::fd_raw(server_socket.as_raw_fd()), BUF_GROUP)
         .build()
         .user_data(3)
         .into();
@@ -2149,7 +2149,7 @@ pub fn test_udp_sendzc_with_dest<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     let buf1 = b"lorep ipsum";
 
     // 2 self events + 1 recv
-    let entry1 = opcode::SendZc::new(Fd(fd), buf1.as_ptr(), buf1.len() as _)
+    let entry1 = opcode::SendZc::new(crate::utils::fd_raw(fd), buf1.as_ptr(), buf1.len() as _)
         .dest_addr(dest_addr.as_ptr())
         .dest_addr_len(dest_addr.len())
         .build()
@@ -2385,7 +2385,7 @@ pub fn test_tcp_recvzc<S: squeue::EntryMarker>(test: &Test) -> anyhow::Result<()
 
     // Submit the accept op.
     let sqe = opcode::Accept::new(
-        types::Fd(socket.as_raw_fd()),
+        crate::utils::fd_raw(socket.as_raw_fd()),
         ptr::null_mut(),
         ptr::null_mut(),
     )
@@ -2425,7 +2425,7 @@ pub fn test_tcp_recvzc<S: squeue::EntryMarker>(test: &Test) -> anyhow::Result<()
         assert!(cqe.result() >= 0);
         let fd = cqe.result();
         let mut squeue = unsafe { ring.submission_shared() };
-        let sqe = opcode::RecvZc::new(types::Fd(fd), STREAM_SIZE)
+        let sqe = opcode::RecvZc::new(crate::utils::fd_raw(fd), STREAM_SIZE)
             .ifq(reg.zcrx_id)
             .build()
             .user_data(REQ_TYPE_RX)

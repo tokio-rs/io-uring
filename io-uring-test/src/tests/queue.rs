@@ -169,7 +169,7 @@ pub fn test_msg_ring_data<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // the existing test/source ring. This will generate two completion events,
     // one on each ring.
     let mut dest_ring = IoUring::new(1)?;
-    let fd = types::Fd(dest_ring.as_raw_fd());
+    let fd = crate::utils::fd_raw(dest_ring.as_raw_fd());
     let result = 82; // b'R'
     let user_data = 85; // b'U'
     unsafe {
@@ -224,7 +224,7 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         let _ = ring.submitter().unregister_files();
         let tmp1 = tempfile::tempfile()?;
         ring.submitter()
-            .register_files(&[tmp1.as_raw_fd()])
+            .register_files(&[crate::utils::reg_fd(&tmp1)])
             .unwrap();
     }
 
@@ -238,7 +238,7 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // to the temp ring (to slot 1).
     // This will generate two completion events, one on each ring.
     unsafe {
-        let fd = types::Fd(temp_ring.as_raw_fd());
+        let fd = crate::utils::fd_raw(temp_ring.as_raw_fd());
         let dest_slot = types::DestinationSlot::try_from_slot_target(1).unwrap();
         ring.submission()
             .push(
@@ -272,7 +272,7 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // to the temp ring (to slot 2).
     // This will again generate two completion events, one on each ring.
     unsafe {
-        let fd = types::Fd(ring.as_raw_fd());
+        let fd = crate::utils::fd_raw(ring.as_raw_fd());
         let dest_slot = types::DestinationSlot::try_from_slot_target(2).unwrap();
         temp_ring
             .submission()

@@ -168,7 +168,7 @@ pub fn test_async_cancel_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("test async_cancel_fd");
 
     let _fd = create_dummy_fd()?;
-    let fd = types::Fd(_fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(_fd.as_raw_fd());
     let poll_e = opcode::PollAdd::new(fd, libc::POLLIN as _).build();
 
     // Cancel one poll request matching FD
@@ -217,7 +217,7 @@ pub fn test_async_cancel_fd_all<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     println!("test async_cancel_fd_all");
 
     let _fd = create_dummy_fd()?;
-    let fd = types::Fd(_fd.as_raw_fd());
+    let fd = crate::utils::fd_raw(_fd.as_raw_fd());
     let poll_e = opcode::PollAdd::new(fd, libc::POLLIN as _).build();
 
     // Cancel all requests matching FD

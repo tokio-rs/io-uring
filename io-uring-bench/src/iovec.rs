@@ -1,9 +1,24 @@
 use std::io;
-use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{AsRawFd, RawFd};
+
+#[cfg(feature = "io_safety")]
+use std::os::fd::BorrowedFd;
+
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use io_uring::{opcode, squeue, types, IoUring};
 use tempfile::tempfile;
+
+#[cfg(feature = "io_safety")]
+fn io_fd(fd: RawFd) -> types::Fd {
+    // SAFETY: bench ensures fd remains valid for the duration of submitted ops.
+    unsafe { BorrowedFd::borrow_raw(fd) }.into()
+}
+
+#[cfg(not(feature = "io_safety"))]
+fn io_fd(fd: RawFd) -> types::Fd {
+    types::Fd(fd)
+}
 
 fn bench_iovec(c: &mut Criterion) {
     let mut ring = IoUring::new(16).unwrap();
@@ -29,7 +44,7 @@ fn bench_iovec(c: &mut Criterion) {
             let bufs = black_box(&bufs);
 
             let entry = opcode::Writev::new(
-                types::Fd(fd.as_raw_fd()),
+                io_fd(fd.as_raw_fd()),
                 bufs.as_ptr() as *const _,
                 bufs.len() as _,
             );
@@ -61,7 +76,7 @@ fn bench_iovec(c: &mut Criterion) {
             let bufs = black_box(&bufs);
 
             let entry = opcode::Writev::new(
-                types::Fd(fd.as_raw_fd()),
+                io_fd(fd.as_raw_fd()),
                 bufs.as_ptr() as *const _,
                 bufs.len() as _,
             );
@@ -93,7 +108,7 @@ fn bench_iovec(c: &mut Criterion) {
             let mut queue = ring.submission();
             for buf in black_box(&bufs) {
                 let entry =
-                    opcode::Write::new(types::Fd(fd.as_raw_fd()), buf.as_ptr(), buf.len() as _);
+                    opcode::Write::new(io_fd(fd.as_raw_fd()), buf.as_ptr(), buf.len() as _);
 
                 unsafe {
                     queue
@@ -117,7 +132,7 @@ fn bench_iovec(c: &mut Criterion) {
         b.iter(|| {
             for buf in black_box(&bufs) {
                 let entry =
-                    opcode::Write::new(types::Fd(fd.as_raw_fd()), buf.as_ptr(), buf.len() as _);
+                    opcode::Write::new(io_fd(fd.as_raw_fd()), buf.as_ptr(), buf.len() as _);
 
                 unsafe {
                     ring.submission()

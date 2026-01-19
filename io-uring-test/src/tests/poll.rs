@@ -1,5 +1,5 @@
 use crate::Test;
-use io_uring::{cqueue, opcode, squeue, types, IoUring};
+use io_uring::{cqueue, opcode, squeue, IoUring};
 use std::fs::File;
 use std::io::{self, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -27,7 +27,7 @@ pub fn test_eventfd_poll<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         File::from_raw_fd(fd)
     };
 
-    let poll_e = opcode::PollAdd::new(types::Fd(fd.as_raw_fd()), libc::POLLIN as _);
+    let poll_e = opcode::PollAdd::new(crate::utils::fd_raw(fd.as_raw_fd()), libc::POLLIN as _);
 
     unsafe {
         let mut queue = ring.submission();
@@ -76,7 +76,7 @@ pub fn test_eventfd_poll_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // add poll
 
-    let poll_e = opcode::PollAdd::new(types::Fd(fd.as_raw_fd()), libc::POLLIN as _);
+    let poll_e = opcode::PollAdd::new(crate::utils::fd_raw(fd.as_raw_fd()), libc::POLLIN as _);
 
     unsafe {
         let mut queue = ring.submission();
@@ -141,7 +141,7 @@ pub fn test_eventfd_poll_remove_failed<S: squeue::EntryMarker, C: cqueue::EntryM
 
     // add poll
 
-    let poll_e = opcode::PollAdd::new(types::Fd(fd.as_raw_fd()), libc::POLLIN as _);
+    let poll_e = opcode::PollAdd::new(crate::utils::fd_raw(fd.as_raw_fd()), libc::POLLIN as _);
 
     unsafe {
         let mut queue = ring.submission();
@@ -201,7 +201,7 @@ pub fn test_eventfd_poll_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         File::from_raw_fd(fd)
     };
 
-    let poll_e = opcode::PollAdd::new(types::Fd(fd.as_raw_fd()), libc::POLLIN as _).multi(true);
+    let poll_e = opcode::PollAdd::new(crate::utils::fd_raw(fd.as_raw_fd()), libc::POLLIN as _).multi(true);
 
     unsafe {
         let mut queue = ring.submission();

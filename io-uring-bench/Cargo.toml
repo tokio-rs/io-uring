@@ -20,3 +20,6 @@ harness = false
 name = "iovec"
 path = "src/iovec.rs"
 harness = false
+
+[features]
+io_safety = ["io-uring/io_safety"]
