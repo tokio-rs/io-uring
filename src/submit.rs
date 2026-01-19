@@ -9,6 +9,12 @@ use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 use bitflags::bitflags;
 
+#[cfg(feature = "io_safety")]
+use std::os::fd::BorrowedFd;
+
+#[cfg(feature = "io_safety")]
+use crate::register::RegisterFd;
+
 use crate::register::Restriction;
 
 use crate::types;
@@ -375,10 +381,24 @@ impl<'a> Submitter<'a> {
     /// [`Fixed`](crate::types::Fixed).
     ///
     /// Each fd may be -1, in which case it is considered "sparse", and can be filled in later with
-    /// [`register_files_update`](Self::register_files_update).
+    /// [`register_files_update`](Self::register_files_update). In io_safety builds, use
+    /// [`register::SKIP_FILE`](crate::register::SKIP_FILE) for a skipped entry.
     ///
     /// Note that this will wait for the ring to idle; it will only return once all active requests
     /// are complete. Use [`register_files_update`](Self::register_files_update) to avoid this.
+    #[cfg(feature = "io_safety")]
+    pub fn register_files(&self, fds: &[RegisterFd]) -> io::Result<()> {
+        let raw_fds = RegisterFd::as_raw_slice(fds);
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_FILES,
+            raw_fds.as_ptr().cast(),
+            raw_fds.len() as _,
+        )
+        .map(drop)
+    }
+
+    #[cfg(not(feature = "io_safety"))]
     pub fn register_files(&self, fds: &[RawFd]) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -394,8 +414,28 @@ impl<'a> Submitter<'a> {
     /// or replacing an existing entry with a new existing entry. The `offset` parameter specifies
     /// the offset into the list of registered files at which to start updating files.
     ///
+    /// In io_safety builds, use [`register::SKIP_FILE`](crate::register::SKIP_FILE) to remove or skip an entry.
+    ///
     /// You can also perform this asynchronously with the
     /// [`FilesUpdate`](crate::opcode::FilesUpdate) opcode.
+    #[cfg(feature = "io_safety")]
+    pub fn register_files_update(&self, offset: u32, fds: &[RegisterFd]) -> io::Result<usize> {
+        let raw_fds = RegisterFd::as_raw_slice(fds);
+        let fu = sys::io_uring_files_update {
+            offset,
+            resv: 0,
+            fds: raw_fds.as_ptr() as _,
+        };
+        let ret = execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_FILES_UPDATE,
+            cast_ptr::<sys::io_uring_files_update>(&fu).cast(),
+            raw_fds.len() as _,
+        )?;
+        Ok(ret as _)
+    }
+
+    #[cfg(not(feature = "io_safety"))]
     pub fn register_files_update(&self, offset: u32, fds: &[RawFd]) -> io::Result<usize> {
         let fu = sys::io_uring_files_update {
             offset,
@@ -412,6 +452,19 @@ impl<'a> Submitter<'a> {
     }
 
     /// Register an eventfd created by [`eventfd`](libc::eventfd) with the io_uring instance.
+    #[cfg(feature = "io_safety")]
+    pub fn register_eventfd(&self, eventfd: BorrowedFd<'_>) -> io::Result<()> {
+        let eventfd = eventfd.as_raw_fd();
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_EVENTFD,
+            cast_ptr::<RawFd>(&eventfd).cast(),
+            1,
+        )
+        .map(drop)
+    }
+
+    #[cfg(not(feature = "io_safety"))]
     pub fn register_eventfd(&self, eventfd: RawFd) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),
@@ -425,6 +478,19 @@ impl<'a> Submitter<'a> {
     /// This works just like [`register_eventfd`](Self::register_eventfd), except notifications are
     /// only posted for events that complete in an async manner, so requests that complete
     /// immediately will not cause a notification.
+    #[cfg(feature = "io_safety")]
+    pub fn register_eventfd_async(&self, eventfd: BorrowedFd<'_>) -> io::Result<()> {
+        let eventfd = eventfd.as_raw_fd();
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_EVENTFD_ASYNC,
+            cast_ptr::<RawFd>(&eventfd).cast(),
+            1,
+        )
+        .map(drop)
+    }
+
+    #[cfg(not(feature = "io_safety"))]
     pub fn register_eventfd_async(&self, eventfd: RawFd) -> io::Result<()> {
         execute(
             self.fd.as_raw_fd(),

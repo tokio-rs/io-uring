@@ -133,6 +133,12 @@ impl IoUring<squeue::Entry, cqueue::Entry> {
     /// The caller must uphold that the file descriptor is owned and refers to a uring. The
     /// `params` argument must be equivalent to the those previously filled in by the kernel when
     /// the provided ring was created.
+    #[cfg(feature = "io_safety")]
+    pub unsafe fn from_fd(fd: OwnedFd, params: Parameters) -> io::Result<Self> {
+        Self::with_fd_and_params(fd, params.0)
+    }
+
+    #[cfg(not(feature = "io_safety"))]
     pub unsafe fn from_fd(fd: RawFd, params: Parameters) -> io::Result<Self> {
         Self::with_fd_and_params(OwnedFd::from_raw_fd(fd), params.0)
     }
@@ -384,6 +390,14 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
 
     /// Share the asynchronous worker thread backend of this io_uring with the specified io_uring
     /// file descriptor instead of creating a new thread pool.
+    #[cfg(feature = "io_safety")]
+    pub fn setup_attach_wq(&mut self, fd: BorrowedFd<'_>) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_ATTACH_WQ;
+        self.params.wq_fd = fd.as_raw_fd() as _;
+        self
+    }
+
+    #[cfg(not(feature = "io_safety"))]
     pub fn setup_attach_wq(&mut self, fd: RawFd) -> &mut Self {
         self.params.flags |= sys::IORING_SETUP_ATTACH_WQ;
         self.params.wq_fd = fd as _;

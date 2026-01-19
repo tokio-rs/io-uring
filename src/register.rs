@@ -5,6 +5,9 @@ use std::{fmt, io};
 
 use crate::sys;
 
+#[cfg(feature = "io_safety")]
+use std::os::fd::{AsRawFd, BorrowedFd};
+
 pub(crate) fn execute(
     fd: RawFd,
     opcode: libc::c_uint,
@@ -128,11 +131,50 @@ impl Restriction {
     }
 }
 
+/// A file descriptor entry for
+/// [register_files_update](crate::Submitter::register_files_update).
+///
+/// Use [`SKIP_FILE`] to mark a sparse (skipped) entry.
+#[cfg(feature = "io_safety")]
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug)]
+pub struct RegisterFd(RawFd);
+
+#[cfg(feature = "io_safety")]
+impl RegisterFd {
+    /// Sentinel value for skipping a file descriptor entry.
+    pub const SKIP_FILE: Self = Self(sys::IORING_REGISTER_FILES_SKIP as RawFd);
+
+    #[inline]
+    pub fn from_borrowed_fd(fd: BorrowedFd<'_>) -> Self {
+        Self(fd.as_raw_fd())
+    }
+
+    #[inline]
+    pub(crate) fn as_raw_slice(fds: &[RegisterFd]) -> &[RawFd] {
+        // SAFETY: RegisterFd is repr(transparent) over RawFd.
+        unsafe { std::slice::from_raw_parts(fds.as_ptr().cast(), fds.len()) }
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<BorrowedFd<'_>> for RegisterFd {
+    #[inline]
+    fn from(fd: BorrowedFd<'_>) -> Self {
+        Self::from_borrowed_fd(fd)
+    }
+}
+
+/// Sentinel value for skipping a file descriptor entry.
+#[cfg(feature = "io_safety")]
+pub const SKIP_FILE: RegisterFd = RegisterFd::SKIP_FILE;
+
 /// A RawFd, which can be used for
 /// [register_files_update](crate::Submitter::register_files_update).
 ///
 /// File descriptors can be skipped if they are set to `SKIP_FILE`.
 /// Skipping an fd will not touch the file associated with the previous fd at that index.
+#[cfg(not(feature = "io_safety"))]
 pub const SKIP_FILE: RawFd = sys::IORING_REGISTER_FILES_SKIP;
 
 #[test]
