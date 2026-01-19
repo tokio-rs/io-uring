@@ -1,4 +1,5 @@
 use io_uring::{opcode, types, IoUring};
+#[cfg(not(feature = "io_safety"))]
 use std::os::unix::io::AsRawFd;
 use std::{fs, io};
 
@@ -8,7 +9,12 @@ fn main() -> io::Result<()> {
     let fd = fs::File::open("README.md")?;
     let mut buf = vec![0; 1024];
 
-    let read_e = opcode::Read::new(types::Fd(fd.as_raw_fd()), buf.as_mut_ptr(), buf.len() as _)
+    #[cfg(feature = "io_safety")]
+    let fd = types::Fd::from_fd(&fd);
+    #[cfg(not(feature = "io_safety"))]
+    let fd = types::Fd(fd.as_raw_fd());
+
+    let read_e = opcode::Read::new(fd, buf.as_mut_ptr(), buf.len() as _)
         .build()
         .user_data(0x42);
 

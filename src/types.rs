@@ -4,6 +4,9 @@ pub(crate) mod sealed {
     use super::{Fd, Fixed};
     use std::os::unix::io::RawFd;
 
+    #[cfg(feature = "io_safety")]
+    use std::os::fd::{AsFd, AsRawFd, BorrowedFd};
+
     #[derive(Debug)]
     pub enum Target {
         Fd(RawFd),
@@ -38,6 +41,38 @@ pub(crate) mod sealed {
             Target::Fixed(self.0)
         }
     }
+
+    #[cfg(feature = "io_safety")]
+    impl<'fd> UseFd for BorrowedFd<'fd> {
+        #[inline]
+        fn into(self) -> RawFd {
+            self.as_raw_fd()
+        }
+    }
+
+    #[cfg(feature = "io_safety")]
+    impl<T: AsFd + ?Sized> UseFd for &T {
+        #[inline]
+        fn into(self) -> RawFd {
+            self.as_fd().as_raw_fd()
+        }
+    }
+
+    #[cfg(feature = "io_safety")]
+    impl<'fd> UseFixed for BorrowedFd<'fd> {
+        #[inline]
+        fn into(self) -> Target {
+            Target::Fd(self.as_raw_fd())
+        }
+    }
+
+    #[cfg(feature = "io_safety")]
+    impl<T: AsFd + ?Sized> UseFixed for &T {
+        #[inline]
+        fn into(self) -> Target {
+            Target::Fd(self.as_fd().as_raw_fd())
+        }
+    }
 }
 
 use crate::sys;
@@ -46,6 +81,8 @@ use bitflags::bitflags;
 use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
+#[cfg(feature = "io_safety")]
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd};
 use std::os::unix::io::RawFd;
 
 #[deprecated]
@@ -76,9 +113,64 @@ pub struct epoll_event {
 }
 
 /// A file descriptor that has not been registered with io_uring.
-#[derive(Debug, Clone, Copy)]
+#[cfg(not(feature = "io_safety"))]
 #[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Fd(pub RawFd);
+
+#[cfg(feature = "io_safety")]
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Fd(RawFd);
+
+#[cfg(feature = "io_safety")]
+impl Fd {
+    /// current working directory sentinel.
+    pub const AT_FDCWD: Self = Self(libc::AT_FDCWD);
+
+    #[inline]
+    pub const fn as_raw_fd(self) -> RawFd {
+        self.0
+    }
+
+    /// Construct from a raw fd.
+    ///
+    /// # Safety
+    /// Caller must uphold I/O-safety invariants (RFC 3128).
+    #[inline]
+    pub unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        Self(fd)
+    }
+
+    /// Construct from a borrowed file descriptor without exposing the raw value.
+    #[inline]
+    pub fn from_borrowed_fd(fd: BorrowedFd<'_>) -> Self {
+        Self(fd.as_raw_fd())
+    }
+
+    /// Construct from anything that can yield a [`BorrowedFd`].
+    #[inline]
+    pub fn from_fd(fd: &impl AsFd) -> Self {
+        Self::from_borrowed_fd(fd.as_fd())
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl From<BorrowedFd<'_>> for Fd {
+    #[inline]
+    fn from(fd: BorrowedFd<'_>) -> Self {
+        Self::from_borrowed_fd(fd)
+    }
+}
+
+#[cfg(feature = "io_safety")]
+impl<T: AsFd> From<&T> for Fd {
+    #[inline]
+    fn from(fd: &T) -> Self {
+        Self::from_borrowed_fd(fd.as_fd())
+    }
+}
+
 
 /// A file descriptor that has been registered with io_uring using
 /// [`Submitter::register_files`](crate::Submitter::register_files) or [`Submitter::register_files_sparse`](crate::Submitter::register_files_sparse).
@@ -579,6 +671,9 @@ impl<'buf> RecvMsgOut<'buf> {
 /// CancelBuilder::user_data(42);
 ///
 /// // Match a single request with fd = 42.
+/// #[cfg(feature = "io_safety")]
+/// CancelBuilder::fd(unsafe { std::os::fd::BorrowedFd::borrow_raw(42) });
+/// #[cfg(not(feature = "io_safety"))]
 /// CancelBuilder::fd(Fd(42));
 ///
 /// // Match a single request with fixed fd = 42.
@@ -701,6 +796,8 @@ mod tests {
     use std::time::Duration;
 
     use crate::types::sealed::Target;
+    #[cfg(feature = "io_safety")]
+    use std::os::fd::BorrowedFd;
 
     use super::*;
 
@@ -725,6 +822,9 @@ mod tests {
         cb = cb.all();
         assert_eq!(cb.flags, AsyncCancelFlags::ALL);
 
+        #[cfg(feature = "io_safety")]
+        let mut cb = CancelBuilder::fd(unsafe { BorrowedFd::borrow_raw(42) });
+        #[cfg(not(feature = "io_safety"))]
         let mut cb = CancelBuilder::fd(Fd(42));
         assert_eq!(cb.flags, AsyncCancelFlags::FD);
         assert!(matches!(cb.fd, Some(Target::Fd(42))));

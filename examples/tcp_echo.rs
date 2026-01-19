@@ -6,6 +6,17 @@ use std::{io, ptr};
 use io_uring::{opcode, squeue, types, IoUring, SubmissionQueue};
 use slab::Slab;
 
+#[cfg(feature = "io_safety")]
+fn io_fd(fd: RawFd) -> types::Fd {
+    // SAFETY: example ensures the fd remains valid for the lifetime of submitted ops.
+    unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) }.into()
+}
+
+#[cfg(not(feature = "io_safety"))]
+fn io_fd(fd: RawFd) -> types::Fd {
+    types::Fd(fd)
+}
+
 #[derive(Clone, Debug)]
 enum Token {
     Accept,
@@ -32,7 +43,7 @@ pub struct AcceptCount {
 impl AcceptCount {
     fn new(fd: RawFd, token: usize, count: usize) -> AcceptCount {
         AcceptCount {
-            entry: opcode::Accept::new(types::Fd(fd), ptr::null_mut(), ptr::null_mut())
+            entry: opcode::Accept::new(io_fd(fd), ptr::null_mut(), ptr::null_mut())
                 .build()
                 .user_data(token as _),
             count,
@@ -122,7 +133,7 @@ fn main() -> anyhow::Result<()> {
                     let fd = ret;
                     let poll_token = token_alloc.insert(Token::Poll { fd });
 
-                    let poll_e = opcode::PollAdd::new(types::Fd(fd), libc::POLLIN as _)
+                    let poll_e = opcode::PollAdd::new(io_fd(fd), libc::POLLIN as _)
                         .build()
                         .user_data(poll_token as _);
 
@@ -145,7 +156,7 @@ fn main() -> anyhow::Result<()> {
 
                     *token = Token::Read { fd, buf_index };
 
-                    let read_e = opcode::Recv::new(types::Fd(fd), buf.as_mut_ptr(), buf.len() as _)
+                    let read_e = opcode::Recv::new(io_fd(fd), buf.as_mut_ptr(), buf.len() as _)
                         .build()
                         .user_data(token_index as _);
 
@@ -176,7 +187,7 @@ fn main() -> anyhow::Result<()> {
                             offset: 0,
                         };
 
-                        let write_e = opcode::Send::new(types::Fd(fd), buf.as_ptr(), len as _)
+                        let write_e = opcode::Send::new(io_fd(fd), buf.as_ptr(), len as _)
                             .build()
                             .user_data(token_index as _);
 
@@ -200,7 +211,7 @@ fn main() -> anyhow::Result<()> {
 
                         *token = Token::Poll { fd };
 
-                        opcode::PollAdd::new(types::Fd(fd), libc::POLLIN as _)
+                        opcode::PollAdd::new(io_fd(fd), libc::POLLIN as _)
                             .build()
                             .user_data(token_index as _)
                     } else {
@@ -216,7 +227,7 @@ fn main() -> anyhow::Result<()> {
                             len,
                         };
 
-                        opcode::Write::new(types::Fd(fd), buf.as_ptr(), len as _)
+                        opcode::Write::new(io_fd(fd), buf.as_ptr(), len as _)
                             .build()
                             .user_data(token_index as _)
                     };
