@@ -955,6 +955,7 @@ opcode! {
         offset: u64 = 0,
         ioprio: u16 = 0,
         rw_flags: i32 = 0,
+        #[cfg(feature = "write_stream")]
         write_stream: Option<u8> = None
     }
 
@@ -965,7 +966,10 @@ opcode! {
             fd,
             buf, len, offset,
             ioprio, rw_flags,
-            write_stream
+            #[cfg(feature = "write_stream")]
+            write_stream,
+            #[cfg(not(feature = "write_stream"))]
+            write_stream: _,
         } = self;
 
         let mut sqe = sqe_zeroed();
@@ -976,6 +980,7 @@ opcode! {
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset;
         sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
+        #[cfg(feature = "write_stream")]
         if let Some(stream) = write_stream {
             sqe.__bindgen_anon_5.__bindgen_anon_2.write_stream = stream;
         }
