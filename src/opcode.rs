@@ -955,7 +955,7 @@ opcode! {
         offset: u64 = 0,
         ioprio: u16 = 0,
         rw_flags: i32 = 0,
-        #[cfg(feature = "write_stream")]
+        #[cfg_attr(not(feature = "write_stream"), allow(dead_code))]
         write_stream: Option<u8> = None
     }
 
