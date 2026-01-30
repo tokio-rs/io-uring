@@ -966,7 +966,10 @@ opcode! {
             fd,
             buf, len, offset,
             ioprio, rw_flags,
+            #[cfg(feature = "write_stream")]
             write_stream,
+            #[cfg(not(feature = "write_stream"))]
+            write_stream: _,
         } = self;
 
         let mut sqe = sqe_zeroed();
