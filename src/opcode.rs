@@ -956,7 +956,7 @@ opcode! {
         ioprio: u16 = 0,
         rw_flags: i32 = 0,
         #[cfg_attr(not(feature = "write_stream"), allow(dead_code))]
-        write_stream: Option<u8> = None
+        write_stream: u8 = 0
     }
 
     pub const CODE = sys::IORING_OP_WRITE;
@@ -966,10 +966,7 @@ opcode! {
             fd,
             buf, len, offset,
             ioprio, rw_flags,
-            #[cfg(feature = "write_stream")]
             write_stream,
-            #[cfg(not(feature = "write_stream"))]
-            write_stream: _,
         } = self;
 
         let mut sqe = sqe_zeroed();
@@ -981,8 +978,8 @@ opcode! {
         sqe.__bindgen_anon_1.off = offset;
         sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
         #[cfg(feature = "write_stream")]
-        if let Some(stream) = write_stream {
-            sqe.__bindgen_anon_5.__bindgen_anon_2.write_stream = stream;
+        if write_stream != 0 {
+            sqe.__bindgen_anon_5.__bindgen_anon_2.write_stream = write_stream;
         }
         Entry(sqe)
     }
