@@ -128,13 +128,15 @@ impl<E: EntryMarker> Inner<E> {
         let ring_entries = sq_mmap.offset(p.sq_off.ring_entries).cast::<u32>().read();
         let flags        = sq_mmap.offset(p.sq_off.flags       ) as *const atomic::AtomicU32;
         let dropped      = sq_mmap.offset(p.sq_off.dropped     ) as *const atomic::AtomicU32;
-        let array        = sq_mmap.offset(p.sq_off.array       ) as *mut u32;
-
         let sqes         = sqe_mmap.as_mut_ptr() as *mut E;
 
-        // To keep it simple, map it directly to `sqes`.
-        for i in 0..ring_entries {
-            array.add(i as usize).write_volatile(i);
+        // Initialize the SQ array with an identity mapping unless NO_SQARRAY is set, in which case
+        // the kernel consumes SQEs directly by ring index and no array exists.
+        if p.flags & sys::IORING_SETUP_NO_SQARRAY == 0 {
+            let array = sq_mmap.offset(p.sq_off.array) as *mut u32;
+            for i in 0..ring_entries {
+                array.add(i as usize).write_volatile(i);
+            }
         }
 
         Self {
