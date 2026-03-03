@@ -2,7 +2,6 @@
 
 #![allow(clippy::new_without_default)]
 
-use std::convert::TryInto;
 use std::mem;
 use std::os::unix::io::RawFd;
 
@@ -1696,14 +1695,10 @@ opcode! {
     pub fn build(self) -> Entry128 {
         let UringCmd80 { fd, cmd_op, cmd, buf_index, addr } = self;
 
-        let cmd1 = cmd[..16].try_into().unwrap();
-        let cmd2 = cmd[16..].try_into().unwrap();
-
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.__bindgen_anon_1.__bindgen_anon_1.cmd_op = cmd_op;
-        unsafe { *sqe.__bindgen_anon_6.cmd.as_mut().as_mut_ptr().cast::<[u8; 16]>() = cmd1 };
         if let Some(buf_index) = buf_index {
             sqe.__bindgen_anon_4.buf_index = buf_index;
             unsafe {
@@ -1713,7 +1708,7 @@ opcode! {
         if let Some(addr) = addr {
             sqe.__bindgen_anon_2.addr = addr;
         }
-        Entry128(Entry(sqe), cmd2)
+        Entry128::with_cmd(sqe, cmd)
     }
 }
 
