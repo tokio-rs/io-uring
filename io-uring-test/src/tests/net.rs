@@ -1222,6 +1222,89 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_tcp_recv_multi_len<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    use std::io::Write;
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::Send::CODE);
+        test.probe.is_supported(opcode::Recv::CODE);
+        test.probe.is_supported(opcode::SendZc::CODE); // also available 6.0, like the multishot for recv
+        test.probe.is_supported(opcode::ProvideBuffers::CODE);
+    );
+
+    println!("test tcp_recv_multi_len");
+
+    let (mut send_stream, recv_stream) = tcp_pair()?;
+
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+
+    // Send 512 bytes but set len=256 to verify each CQE receives at most 256 bytes.
+    let input = vec![0xab; 512];
+    let mut bufs = vec![0u8; 2 * 512];
+
+    // provide 2 buffers of 512 bytes each
+    let provide_bufs_e = opcode::ProvideBuffers::new(bufs.as_mut_ptr(), 512, 2, 0xbeef, 0);
+
+    unsafe {
+        ring.submission()
+            .push(&provide_bufs_e.build().user_data(0x41).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x41);
+    assert_eq!(cqe.result(), 0);
+
+    send_stream.write_all(&input)?;
+    send_stream.shutdown(Shutdown::Write)?;
+
+    // multishot recv with len=256 on 512-byte buffers, so each CQE should read at most 256 bytes
+    let recv_e = opcode::RecvMulti::new(recv_fd, 0xbeef)
+        .len(256)
+        .build()
+        .user_data(0x42)
+        .into();
+
+    unsafe {
+        ring.submission().push(&recv_e).expect("queue is full");
+    }
+
+    ring.submit_and_wait(3)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 3);
+
+    assert_eq!(cqes[0].user_data(), 0x42);
+    assert!(cqes[0].result() <= 256, "result should be <= len=256");
+    assert!(cqueue::more(cqes[0].flags()));
+
+    assert_eq!(cqes[1].user_data(), 0x42);
+    assert!(cqes[1].result() <= 256, "result should be <= len=256");
+    assert!(cqueue::more(cqes[1].flags()));
+
+    assert_eq!(cqes[2].user_data(), 0x42);
+    assert!(!cqueue::more(cqes[2].flags()));
+    assert_eq!(cqes[2].result(), -libc::ENOBUFS);
+
+    let total = cqes[0].result() + cqes[1].result();
+    assert_eq!(total, 512);
+
+    let len0 = cqes[0].result() as usize;
+    let len1 = cqes[1].result() as usize;
+    let buf_id_0 = cqueue::buffer_select(cqes[0].flags()).unwrap() as usize;
+    let buf_id_1 = cqueue::buffer_select(cqes[1].flags()).unwrap() as usize;
+    assert_eq!(&bufs[buf_id_0 * 512..][..len0], &input[..len0]);
+    assert_eq!(&bufs[buf_id_1 * 512..][..len1], &input[len0..]);
+
+    Ok(())
+}
+
 pub fn test_tcp_recv_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
