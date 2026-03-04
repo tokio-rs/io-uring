@@ -38,12 +38,45 @@ pub trait EntryMarker: Clone + Debug + From<Entry> + private::Sealed {
 /// A 64-byte submission queue entry (SQE), representing a request for an I/O operation.
 ///
 /// These can be created via opcodes in [`opcode`](crate::opcode).
+///
+/// # Example
+///
+/// ```
+/// use io_uring::{opcode, types};
+/// use std::ffi::CString;
+///
+/// let path = CString::new("/etc/passwd").unwrap();
+///
+/// // Create an Entry to open /etc/passwd for reading
+/// let entry = opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), path.as_ptr())
+///     .flags(libc::O_RDONLY)
+///     .build()
+///     .user_data(0x42);
+/// ```
 #[repr(C)]
 pub struct Entry(pub(crate) sys::io_uring_sqe);
 
 /// A 128-byte submission queue entry (SQE), representing a request for an I/O operation.
 ///
-/// These can be created via opcodes in [`opcode`](crate::opcode).
+/// These can be created via opcodes in [`opcode`](crate::opcode), or by converting
+/// from an [`Entry`] using the [`From`] trait.
+///
+/// # Example
+///
+/// ```
+/// use io_uring::{opcode, squeue::Entry128, types};
+/// use std::ffi::CString;
+///
+/// let path = CString::new("/etc/passwd").unwrap();
+///
+/// // Create an Entry128 to open /etc/passwd for reading
+/// let entry = Entry128::from(
+///     opcode::OpenAt::new(types::Fd(libc::AT_FDCWD), path.as_ptr())
+///         .flags(libc::O_RDONLY)
+///         .build()
+///         .user_data(0x42)
+/// );
+/// ```
 #[repr(C)]
 #[derive(Clone)]
 pub struct Entry128(pub(crate) Entry, pub(crate) [u8; 64]);
