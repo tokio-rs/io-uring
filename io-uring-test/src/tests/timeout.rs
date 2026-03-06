@@ -34,7 +34,10 @@ pub fn test_timeout<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x09);
-    assert_eq!(cqes[0].result(), -libc::ETIME);
+    assert_eq!(
+        cqes[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ETIME
+    );
 
     // add timeout but no
 
@@ -63,7 +66,7 @@ pub fn test_timeout<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0b);
-    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(cqes[0].io_result().unwrap(), 0);
 
     // timeout
 
@@ -75,7 +78,10 @@ pub fn test_timeout<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0a);
-    assert_eq!(cqes[0].result(), -libc::ETIME);
+    assert_eq!(
+        cqes[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ETIME
+    );
 
     Ok(())
 }
@@ -116,8 +122,8 @@ pub fn test_timeout_count<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x0c);
     assert_eq!(cqes[1].user_data(), 0x0d);
-    assert_eq!(cqes[0].result(), 0);
-    assert_eq!(cqes[1].result(), 0);
+    assert_eq!(cqes[0].io_result().unwrap(), 0);
+    assert_eq!(cqes[1].io_result().unwrap(), 0);
 
     Ok(())
 }
@@ -170,8 +176,11 @@ pub fn test_timeout_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x10);
     assert_eq!(cqes[1].user_data(), 0x11);
-    assert_eq!(cqes[0].result(), -libc::ECANCELED);
-    assert_eq!(cqes[1].result(), 0);
+    assert_eq!(
+        cqes[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ECANCELED
+    );
+    assert_eq!(cqes[1].io_result().unwrap(), 0);
 
     Ok(())
 }
@@ -226,8 +235,11 @@ pub fn test_timeout_update<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x10);
     assert_eq!(cqes[1].user_data(), 0x11);
-    assert_eq!(cqes[0].result(), -libc::ETIME);
-    assert_eq!(cqes[1].result(), 0);
+    assert_eq!(
+        cqes[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ETIME
+    );
+    assert_eq!(cqes[1].io_result().unwrap(), 0);
 
     Ok(())
 }
@@ -280,8 +292,11 @@ pub fn test_timeout_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x10);
     assert_eq!(cqes[1].user_data(), 0x11);
-    assert_eq!(cqes[0].result(), -libc::ECANCELED);
-    assert_eq!(cqes[1].result(), 0);
+    assert_eq!(
+        cqes[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ECANCELED
+    );
+    assert_eq!(cqes[1].io_result().unwrap(), 0);
 
     Ok(())
 }
@@ -328,7 +343,10 @@ pub fn test_timeout_abs<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x19);
-    assert_eq!(cqes[0].result(), -libc::ETIME);
+    assert_eq!(
+        cqes[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ETIME
+    );
 
     Ok(())
 }
@@ -377,7 +395,7 @@ pub fn test_timeout_submit_args<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x1c);
-    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(cqes[0].io_result().unwrap(), 0);
 
     Ok(())
 }
@@ -429,7 +447,7 @@ pub fn test_timeout_submit_args_min_wait<S: squeue::EntryMarker, C: cqueue::Entr
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x1d);
-    assert_eq!(cqes[0].result(), 0);
+    assert_eq!(cqes[0].io_result().unwrap(), 0);
 
     Ok(())
 }
@@ -467,7 +485,10 @@ pub fn test_timeout_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0c);
-    assert_eq!(cqes[0].result(), -libc::ETIME);
+    assert_eq!(
+        cqes[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ETIME
+    );
     assert!(cqueue::more(cqes[0].flags()));
 
     ring.submit_and_wait(1)?;
@@ -479,7 +500,10 @@ pub fn test_timeout_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x0c);
-    assert_eq!(cqes[0].result(), -libc::ETIME);
+    assert_eq!(
+        cqes[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ETIME
+    );
     assert!(!cqueue::more(cqes[0].flags()));
 
     Ok(())

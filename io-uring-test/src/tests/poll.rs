@@ -47,7 +47,7 @@ pub fn test_eventfd_poll<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x04);
-    assert_eq!(cqes[0].result(), 1);
+    assert_eq!(cqes[0].io_result().unwrap(), 1);
 
     Ok(())
 }
@@ -111,8 +111,11 @@ pub fn test_eventfd_poll_remove<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x05);
     assert_eq!(cqes[1].user_data(), 0x06);
-    assert_eq!(cqes[0].result(), -libc::ECANCELED);
-    assert_eq!(cqes[1].result(), 0);
+    assert_eq!(
+        cqes[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ECANCELED
+    );
+    assert_eq!(cqes[1].io_result().unwrap(), 0);
 
     Ok(())
 }
@@ -173,8 +176,11 @@ pub fn test_eventfd_poll_remove_failed<S: squeue::EntryMarker, C: cqueue::EntryM
     assert_eq!(cqes.len(), 2);
     assert_eq!(cqes[0].user_data(), 0x07);
     assert_eq!(cqes[1].user_data(), 0x08);
-    assert_eq!(cqes[0].result(), 1);
-    assert_eq!(cqes[1].result(), -libc::ENOENT);
+    assert_eq!(cqes[0].io_result().unwrap(), 1);
+    assert_eq!(
+        cqes[1].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ENOENT
+    );
 
     Ok(())
 }
@@ -225,11 +231,11 @@ pub fn test_eventfd_poll_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     assert_eq!(cqes[0].user_data(), 0x04);
     assert!(io_uring::cqueue::more(cqes[0].flags()));
-    assert_eq!(cqes[0].result(), 1);
+    assert_eq!(cqes[0].io_result().unwrap(), 1);
 
     assert_eq!(cqes[1].user_data(), 0x04);
     assert!(io_uring::cqueue::more(cqes[1].flags()));
-    assert_eq!(cqes[1].result(), 1);
+    assert_eq!(cqes[1].io_result().unwrap(), 1);
 
     Ok(())
 }

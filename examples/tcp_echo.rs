@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::net::TcpListener;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::{io, ptr};
+use std::ptr;
 
 use io_uring::{opcode, squeue, types, IoUring, SubmissionQueue};
 use slab::Slab;
@@ -100,17 +100,15 @@ fn main() -> anyhow::Result<()> {
         accept.push_to(&mut sq);
 
         for cqe in &mut cq {
-            let ret = cqe.result();
             let token_index = cqe.user_data() as usize;
 
-            if ret < 0 {
-                eprintln!(
-                    "token {:?} error: {:?}",
-                    token_alloc.get(token_index),
-                    io::Error::from_raw_os_error(-ret)
-                );
-                continue;
-            }
+            let ret = match cqe.io_result() {
+                Ok(x) => x,
+                Err(e) => {
+                    eprintln!("token {:?} error: {e:?}", token_alloc.get(token_index),);
+                    continue;
+                }
+            };
 
             let token = &mut token_alloc[token_index];
             match token.clone() {
@@ -119,7 +117,7 @@ fn main() -> anyhow::Result<()> {
 
                     accept.count += 1;
 
-                    let fd = ret;
+                    let fd = ret as i32;
                     let poll_token = token_alloc.insert(Token::Poll { fd });
 
                     let poll_e = opcode::PollAdd::new(types::Fd(fd), libc::POLLIN as _)

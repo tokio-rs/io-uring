@@ -1,9 +1,9 @@
 //! Completion Queue
 
 use std::fmt::{self, Debug};
-use std::mem;
 use std::mem::MaybeUninit;
 use std::sync::atomic;
+use std::{io, mem};
 
 use crate::sys;
 use crate::util::{private, unsync_load, Mmap};
@@ -199,6 +199,28 @@ impl Entry {
         self.0.res
     }
 
+    /// The result of the operation.  If the operation succeeded, this is the operation-specific
+    /// return value.  For example, for a [`Read`](crate::opcode::Read) operation this is
+    /// equivalent to the return value of the `read(2)` system call.  If the operation failed, an
+    /// error is returned.
+    #[inline]
+    pub fn io_result(&self) -> io::Result<u32> {
+        // The following text is found in many io_uring man pages:
+        //
+        // > Note that where synchronous system calls will return -1 on failure
+        // > and set errno to the actual error value, io_uring never uses errno.
+        // > Instead it returns the negated errno directly in the CQE res field.
+        //
+        // Furthermore, I believe a negative value in the `res` field is
+        // _always_ a negated errno.  We return a `Result` instead for
+        // convenience.
+        if let Ok(x) = u32::try_from(self.0.res) {
+            Ok(x)
+        } else {
+            Err(io::Error::from_raw_os_error(-self.0.res))
+        }
+    }
+
     /// The user data of the request, as set by
     /// [`Entry::user_data`](crate::squeue::Entry::user_data) on the submission queue event.
     #[inline]
@@ -246,6 +268,20 @@ impl Entry32 {
     #[inline]
     pub fn result(&self) -> i32 {
         self.0 .0.res
+    }
+
+    /// The result of the operation.  If the operation succeeded, this is the operation-specific
+    /// return value.  For example, for a [`Read`](crate::opcode::Read) operation this is
+    /// equivalent to the return value of the `read(2)` system call.  If the operation failed, an
+    /// error is returned.
+    #[inline]
+    pub fn io_result(&self) -> io::Result<u32> {
+        // See Entry::io_result() for the justification for this logic.
+        if let Ok(x) = u32::try_from(self.0 .0.res) {
+            Ok(x)
+        } else {
+            Err(io::Error::from_raw_os_error(-self.0 .0.res))
+        }
     }
 
     /// The user data of the request, as set by

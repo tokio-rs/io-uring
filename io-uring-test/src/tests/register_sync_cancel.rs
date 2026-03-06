@@ -76,7 +76,10 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     let completions = wait_get_completions(ring, 1).unwrap();
     assert_eq!(completions.len(), 1);
     assert_eq!(completions[0].user_data(), USER_DATA_0);
-    assert_eq!(completions[0].result(), -libc::ECANCELED);
+    assert_eq!(
+        completions[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ECANCELED
+    );
 
     // Cancel the second and third operation by user_data.
     ring.submitter()
@@ -85,7 +88,10 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     assert_eq!(completions.len(), 2);
     for completion in completions {
         assert_eq!(completion.user_data(), USER_DATA_1);
-        assert_eq!(completion.result(), -libc::ECANCELED);
+        assert_eq!(
+            completion.io_result().unwrap_err().raw_os_error().unwrap(),
+            libc::ECANCELED
+        );
     }
 
     // Cancel the fourth and fifth operation by fd.
@@ -95,7 +101,10 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     assert_eq!(completions.len(), 2);
     for completion in completions {
         assert_eq!(completion.user_data(), USER_DATA_2);
-        assert_eq!(completion.result(), -libc::ECANCELED);
+        assert_eq!(
+            completion.io_result().unwrap_err().raw_os_error().unwrap(),
+            libc::ECANCELED
+        );
     }
 
     // Cancel one of the fixed_fd operations by the fixed_fd.
@@ -104,7 +113,10 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     let completions = wait_get_completions(ring, 1).unwrap();
     assert_eq!(completions.len(), 1);
     assert_eq!(completions[0].user_data(), USER_DATA_3);
-    assert_eq!(completions[0].result(), -libc::ECANCELED);
+    assert_eq!(
+        completions[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ECANCELED
+    );
 
     // Cancel the two remaining fixed_fd operations by the fixed_fd.
     ring.submitter()
@@ -112,7 +124,10 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     let completions = wait_get_completions(ring, 2).unwrap();
     for completion in completions {
         assert_eq!(completion.user_data(), USER_DATA_3);
-        assert_eq!(completion.result(), -libc::ECANCELED);
+        assert_eq!(
+            completion.io_result().unwrap_err().raw_os_error().unwrap(),
+            libc::ECANCELED
+        );
     }
 
     // Cancel all of the remaining requests, should be 3 outstanding.
@@ -122,7 +137,10 @@ pub fn test_register_sync_cancel<S: squeue::EntryMarker, C: cqueue::EntryMarker>
     assert_eq!(completions.len(), 3);
     for completion in completions {
         assert_eq!(completion.user_data(), USER_DATA_4);
-        assert_eq!(completion.result(), -libc::ECANCELED);
+        assert_eq!(
+            completion.io_result().unwrap_err().raw_os_error().unwrap(),
+            libc::ECANCELED
+        );
     }
 
     ring.submitter().unregister_files()?;
@@ -163,7 +181,10 @@ pub fn test_register_sync_cancel_any<S: squeue::EntryMarker, C: cqueue::EntryMar
     let completions = wait_get_completions(ring, 5).unwrap();
     assert_eq!(completions.len(), 3);
     for completion in completions.iter() {
-        assert_eq!(completion.result(), -libc::ECANCELED);
+        assert_eq!(
+            completion.io_result().unwrap_err().raw_os_error().unwrap(),
+            libc::ECANCELED
+        );
     }
     let mut user_data_entries = completions
         .into_iter()
@@ -216,7 +237,10 @@ pub fn test_register_sync_cancel_unsubmitted<S: squeue::EntryMarker, C: cqueue::
     let completions = wait_get_completions(ring, 1)?;
     assert_eq!(completions.len(), 1);
     assert_eq!(completions[0].user_data(), USER_DATA);
-    assert_eq!(completions[0].result(), -libc::ECANCELED);
+    assert_eq!(
+        completions[0].io_result().unwrap_err().raw_os_error().unwrap(),
+        libc::ECANCELED
+    );
 
     Ok(())
 }

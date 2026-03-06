@@ -36,7 +36,7 @@ pub fn test_pipe<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         .map(Into::<cqueue::Entry>::into)
         .next()
         .unwrap();
-    assert!(cqe.result() >= 0);
+    let _ = cqe.io_result().unwrap();
     assert_eq!(cqe.user_data(), REQ_TYPE_PIPE);
 
     // Ensure the fds were assigned.

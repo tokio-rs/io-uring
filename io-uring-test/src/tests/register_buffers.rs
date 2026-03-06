@@ -133,8 +133,8 @@ fn _test_register_buffers<
     cqes.iter().enumerate().for_each(|(index, ce)| {
         assert!(ce.user_data() < BUFFERS as u64);
         assert_eq!(
-            ce.result(),
-            BUF_SIZE as i32,
+            ce.io_result().unwrap(),
+            BUF_SIZE as u32,
             "WriteFixed operation {} failed",
             index
         );
@@ -171,8 +171,8 @@ fn _test_register_buffers<
     cqes.iter().enumerate().for_each(|(index, ce)| {
         assert!(ce.user_data() < BUFFERS as u64);
         assert_eq!(
-            ce.result(),
-            BUF_SIZE as i32,
+            ce.io_result().unwrap(),
+            BUF_SIZE as u32,
             "ReadFixed operation {} failed",
             index
         );
@@ -255,8 +255,9 @@ pub fn test_register_buffers_update<S: squeue::EntryMarker, C: cqueue::EntryMark
     }
 
     // EFAULT is to be expected with incorrect fixed buffers
-    if cqe.result() != -EFAULT {
-        return Err(anyhow::anyhow!("unexpected read result: {}", cqe.result()));
+    match cqe.io_result() {
+        Err(e) if e.raw_os_error() == Some(EFAULT) => (),
+        x => anyhow::bail!("unexpected read result: {x:?}"),
     }
 
     // Register a buffer at the index 5
@@ -309,8 +310,8 @@ pub fn test_register_buffers_update<S: squeue::EntryMarker, C: cqueue::EntryMark
     }
 
     // We should read exactly two bytes
-    if cqe.result() != 2 {
-        return Err(anyhow::anyhow!("unexpected read result: {}", cqe.result()));
+    if cqe.io_result()? != 2 {
+        return Err(anyhow::anyhow!("unexpected read result: {}", cqe.io_result()?));
     }
 
     // The first two bytes of `buf` should be "yo"
