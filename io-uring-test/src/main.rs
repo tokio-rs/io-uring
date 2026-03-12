@@ -71,6 +71,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     };
 
     tests::queue::test_nop(&mut ring, &test)?;
+    tests::queue::test_setup_no_sqarray(&mut ring, &test)?;
     tests::queue::test_queue_split(&mut ring, &test)?;
     tests::queue::test_debug_print(&mut ring, &test)?;
     tests::queue::test_msg_ring_data(&mut ring, &test)?;
