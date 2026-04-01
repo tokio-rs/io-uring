@@ -753,4 +753,39 @@ impl<'a> Submitter<'a> {
         )
         .map(drop)
     }
+
+    /// Register NAPI busy-poll settings on this io_uring ring.
+    ///
+    /// The kernel writes the previous settings back to `napi` before
+    /// applying the new ones.
+    ///
+    /// Available since Linux 6.9.
+    pub fn register_napi(&self, napi: &mut sys::io_uring_napi) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_NAPI,
+            (napi as *mut sys::io_uring_napi).cast::<libc::c_void>().cast_const(),
+            1,
+        )
+        .map(drop)
+    }
+
+    /// Unregister NAPI busy-poll from this io_uring ring.
+    ///
+    /// If `napi` is `Some`, the kernel writes the current settings back
+    /// before disabling.
+    ///
+    /// Available since Linux 6.9.
+    pub fn unregister_napi(&self, napi: Option<&mut sys::io_uring_napi>) -> io::Result<()> {
+        let (ptr, len) = match napi {
+            Some(n) => (
+                (n as *mut sys::io_uring_napi)
+                    .cast::<libc::c_void>()
+                    .cast_const(),
+                1,
+            ),
+            None => (ptr::null(), 0),
+        };
+        execute(self.fd.as_raw_fd(), sys::IORING_UNREGISTER_NAPI, ptr, len).map(drop)
+    }
 }
