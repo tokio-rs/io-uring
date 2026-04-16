@@ -1190,6 +1190,7 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // multishot recv using a buf_group with 1024 length buffers
     let recv_e = opcode::RecvMulti::new(recv_fd, 0xdead)
+        .len(640) // (1024 + 256) / 2 = 640
         .build()
         .user_data(0x22)
         .into();
@@ -1204,16 +1205,16 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 3);
 
     assert_eq!(cqes[0].user_data(), 0x22);
-    assert_eq!(cqes[0].result(), 1024); // length 1024
+    assert_eq!(cqes[0].result(), 640); // length 640
     assert!(cqueue::more(cqes[0].flags()));
     assert_eq!(cqueue::buffer_select(cqes[0].flags()), Some(0));
-    assert_eq!(&bufs[..1024], &input[..1024]);
+    assert_eq!(&bufs[..640], &input[..640]);
 
     assert_eq!(cqes[1].user_data(), 0x22);
-    assert_eq!(cqes[1].result(), 256); // length 256
+    assert_eq!(cqes[1].result(), 640); // length 640
     assert!(cqueue::more(cqes[1].flags()));
     assert_eq!(cqueue::buffer_select(cqes[1].flags()), Some(1));
-    assert_eq!(&bufs[1024..][..256], &input[1024..][..256]);
+    assert_eq!(&bufs[1024..][..640], &input[640..][..640]);
 
     assert_eq!(cqes[2].user_data(), 0x22);
     assert!(!cqueue::more(cqes[2].flags()));
