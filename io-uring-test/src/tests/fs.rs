@@ -81,7 +81,7 @@ pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     .flags(squeue::Flags::IO_LINK)
     .into();
     unsafe { ring.submission().push(&sqe_write0) }?;
-    ring.submit_and_wait(1)?;
+    ring.submit_and_wait(2)?;
 
     // Process one write/read pair. Fills the first buffer in the ring.
 
@@ -125,7 +125,7 @@ pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     .flags(squeue::Flags::IO_LINK)
     .into();
     unsafe { ring.submission().push(&sqe_write1) }?;
-    ring.submit_and_wait(1)?;
+    ring.submit_and_wait(2)?;
 
     // Process one write/read pair. Fills the first buffer in the ring.
 
