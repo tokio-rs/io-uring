@@ -29,6 +29,43 @@ pub fn test_nop<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_setup_no_sqarray<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    _ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require! {
+        test;
+    }
+
+    println!("test setup_no_sqarray");
+
+    let mut ring = match IoUring::<S, C>::builder().setup_no_sqarray().build(8) {
+        Ok(ring) => ring,
+        Err(err) => match err.raw_os_error() {
+            Some(libc::EINVAL) | Some(libc::EOPNOTSUPP) => {
+                println!("IORING_SETUP_NO_SQARRAY is not supported by the kernel, skip");
+                return Ok(());
+            }
+            _ => return Err(err.into()),
+        },
+    };
+
+    let nop_e = opcode::Nop::new().build().user_data(0x4242).into();
+
+    unsafe {
+        ring.submission().push(&nop_e).expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x4242);
+    assert_eq!(cqes[0].result(), 0);
+
+    Ok(())
+}
+
 pub fn test_batch<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
