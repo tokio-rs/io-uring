@@ -429,6 +429,29 @@ impl Debug for Entry {
 }
 
 impl Entry128 {
+    /// Create an Entry128 from an sqe and an 80-byte command parameter.
+    /// The first 16 bytes go into the sqe's cmd field, the remaining 64 bytes
+    /// go into the Entry128's extended area.
+    pub(crate) fn with_cmd(mut sqe: sys::io_uring_sqe, cmd: [u8; 80]) -> Entry128 {
+        let cmd1: [u8; 16] = cmd[..16].try_into().unwrap();
+        let cmd2: [u8; 64] = cmd[16..].try_into().unwrap();
+
+        let sqe_cmd = unsafe {
+            sqe.__bindgen_anon_6
+                .cmd
+                .as_mut()
+                .as_mut_ptr()
+                .cast::<[u8; 16]>()
+        };
+        debug_assert!(
+            unsafe { *sqe_cmd } == [0u8; 16],
+            "cmd field must be unset before setting"
+        );
+        unsafe { *sqe_cmd = cmd1 };
+
+        Entry128(Entry(sqe), cmd2)
+    }
+
     /// Set the submission event's [flags](Flags).
     #[inline]
     pub fn flags(mut self, flags: Flags) -> Entry128 {
