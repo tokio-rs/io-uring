@@ -155,6 +155,23 @@ bitflags! {
     }
 }
 
+bitflags! {
+    /// Options for
+    /// [`Submitter::register_buffers_clone`](super::Submitter::register_buffers_clone) and
+    /// [`Submitter::register_buffers_clone_offset`](super::Submitter::register_buffers_clone_offset).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct CloneBuffersFlags: u32 {
+        /// Interpret `src_fd` as a registered ring descriptor rather than a
+        /// raw file descriptor.
+        const SRC_REGISTERED = sys::IORING_REGISTER_SRC_REGISTERED;
+
+        /// Allow cloning into a destination range that already has buffers
+        /// registered, replacing them. Without this flag the destination
+        /// range must be empty.
+        const DST_REPLACE = sys::IORING_REGISTER_DST_REPLACE;
+    }
+}
+
 /// Wrapper around `open_how` as used in [the `openat2(2)` system
 /// call](https://man7.org/linux/man-pages/man2/openat2.2.html).
 #[derive(Default, Debug, Clone, Copy)]

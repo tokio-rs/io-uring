@@ -4,7 +4,7 @@ use std::{io, mem, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
-use crate::types::{CancelBuilder, Timespec};
+use crate::types::{CancelBuilder, CloneBuffersFlags, Timespec};
 use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 use bitflags::bitflags;
@@ -345,6 +345,57 @@ impl<'a> Submitter<'a> {
             sys::IORING_REGISTER_BUFFERS2,
             cast_ptr::<sys::io_uring_rsrc_register>(&rr).cast(),
             std::mem::size_of::<sys::io_uring_rsrc_register>() as _,
+        )
+        .map(drop)
+    }
+
+    /// Clone the entire registered buffer table from another ring into this one.
+    ///
+    /// `src_fd` is the raw file descriptor of the source `io_uring`. The source's
+    /// buffers are shared with this ring rather than copied, so a single physical
+    /// registration can back many rings without re-pinning the pages in the kernel.
+    ///
+    /// This ring's buffer table must be empty. To clone into a non-empty table or
+    /// to copy a sub-range, use
+    /// [`register_buffers_clone_offset`](Self::register_buffers_clone_offset).
+    ///
+    /// Available since Linux 6.12.
+    pub fn register_buffers_clone(&self, src_fd: RawFd) -> io::Result<()> {
+        self.register_buffers_clone_offset(src_fd, 0, 0, 0, CloneBuffersFlags::empty())
+    }
+
+    /// Clone a range of the registered buffer table from another ring into this one.
+    ///
+    /// `src_fd` is the raw file descriptor of the source `io_uring`. `nr` buffers
+    /// starting at `src_off` in the source table are installed starting at `dst_off`
+    /// in this ring's table. A `nr` of `0` clones the source's entire table.
+    ///
+    /// See [`CloneBuffersFlags`] for replacing an existing destination range or
+    /// treating `src_fd` as a registered ring descriptor.
+    ///
+    /// Available since Linux 6.12.
+    pub fn register_buffers_clone_offset(
+        &self,
+        src_fd: RawFd,
+        src_off: u32,
+        dst_off: u32,
+        nr: u32,
+        flags: CloneBuffersFlags,
+    ) -> io::Result<()> {
+        let arg = sys::io_uring_clone_buffers {
+            src_fd: src_fd as _,
+            flags: flags.bits(),
+            src_off,
+            dst_off,
+            nr,
+            ..Default::default()
+        };
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_CLONE_BUFFERS,
+            cast_ptr::<sys::io_uring_clone_buffers>(&arg).cast(),
+            // This opcode takes a single struct; the kernel requires nr_args == 1.
+            1,
         )
         .map(drop)
     }
