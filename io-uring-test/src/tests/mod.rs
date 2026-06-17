@@ -10,6 +10,7 @@ pub mod queue;
 pub mod register;
 pub mod register_buf_ring;
 pub mod register_buffers;
+pub mod register_napi;
 pub mod register_sync_cancel;
 pub mod regression;
 pub mod timeout;

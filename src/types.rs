@@ -713,6 +713,92 @@ impl FutexWaitV {
     }
 }
 
+/// Strategy the kernel uses to track which NAPI instances to busy-poll, used by
+/// [`Napi::tracking`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NapiTracking {
+    /// The kernel discovers NAPI ids automatically from the sockets used on the ring.
+    Dynamic,
+    /// The application manages the polled NAPI id set explicitly.
+    Static,
+    /// NAPI ids are not tracked.
+    Inactive,
+}
+
+impl NapiTracking {
+    const fn op_param(self) -> u32 {
+        match self {
+            NapiTracking::Dynamic => sys::IO_URING_NAPI_TRACKING_DYNAMIC,
+            NapiTracking::Static => sys::IO_URING_NAPI_TRACKING_STATIC,
+            NapiTracking::Inactive => sys::IO_URING_NAPI_TRACKING_INACTIVE,
+        }
+    }
+}
+
+/// NAPI busy-poll configuration for
+/// [`Submitter::register_napi`](super::Submitter::register_napi) and
+/// [`Submitter::unregister_napi`](super::Submitter::unregister_napi).
+///
+/// On (un)register the kernel writes the *previous* settings back into the value, which
+/// can be read with [`busy_poll_timeout`](Self::busy_poll_timeout) and
+/// [`prefer_busy_poll`](Self::prefer_busy_poll).
+///
+/// Available since Linux 6.9.
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct Napi(sys::io_uring_napi);
+
+impl Napi {
+    pub const fn new() -> Self {
+        Napi(sys::io_uring_napi {
+            busy_poll_to: 0,
+            prefer_busy_poll: 0,
+            opcode: sys::IO_URING_NAPI_REGISTER_OP as _,
+            pad: [0; 2],
+            op_param: sys::IO_URING_NAPI_TRACKING_DYNAMIC,
+            resv: 0,
+        })
+    }
+
+    /// Set the busy-poll timeout, in microseconds.
+    pub const fn set_busy_poll_timeout(mut self, micros: u32) -> Self {
+        self.0.busy_poll_to = micros;
+        self
+    }
+
+    /// Set whether the kernel should prefer busy-polling over interrupts.
+    pub const fn set_prefer_busy_poll(mut self, enabled: bool) -> Self {
+        self.0.prefer_busy_poll = enabled as _;
+        self
+    }
+
+    /// Set the tracking strategy.
+    pub const fn tracking(mut self, strategy: NapiTracking) -> Self {
+        self.0.op_param = strategy.op_param();
+        self
+    }
+
+    /// The busy-poll timeout, in microseconds.
+    pub const fn busy_poll_timeout(&self) -> u32 {
+        self.0.busy_poll_to
+    }
+
+    /// Whether busy-polling is preferred over interrupts.
+    pub const fn prefer_busy_poll(&self) -> bool {
+        self.0.prefer_busy_poll != 0
+    }
+
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut sys::io_uring_napi {
+        &mut self.0
+    }
+}
+
+impl Default for Napi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
