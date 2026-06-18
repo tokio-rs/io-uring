@@ -52,6 +52,7 @@ bitflags!(
 pub struct Submitter<'a> {
     fd: &'a OwnedFd,
     params: &'a Parameters,
+    enter_ring_fd: &'a atomic::AtomicI32,
 
     sq_head: *const atomic::AtomicU32,
     sq_tail: *const atomic::AtomicU32,
@@ -63,6 +64,7 @@ impl<'a> Submitter<'a> {
     pub(crate) const fn new(
         fd: &'a OwnedFd,
         params: &'a Parameters,
+        enter_ring_fd: &'a atomic::AtomicI32,
         sq_head: *const atomic::AtomicU32,
         sq_tail: *const atomic::AtomicU32,
         sq_flags: *const atomic::AtomicU32,
@@ -70,6 +72,7 @@ impl<'a> Submitter<'a> {
         Submitter {
             fd,
             params,
+            enter_ring_fd,
             sq_head,
             sq_tail,
             sq_flags,
@@ -124,15 +127,19 @@ impl<'a> Submitter<'a> {
             .map(|arg| cast_ptr(arg).cast())
             .unwrap_or_else(ptr::null);
         let size = mem::size_of::<T>();
-        sys::io_uring_enter(
-            self.fd.as_raw_fd(),
-            to_submit,
-            min_complete,
-            flag,
-            arg,
-            size,
-        )
-        .map(|res| res as _)
+
+        // If a ring fd has been registered with [`register_ring_fd`](Self::register_ring_fd),
+        // `enter_ring_fd` holds its index (otherwise `-1`); pass it together with
+        // `IORING_ENTER_REGISTERED_RING` instead of the raw file descriptor to avoid the per-call
+        // fd lookup in the kernel.
+        let enter_ring_fd = self.enter_ring_fd.load(atomic::Ordering::Relaxed);
+        let (fd, flag) = if enter_ring_fd >= 0 {
+            (enter_ring_fd, flag | sys::IORING_ENTER_REGISTERED_RING)
+        } else {
+            (self.fd.as_raw_fd(), flag)
+        };
+
+        sys::io_uring_enter(fd, to_submit, min_complete, flag, arg, size).map(|res| res as _)
     }
 
     /// Submit all queued submission queue events to the kernel.
@@ -603,35 +610,49 @@ impl<'a> Submitter<'a> {
     }
 
     /// Register the io_uring instance's own file descriptor with the kernel, so that subsequent
-    /// [`enter`](Self::enter) calls can use [`EnterFlags::REGISTERED_RING`] together with the
-    /// returned index instead of the raw file descriptor. This avoids the per-call file descriptor
-    /// lookup overhead in the kernel.
+    /// [`enter`](Self::enter) calls (including [`submit`](Self::submit) and
+    /// [`submit_and_wait`](Self::submit_and_wait)) automatically pass
+    /// [`EnterFlags::REGISTERED_RING`] together with the registered index instead of the raw file
+    /// descriptor. This avoids the per-call file descriptor lookup overhead in the kernel.
     ///
-    /// Returns the index assigned to the registered ring file descriptor.
+    /// The registration is remembered by the [`IoUring`](crate::IoUring) instance and used
+    /// transparently; call [`unregister_ring_fd`](Self::unregister_ring_fd) to undo it. Calling this
+    /// while a ring fd is already registered returns an `EEXIST` error.
     ///
     /// Available since Linux 5.18.
-    pub fn register_ring_fd(&self) -> io::Result<u32> {
+    pub fn register_ring_fd(&self) -> io::Result<()> {
+        if self.enter_ring_fd.load(atomic::Ordering::Relaxed) >= 0 {
+            return Err(io::Error::from_raw_os_error(libc::EEXIST));
+        }
+        let raw_fd = self.fd.as_raw_fd();
         let mut up = sys::io_uring_rsrc_update {
             offset: u32::MAX,
             resv: 0,
-            data: self.fd.as_raw_fd() as _,
+            data: raw_fd as _,
         };
         execute(
-            self.fd.as_raw_fd(),
+            raw_fd,
             sys::IORING_REGISTER_RING_FDS,
             (&mut up as *mut sys::io_uring_rsrc_update).cast(),
             1,
         )?;
-        Ok(up.offset)
+        self.enter_ring_fd
+            .store(up.offset as i32, atomic::Ordering::Relaxed);
+        Ok(())
     }
 
     /// Unregister a ring file descriptor previously registered with
-    /// [`register_ring_fd`](Self::register_ring_fd). `offset` is the index returned by that call.
+    /// [`register_ring_fd`](Self::register_ring_fd). Subsequent [`enter`](Self::enter) calls revert
+    /// to using the raw file descriptor. Returns an `EINVAL` error if no ring fd is registered.
     ///
     /// Available since Linux 5.18.
-    pub fn unregister_ring_fd(&self, offset: u32) -> io::Result<()> {
+    pub fn unregister_ring_fd(&self) -> io::Result<()> {
+        let offset = self.enter_ring_fd.load(atomic::Ordering::Relaxed);
+        if offset < 0 {
+            return Err(io::Error::from_raw_os_error(libc::EINVAL));
+        }
         let up = sys::io_uring_rsrc_update {
-            offset,
+            offset: offset as u32,
             resv: 0,
             data: 0,
         };
@@ -640,8 +661,9 @@ impl<'a> Submitter<'a> {
             sys::IORING_UNREGISTER_RING_FDS,
             cast_ptr::<sys::io_uring_rsrc_update>(&up).cast(),
             1,
-        )
-        .map(drop)
+        )?;
+        self.enter_ring_fd.store(-1, atomic::Ordering::Relaxed);
+        Ok(())
     }
 
     /// Register buffer ring for provided buffers.

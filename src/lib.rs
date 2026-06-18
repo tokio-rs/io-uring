@@ -56,6 +56,7 @@ pub mod types;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::sync::atomic;
 use std::{cmp, io, mem};
 
 #[cfg(feature = "io_safety")]
@@ -84,6 +85,11 @@ where
     fd: OwnedFd,
     params: Parameters,
     memory: ManuallyDrop<MemoryMap>,
+
+    /// The registered ring fd index used for `io_uring_enter`, or `-1` when no ring fd is
+    /// registered. While set to a valid index (by [`Submitter::register_ring_fd`]), `enter` passes
+    /// it together with `IORING_ENTER_REGISTERED_RING` instead of the raw file descriptor.
+    enter_ring_fd: atomic::AtomicI32,
 }
 
 #[allow(dead_code)]
@@ -217,6 +223,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
             fd,
             params: Parameters(p),
             memory: ManuallyDrop::new(mm),
+            enter_ring_fd: atomic::AtomicI32::new(-1),
         })
     }
 
@@ -227,6 +234,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
         Submitter::new(
             &self.fd,
             &self.params,
+            &self.enter_ring_fd,
             self.sq.head,
             self.sq.tail,
             self.sq.flags,
@@ -269,6 +277,7 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
         let submit = Submitter::new(
             &self.fd,
             &self.params,
+            &self.enter_ring_fd,
             self.sq.head,
             self.sq.tail,
             self.sq.flags,
