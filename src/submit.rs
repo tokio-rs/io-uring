@@ -602,6 +602,48 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
+    /// Register the io_uring instance's own file descriptor with the kernel, so that subsequent
+    /// [`enter`](Self::enter) calls can use [`EnterFlags::REGISTERED_RING`] together with the
+    /// returned index instead of the raw file descriptor. This avoids the per-call file descriptor
+    /// lookup overhead in the kernel.
+    ///
+    /// Returns the index assigned to the registered ring file descriptor.
+    ///
+    /// Available since Linux 5.18.
+    pub fn register_ring_fd(&self) -> io::Result<u32> {
+        let mut up = sys::io_uring_rsrc_update {
+            offset: u32::MAX,
+            resv: 0,
+            data: self.fd.as_raw_fd() as _,
+        };
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_RING_FDS,
+            (&mut up as *mut sys::io_uring_rsrc_update).cast(),
+            1,
+        )?;
+        Ok(up.offset)
+    }
+
+    /// Unregister a ring file descriptor previously registered with
+    /// [`register_ring_fd`](Self::register_ring_fd). `offset` is the index returned by that call.
+    ///
+    /// Available since Linux 5.18.
+    pub fn unregister_ring_fd(&self, offset: u32) -> io::Result<()> {
+        let up = sys::io_uring_rsrc_update {
+            offset,
+            resv: 0,
+            data: 0,
+        };
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_UNREGISTER_RING_FDS,
+            cast_ptr::<sys::io_uring_rsrc_update>(&up).cast(),
+            1,
+        )
+        .map(drop)
+    }
+
     /// Register buffer ring for provided buffers.
     ///
     /// Details can be found in the io_uring_register_buf_ring.3 man page.
