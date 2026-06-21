@@ -349,3 +349,85 @@ fn check_only_timeout<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     Err(anyhow::anyhow!("unexpected completion queue entry"))
 }
+
+// This test manages its own source and destination rings, so unlike its siblings
+// it does not take the harness's shared ring.
+pub fn test_register_buffers_clone(test: &Test) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(WriteFixed::CODE);
+        test.probe.is_supported(ReadFixed::CODE);
+    );
+
+    println!("test register_buffers_clone");
+
+    const BUF_SIZE: usize = 1 << 12; // Page size
+
+    // Use dedicated source and destination rings: cloning requires the destination
+    // buffer table to be empty, so we can't reuse the harness's shared `ring`.
+    let src_ring = IoUring::new(8)?;
+    let mut dst_ring = IoUring::new(8)?;
+
+    // The source ring owns the physical buffer registration.
+    let mut buf = vec![b'Z'; BUF_SIZE];
+    let iovecs = [libc::iovec {
+        iov_base: buf.as_mut_ptr().cast(),
+        iov_len: buf.len(),
+    }];
+    // Safety: `buf` outlives the registration; it is unregistered before returning.
+    unsafe { src_ring.submitter().register_buffers(&iovecs)? };
+
+    // Clone the source table into the destination, sharing the pages.
+    if let Err(e) = dst_ring
+        .submitter()
+        .register_buffers_clone(src_ring.as_raw_fd())
+    {
+        // IORING_REGISTER_CLONE_BUFFERS requires Linux 6.12+.
+        if matches!(e.raw_os_error(), Some(libc::EINVAL | libc::ENOTSUP)) {
+            println!("skipping register_buffers_clone: not supported by this kernel");
+            src_ring.submitter().unregister_buffers()?;
+            return Ok(());
+        }
+        return Err(e.into());
+    }
+
+    // The destination ring can now drive fixed I/O against the cloned buffer.
+    let file = tempfile::tempfile()?;
+    let fd = Fd(file.as_raw_fd());
+
+    let write = WriteFixed::new(fd, buf.as_ptr(), BUF_SIZE as u32, 0)
+        .build()
+        .user_data(1);
+    // Safety: buffer index 0 is registered (cloned) and `buf` is valid here.
+    unsafe { dst_ring.submission().push(&write)? };
+    assert_eq!(dst_ring.submit_and_wait(1)?, 1);
+    let cqe = dst_ring.completion().next().unwrap();
+    assert_eq!(
+        cqe.result(),
+        BUF_SIZE as i32,
+        "WriteFixed via cloned buffer failed"
+    );
+
+    buf.fill(0);
+    let read = ReadFixed::new(fd, buf.as_mut_ptr(), BUF_SIZE as u32, 0)
+        .build()
+        .user_data(2);
+    // Safety: buffer index 0 is registered (cloned) and `buf` is valid here.
+    unsafe { dst_ring.submission().push(&read)? };
+    assert_eq!(dst_ring.submit_and_wait(1)?, 1);
+    let cqe = dst_ring.completion().next().unwrap();
+    assert_eq!(
+        cqe.result(),
+        BUF_SIZE as i32,
+        "ReadFixed via cloned buffer failed"
+    );
+    assert!(
+        buf.iter().all(|&x| x == b'Z'),
+        "data round-tripped incorrectly"
+    );
+
+    dst_ring.submitter().unregister_buffers()?;
+    src_ring.submitter().unregister_buffers()?;
+
+    Ok(())
+}
