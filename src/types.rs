@@ -773,7 +773,7 @@ impl Napi {
     }
 
     /// Set the tracking strategy.
-    pub const fn tracking(mut self, strategy: NapiTracking) -> Self {
+    pub const fn set_tracking(mut self, strategy: NapiTracking) -> Self {
         self.0.op_param = strategy.op_param();
         self
     }

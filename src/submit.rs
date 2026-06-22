@@ -672,7 +672,8 @@ impl<'a> Submitter<'a> {
 
     /// Unregister NAPI busy-poll from this ring.
     ///
-    /// The kernel writes the current settings back into `napi` before disabling them; a
+    /// The kernel writes the current settings back into `napi` before disabling them;
+    /// read them back with [`Napi::busy_poll_timeout`] and [`Napi::prefer_busy_poll`]. A
     /// valid buffer is required, as the kernel rejects a null argument with `EINVAL`.
     ///
     /// Available since Linux 6.9.

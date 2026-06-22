@@ -13,6 +13,8 @@ pub fn test_register_napi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 ) -> io::Result<()> {
     require!(
         test;
+        // IORING_REGISTER_NAPI requires Linux 6.9+.
+        napi_supported(ring);
     );
 
     println!("test register_napi");
@@ -22,14 +24,7 @@ pub fn test_register_napi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     let mut first = Napi::new()
         .set_busy_poll_timeout(60)
         .set_prefer_busy_poll(true);
-    if let Err(e) = ring.submitter().register_napi(&mut first) {
-        // IORING_REGISTER_NAPI requires Linux 6.9+.
-        if matches!(e.raw_os_error(), Some(libc::EINVAL | libc::ENOTSUP)) {
-            println!("skipping register_napi: not supported by this kernel");
-            return Ok(());
-        }
-        return Err(e);
-    }
+    ring.submitter().register_napi(&mut first)?;
     assert_eq!(
         first.busy_poll_timeout(),
         0,
@@ -60,7 +55,7 @@ pub fn test_register_napi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     // Static tracking with explicit NAPI id management (Linux 6.13+). On 6.9-6.12 the
     // kernel rejects the static tracking strategy, so guard on the register succeeding.
-    let mut static_cfg = Napi::new().tracking(NapiTracking::Static);
+    let mut static_cfg = Napi::new().set_tracking(NapiTracking::Static);
     if ring.submitter().register_napi(&mut static_cfg).is_ok() {
         // We have no real NAPI id here (loopback exposes none), so we only confirm the
         // calls reach the kernel; a fabricated id is rejected with EINVAL, which is an
@@ -71,4 +66,17 @@ pub fn test_register_napi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     }
 
     Ok(())
+}
+
+/// Probe whether the kernel supports `IORING_REGISTER_NAPI` by registering and immediately
+/// unregistering a default configuration. Returns `false` on kernels older than 6.9.
+fn napi_supported<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+) -> bool {
+    let mut napi = Napi::new();
+    if ring.submitter().register_napi(&mut napi).is_err() {
+        return false;
+    }
+    let _ = ring.submitter().unregister_napi(&mut napi);
+    true
 }
