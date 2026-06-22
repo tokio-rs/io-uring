@@ -7,6 +7,16 @@ use io_uring::IoUring;
 
 use crate::Test;
 
+/// Exercises the `register_napi` / `unregister_napi` API contract.
+///
+/// Scope is intentionally limited to what is observable and deterministic from a test:
+/// that configuration round-trips through the kernel's write-back (each call reports the
+/// settings previously in effect) and that the static-tracking id ops reach the kernel.
+///
+/// It deliberately does *not* assert NAPI's actual runtime effect — busy-polling the NIC
+/// to lower completion latency. That would require a real network device and timing
+/// measurements that are neither reproducible nor deterministic in CI, so it is out of
+/// scope here.
 pub fn test_register_napi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -57,9 +67,9 @@ pub fn test_register_napi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // kernel rejects the static tracking strategy, so guard on the register succeeding.
     let mut static_cfg = Napi::new().set_tracking(NapiTracking::Static);
     if ring.submitter().register_napi(&mut static_cfg).is_ok() {
-        // We have no real NAPI id here (loopback exposes none), so we only confirm the
-        // calls reach the kernel; a fabricated id is rejected with EINVAL, which is an
-        // acceptable outcome for this exercise.
+        // A real napi_id would come from a socket via SO_INCOMING_NAPI_ID; obtaining one
+        // requires a real NIC, so here we only confirm the add/del ops reach the kernel.
+        // A fabricated id is rejected with EINVAL, which is an acceptable outcome.
         let _ = ring.submitter().register_napi_add_id(1);
         let _ = ring.submitter().register_napi_del_id(1);
         ring.submitter().unregister_napi(&mut Napi::new())?;
