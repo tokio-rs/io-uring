@@ -654,6 +654,18 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_MIN_TIMEOUT != 0
     }
 
+    /// Whether the kernel supports `IORING_ENTER_NO_IOWAIT`.
+    ///
+    /// If this flag is set, [`Submitter::enter`] accepts
+    /// [`EnterFlags::NO_IOWAIT`](crate::EnterFlags::NO_IOWAIT), which
+    /// stops the CQE wait from being accounted as iowait. An always-armed ring
+    /// parked on the wait would otherwise inflate per-task iowait and
+    /// `/proc/pressure/io` even with no I/O outstanding. Available since kernel
+    /// 6.15.
+    pub fn is_feature_no_iowait(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_NO_IOWAIT != 0
+    }
+
     /// The number of submission queue entries allocated.
     pub fn sq_entries(&self) -> u32 {
         self.0.sq_entries
