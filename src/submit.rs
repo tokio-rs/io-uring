@@ -4,7 +4,7 @@ use std::{io, mem, ptr};
 
 use crate::register::{execute, Probe};
 use crate::sys;
-use crate::types::{CancelBuilder, CloneBuffersFlags, Timespec};
+use crate::types::{CancelBuilder, CloneBuffersFlags, Napi, Timespec};
 use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 use bitflags::bitflags;
@@ -649,6 +649,83 @@ impl<'a> Submitter<'a> {
             sys::IORING_REGISTER_IOWQ_MAX_WORKERS,
             max.as_mut_ptr().cast(),
             max.len() as _,
+        )
+        .map(drop)
+    }
+
+    /// Register NAPI busy-poll settings on this ring.
+    ///
+    /// The kernel writes the previous settings back into `napi` before applying the new
+    /// ones; read them back with [`Napi::busy_poll_timeout`] and
+    /// [`Napi::prefer_busy_poll`].
+    ///
+    /// Available since Linux 6.9.
+    pub fn register_napi(&self, napi: &mut Napi) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_NAPI,
+            napi.as_mut_ptr().cast(),
+            1,
+        )
+        .map(drop)
+    }
+
+    /// Unregister NAPI busy-poll from this ring.
+    ///
+    /// The kernel writes the current settings back into `napi` before disabling them;
+    /// read them back with [`Napi::busy_poll_timeout`] and [`Napi::prefer_busy_poll`]. A
+    /// valid buffer is required, as the kernel rejects a null argument with `EINVAL`.
+    ///
+    /// Available since Linux 6.9.
+    pub fn unregister_napi(&self, napi: &mut Napi) -> io::Result<()> {
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_UNREGISTER_NAPI,
+            napi.as_mut_ptr().cast(),
+            1,
+        )
+        .map(drop)
+    }
+
+    /// Add a NAPI id to this ring's statically tracked busy-poll set.
+    ///
+    /// The ring must already be registered with [`NapiTracking::Static`]; otherwise the
+    /// kernel returns an error. `napi_id` identifies a NIC receive-queue NAPI instance,
+    /// typically obtained from a socket via the `SO_INCOMING_NAPI_ID` socket option.
+    ///
+    /// [`NapiTracking::Static`]: crate::types::NapiTracking::Static
+    ///
+    /// Available since Linux 6.13.
+    pub fn register_napi_add_id(&self, napi_id: u32) -> io::Result<()> {
+        self.register_napi_static_op(sys::IO_URING_NAPI_STATIC_ADD_ID as _, napi_id)
+    }
+
+    /// Remove a NAPI id from this ring's statically tracked busy-poll set.
+    ///
+    /// The ring must already be registered with [`NapiTracking::Static`]; otherwise the
+    /// kernel returns an error. See [`register_napi_add_id`](Self::register_napi_add_id).
+    ///
+    /// [`NapiTracking::Static`]: crate::types::NapiTracking::Static
+    ///
+    /// Available since Linux 6.13.
+    pub fn register_napi_del_id(&self, napi_id: u32) -> io::Result<()> {
+        self.register_napi_static_op(sys::IO_URING_NAPI_STATIC_DEL_ID as _, napi_id)
+    }
+
+    fn register_napi_static_op(&self, opcode: u8, napi_id: u32) -> io::Result<()> {
+        // Both ops are issued through IORING_REGISTER_NAPI, distinguished by `opcode`,
+        // with the NAPI id carried in `op_param`. The kernel writes the current settings
+        // back into the struct, so pass a mutable pointer even though we discard them.
+        let mut arg = sys::io_uring_napi {
+            opcode,
+            op_param: napi_id,
+            ..Default::default()
+        };
+        execute(
+            self.fd.as_raw_fd(),
+            sys::IORING_REGISTER_NAPI,
+            (&mut arg as *mut sys::io_uring_napi).cast(),
+            1,
         )
         .map(drop)
     }

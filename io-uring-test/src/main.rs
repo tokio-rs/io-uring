@@ -88,6 +88,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::register_sync_cancel::test_register_sync_cancel(&mut ring, &test)?;
     tests::register_sync_cancel::test_register_sync_cancel_unsubmitted(&mut ring, &test)?;
     tests::register_sync_cancel::test_register_sync_cancel_any(&mut ring, &test)?;
+    tests::register_napi::test_register_napi(&mut ring, &test)?;
 
     // async cancellation
     tests::cancel::test_async_cancel_user_data(&mut ring, &test)?;
