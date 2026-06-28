@@ -2,7 +2,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, mem, ptr};
 
-use crate::register::{execute, Probe};
+use crate::register::{execute, Probe, RegisterRing};
 use crate::sys;
 use crate::types::{CancelBuilder, Timespec};
 use crate::util::{cast_ptr, OwnedFd};
@@ -111,17 +111,17 @@ impl<'a> Submitter<'a> {
         arg: *const libc::c_void,
         len: libc::c_uint,
     ) -> io::Result<i32> {
-        let enter_ring_fd = self.enter_ring_fd;
-        let (fd, opcode) = if enter_ring_fd >= 0 && self.params.is_feature_reg_reg_ring() {
-            (
-                enter_ring_fd,
-                opcode | sys::IORING_REGISTER_USE_REGISTERED_RING,
-            )
-        } else {
-            (self.fd.as_raw_fd(), opcode)
-        };
+        execute(self.register_ring(), opcode, arg, len)
+    }
 
-        execute(fd, opcode, arg, len)
+    #[inline]
+    fn register_ring(&self) -> RegisterRing {
+        let enter_ring_fd = self.enter_ring_fd;
+        if enter_ring_fd >= 0 && self.params.is_feature_reg_reg_ring() {
+            RegisterRing::RegisteredIndex(enter_ring_fd)
+        } else {
+            RegisterRing::RawFd(self.fd.as_raw_fd())
+        }
     }
 
     /// Initiate and/or complete asynchronous I/O. This is a low-level wrapper around
