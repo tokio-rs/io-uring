@@ -289,7 +289,12 @@ pub fn test_race<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         nr: usize,
     ) -> anyhow::Result<()> {
         for rx_idx in events.iter().take(nr) {
-            let mut tmp = [0u8; 16];
+            // The buffer must be a multiple of `DATA.len()`. A size that isn't (such as
+            // the previous 16) can split a write across two reads once the writer gets
+            // ahead and a pipe holds more than one buffer's worth: the read stops mid
+            // `DATA`, leaving a partial chunk that the next level-triggered read observes
+            // as a short read (`len < DATA.len()`), failing the assertion below.
+            let mut tmp = [0u8; DATA.len() * 8];
             // read
             let len = readers[rx_idx.u64 as usize].read(&mut tmp)?;
             // account for possibility of multiple writes

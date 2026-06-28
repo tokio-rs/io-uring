@@ -4,7 +4,7 @@ use std::{io, mem, ptr};
 
 use crate::register::{execute, Probe, RegisterRing};
 use crate::sys;
-use crate::types::{CancelBuilder, Timespec};
+use crate::types::{CancelBuilder, CloneBuffersFlags, Napi, Timespec};
 use crate::util::{cast_ptr, OwnedFd};
 use crate::Parameters;
 use bitflags::bitflags;
@@ -371,6 +371,56 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
+    /// Clone the entire registered buffer table from another ring into this one.
+    ///
+    /// `src_fd` is the raw file descriptor of the source `io_uring`. The source's
+    /// buffers are shared with this ring rather than copied, so a single physical
+    /// registration can back many rings without re-pinning the pages in the kernel.
+    ///
+    /// This ring's buffer table must be empty. To clone into a non-empty table or
+    /// to copy a sub-range, use
+    /// [`register_buffers_clone_offset`](Self::register_buffers_clone_offset).
+    ///
+    /// Available since Linux 6.12.
+    pub fn register_buffers_clone(&self, src_fd: RawFd) -> io::Result<()> {
+        self.register_buffers_clone_offset(src_fd, 0, 0, 0, CloneBuffersFlags::empty())
+    }
+
+    /// Clone a range of the registered buffer table from another ring into this one.
+    ///
+    /// `src_fd` is the raw file descriptor of the source `io_uring`. `nr` buffers
+    /// starting at `src_off` in the source table are installed starting at `dst_off`
+    /// in this ring's table. A `nr` of `0` clones the source's entire table.
+    ///
+    /// See [`CloneBuffersFlags`] for replacing an existing destination range or
+    /// treating `src_fd` as a registered ring descriptor.
+    ///
+    /// Available since Linux 6.12.
+    pub fn register_buffers_clone_offset(
+        &self,
+        src_fd: RawFd,
+        src_off: u32,
+        dst_off: u32,
+        nr: u32,
+        flags: CloneBuffersFlags,
+    ) -> io::Result<()> {
+        let arg = sys::io_uring_clone_buffers {
+            src_fd: src_fd as _,
+            flags: flags.bits(),
+            src_off,
+            dst_off,
+            nr,
+            ..Default::default()
+        };
+        self.execute_register(
+            sys::IORING_REGISTER_CLONE_BUFFERS,
+            cast_ptr::<sys::io_uring_clone_buffers>(&arg).cast(),
+            // This opcode takes a single struct; the kernel requires nr_args == 1.
+            1,
+        )
+        .map(drop)
+    }
+
     /// Registers an empty file table of nr_files number of file descriptors. The sparse variant is
     /// available in kernels 5.19 and later.
     ///
@@ -641,6 +691,72 @@ impl<'a> Submitter<'a> {
         )?;
         self.enter_ring_fd = -1;
         Ok(())
+    }
+
+    /// Register NAPI busy-poll settings on this ring.
+    ///
+    /// The kernel writes the previous settings back into `napi` before applying the new
+    /// ones; read them back with [`Napi::busy_poll_timeout`] and
+    /// [`Napi::prefer_busy_poll`].
+    ///
+    /// Available since Linux 6.9.
+    pub fn register_napi(&self, napi: &mut Napi) -> io::Result<()> {
+        self.execute_register(sys::IORING_REGISTER_NAPI, napi.as_mut_ptr().cast(), 1)
+            .map(drop)
+    }
+
+    /// Unregister NAPI busy-poll from this ring.
+    ///
+    /// The kernel writes the current settings back into `napi` before disabling them;
+    /// read them back with [`Napi::busy_poll_timeout`] and [`Napi::prefer_busy_poll`]. A
+    /// valid buffer is required, as the kernel rejects a null argument with `EINVAL`.
+    ///
+    /// Available since Linux 6.9.
+    pub fn unregister_napi(&self, napi: &mut Napi) -> io::Result<()> {
+        self.execute_register(sys::IORING_UNREGISTER_NAPI, napi.as_mut_ptr().cast(), 1)
+            .map(drop)
+    }
+
+    /// Add a NAPI id to this ring's statically tracked busy-poll set.
+    ///
+    /// The ring must already be registered with [`NapiTracking::Static`]; otherwise the
+    /// kernel returns an error. `napi_id` identifies a NIC receive-queue NAPI instance,
+    /// typically obtained from a socket via the `SO_INCOMING_NAPI_ID` socket option.
+    ///
+    /// [`NapiTracking::Static`]: crate::types::NapiTracking::Static
+    ///
+    /// Available since Linux 6.13.
+    pub fn register_napi_add_id(&self, napi_id: u32) -> io::Result<()> {
+        self.register_napi_static_op(sys::IO_URING_NAPI_STATIC_ADD_ID as _, napi_id)
+    }
+
+    /// Remove a NAPI id from this ring's statically tracked busy-poll set.
+    ///
+    /// The ring must already be registered with [`NapiTracking::Static`]; otherwise the
+    /// kernel returns an error. See [`register_napi_add_id`](Self::register_napi_add_id).
+    ///
+    /// [`NapiTracking::Static`]: crate::types::NapiTracking::Static
+    ///
+    /// Available since Linux 6.13.
+    pub fn register_napi_del_id(&self, napi_id: u32) -> io::Result<()> {
+        self.register_napi_static_op(sys::IO_URING_NAPI_STATIC_DEL_ID as _, napi_id)
+    }
+
+    fn register_napi_static_op(&self, opcode: u8, napi_id: u32) -> io::Result<()> {
+        // Both ops are issued through IORING_REGISTER_NAPI, distinguished by `opcode`,
+        // with the NAPI id carried in `op_param`. The kernel writes the current settings
+        // back into the struct, so pass a mutable pointer even though we discard them.
+        let mut arg = sys::io_uring_napi {
+            opcode,
+            op_param: napi_id,
+            ..Default::default()
+        };
+        self.execute_register(
+            sys::IORING_REGISTER_NAPI,
+            (&mut arg as *mut sys::io_uring_napi).cast(),
+            1,
+        )
+        .map(drop)
     }
 
     /// Register buffer ring for provided buffers.
