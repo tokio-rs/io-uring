@@ -14,7 +14,7 @@ macro_rules! require {
         }
 
         $(
-            cond &= $cond;
+            cond = cond && $cond;
         )*
 
         if !cond {

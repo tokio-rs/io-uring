@@ -71,18 +71,18 @@ pub fn test_register_files_sparse<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
 pub fn test_register_ring_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
-    _test: &Test,
+    test: &Test,
 ) -> anyhow::Result<()> {
+    require!(
+        test;
+        is_register_ring_fd_supported(ring)?;
+    );
+
     println!("test register_ring_fd");
 
-    // register_ring_fd was introduced in kernel 5.18. Skip the test if it is not supported.
     let mut submitter = ring.submitter();
     match submitter.register_ring_fd() {
         Ok(()) => {}
-        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
-            println!("register_ring_fd not supported, skipping");
-            return Ok(());
-        }
         Err(e) => return Err(anyhow::anyhow!("register_ring_fd failed: {}", e)),
     }
 
@@ -100,6 +100,9 @@ pub fn test_register_ring_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
             ));
         }
     }
+
+    let mut probe = io_uring::Probe::new();
+    submitter.register_probe(&mut probe)?;
 
     let mut other_submitter = ring.submitter();
     match other_submitter.unregister_ring_fd() {
@@ -182,4 +185,19 @@ pub fn test_register_ring_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes[0].result(), 0);
 
     Ok(())
+}
+
+fn is_register_ring_fd_supported<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+) -> anyhow::Result<bool> {
+    let mut submitter = ring.submitter();
+
+    match submitter.register_ring_fd() {
+        Ok(()) => {
+            submitter.unregister_ring_fd()?;
+            Ok(true)
+        }
+        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => Ok(false),
+        Err(e) => Err(anyhow::anyhow!("register_ring_fd probe failed: {}", e)),
+    }
 }
