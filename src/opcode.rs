@@ -954,7 +954,9 @@ opcode! {
         /// like the `read(2)` and `write(2)` system calls.
         offset: u64 = 0,
         ioprio: u16 = 0,
-        rw_flags: i32 = 0
+        rw_flags: i32 = 0,
+        #[cfg_attr(not(feature = "write_stream"), allow(dead_code))]
+        write_stream: u8 = 0
     }
 
     pub const CODE = sys::IORING_OP_WRITE;
@@ -963,7 +965,11 @@ opcode! {
         let Write {
             fd,
             buf, len, offset,
-            ioprio, rw_flags
+            ioprio, rw_flags,
+            #[cfg(feature = "write_stream")]
+            write_stream,
+            #[cfg(not(feature = "write_stream"))]
+            write_stream: _,
         } = self;
 
         let mut sqe = sqe_zeroed();
@@ -974,6 +980,10 @@ opcode! {
         sqe.len = len;
         sqe.__bindgen_anon_1.off = offset;
         sqe.__bindgen_anon_3.rw_flags = rw_flags as _;
+        #[cfg(feature = "write_stream")]
+        if write_stream != 0 {
+            sqe.__bindgen_anon_5.__bindgen_anon_2.write_stream = write_stream;
+        }
         Entry(sqe)
     }
 }

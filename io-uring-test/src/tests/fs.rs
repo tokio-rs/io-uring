@@ -27,6 +27,57 @@ pub fn test_file_write_read<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+#[cfg(feature = "write_stream")]
+pub fn test_file_write_stream<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Write::CODE);
+        test.probe.is_supported(opcode::Read::CODE);
+    );
+
+    println!("test file_write_stream");
+
+    let fd = tempfile::tempfile()?;
+    let fd = types::Fd(fd.as_raw_fd());
+
+    let text = b"The quick brown fox jumps over the lazy dog.";
+    let mut output = vec![0; text.len()];
+
+    let write_e = opcode::Write::new(fd, text.as_ptr(), text.len() as _).write_stream(0);
+
+    let read_e = opcode::Read::new(fd, output.as_mut_ptr(), output.len() as _);
+
+    unsafe {
+        let mut queue = ring.submission();
+        let write_e = write_e
+            .build()
+            .user_data(0x01)
+            .flags(squeue::Flags::IO_LINK)
+            .into();
+        queue.push(&write_e).expect("queue is full");
+        queue
+            .push(&read_e.build().user_data(0x02).into())
+            .expect("queue is full");
+    }
+
+    assert_eq!(ring.submit_and_wait(2)?, 2);
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+
+    assert_eq!(cqes.len(), 2);
+    assert_eq!(cqes[0].user_data(), 0x01);
+    assert_eq!(cqes[1].user_data(), 0x02);
+    assert_eq!(cqes[0].result(), text.len() as i32);
+    assert_eq!(cqes[1].result(), text.len() as i32);
+
+    assert_eq!(&output[..cqes[1].result() as usize], text);
+
+    Ok(())
+}
+
 pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
