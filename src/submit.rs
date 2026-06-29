@@ -702,13 +702,8 @@ impl<'a> Submitter<'a> {
     ///
     /// Available since Linux 6.9.
     pub fn register_napi(&self, napi: &mut Napi) -> io::Result<()> {
-        execute(
-            RegisterRing::RawFd(self.fd.as_raw_fd()),
-            sys::IORING_REGISTER_NAPI,
-            napi.as_mut_ptr().cast(),
-            1,
-        )
-        .map(drop)
+        self.execute_register(sys::IORING_REGISTER_NAPI, napi.as_mut_ptr().cast(), 1)
+            .map(drop)
     }
 
     /// Unregister NAPI busy-poll from this ring.
@@ -719,13 +714,8 @@ impl<'a> Submitter<'a> {
     ///
     /// Available since Linux 6.9.
     pub fn unregister_napi(&self, napi: &mut Napi) -> io::Result<()> {
-        execute(
-            RegisterRing::RawFd(self.fd.as_raw_fd()),
-            sys::IORING_UNREGISTER_NAPI,
-            napi.as_mut_ptr().cast(),
-            1,
-        )
-        .map(drop)
+        self.execute_register(sys::IORING_UNREGISTER_NAPI, napi.as_mut_ptr().cast(), 1)
+            .map(drop)
     }
 
     /// Add a NAPI id to this ring's statically tracked busy-poll set.
@@ -762,8 +752,7 @@ impl<'a> Submitter<'a> {
             op_param: napi_id,
             ..Default::default()
         };
-        execute(
-            RegisterRing::RawFd(self.fd.as_raw_fd()),
+        self.execute_register(
             sys::IORING_REGISTER_NAPI,
             (&mut arg as *mut sys::io_uring_napi).cast(),
             1,
