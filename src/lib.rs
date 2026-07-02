@@ -638,6 +638,10 @@ impl Parameters {
         self.0.features & sys::IORING_FEAT_LINKED_FILE != 0
     }
 
+    pub(crate) fn is_feature_reg_reg_ring(&self) -> bool {
+        self.0.features & sys::IORING_FEAT_REG_REG_RING != 0
+    }
+
     /// Whether the kernel supports `IORING_RECVSEND_BUNDLE`.
     ///
     /// This feature allows sending and recieving multiple buffers as a single bundle. Available
