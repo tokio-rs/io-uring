@@ -2,7 +2,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic;
 use std::{io, mem, ptr};
 
-use crate::register::{execute, Probe};
+use crate::register::{execute, Probe, RegisterRing};
 use crate::sys;
 use crate::types::{CancelBuilder, CloneBuffersFlags, Napi, Timespec};
 use crate::util::{cast_ptr, OwnedFd};
@@ -52,6 +52,7 @@ bitflags!(
 pub struct Submitter<'a> {
     fd: &'a OwnedFd,
     params: &'a Parameters,
+    enter_ring_fd: i32,
 
     sq_head: *const atomic::AtomicU32,
     sq_tail: *const atomic::AtomicU32,
@@ -70,6 +71,7 @@ impl<'a> Submitter<'a> {
         Submitter {
             fd,
             params,
+            enter_ring_fd: -1,
             sq_head,
             sq_tail,
             sq_flags,
@@ -102,6 +104,26 @@ impl<'a> Submitter<'a> {
         }
     }
 
+    #[inline]
+    fn execute_register(
+        &self,
+        opcode: libc::c_uint,
+        arg: *const libc::c_void,
+        len: libc::c_uint,
+    ) -> io::Result<i32> {
+        execute(self.register_ring(), opcode, arg, len)
+    }
+
+    #[inline]
+    fn register_ring(&self) -> RegisterRing {
+        let enter_ring_fd = self.enter_ring_fd;
+        if enter_ring_fd >= 0 && self.params.is_feature_reg_reg_ring() {
+            RegisterRing::RegisteredIndex(enter_ring_fd)
+        } else {
+            RegisterRing::RawFd(self.fd.as_raw_fd())
+        }
+    }
+
     /// Initiate and/or complete asynchronous I/O. This is a low-level wrapper around
     /// `io_uring_enter` - see `man io_uring_enter` (or [its online
     /// version](https://manpages.debian.org/unstable/liburing-dev/io_uring_enter.2.en.html) for
@@ -124,15 +146,19 @@ impl<'a> Submitter<'a> {
             .map(|arg| cast_ptr(arg).cast())
             .unwrap_or_else(ptr::null);
         let size = mem::size_of::<T>();
-        sys::io_uring_enter(
-            self.fd.as_raw_fd(),
-            to_submit,
-            min_complete,
-            flag,
-            arg,
-            size,
-        )
-        .map(|res| res as _)
+
+        // If a ring fd has been registered with [`register_ring_fd`](Self::register_ring_fd),
+        // `enter_ring_fd` holds its index (otherwise `-1`); pass it together with
+        // `IORING_ENTER_REGISTERED_RING` instead of the raw file descriptor to avoid the per-call
+        // fd lookup in the kernel.
+        let enter_ring_fd = self.enter_ring_fd;
+        let (fd, flag) = if enter_ring_fd >= 0 {
+            (enter_ring_fd, flag | sys::IORING_ENTER_REGISTERED_RING)
+        } else {
+            (self.fd.as_raw_fd(), flag)
+        };
+
+        sys::io_uring_enter(fd, to_submit, min_complete, flag, arg, size).map(|res| res as _)
     }
 
     /// Submit all queued submission queue events to the kernel.
@@ -238,8 +264,7 @@ impl<'a> Submitter<'a> {
     /// be valid until buffers are unregistered or the ring destroyed, otherwise undefined
     /// behaviour may occur.
     pub unsafe fn register_buffers(&self, bufs: &[libc::iovec]) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_BUFFERS,
             bufs.as_ptr().cast(),
             bufs.len() as _,
@@ -281,8 +306,7 @@ impl<'a> Submitter<'a> {
             ..Default::default()
         };
 
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_BUFFERS_UPDATE,
             cast_ptr::<sys::io_uring_rsrc_update2>(&rr).cast(),
             std::mem::size_of::<sys::io_uring_rsrc_update2>() as _,
@@ -316,8 +340,7 @@ impl<'a> Submitter<'a> {
             tags: tags.as_ptr() as _,
             ..Default::default()
         };
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_BUFFERS2,
             cast_ptr::<sys::io_uring_rsrc_register>(&rr).cast(),
             std::mem::size_of::<sys::io_uring_rsrc_register>() as _,
@@ -340,8 +363,7 @@ impl<'a> Submitter<'a> {
             flags: sys::IORING_RSRC_REGISTER_SPARSE,
             ..Default::default()
         };
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_BUFFERS2,
             cast_ptr::<sys::io_uring_rsrc_register>(&rr).cast(),
             std::mem::size_of::<sys::io_uring_rsrc_register>() as _,
@@ -391,7 +413,7 @@ impl<'a> Submitter<'a> {
             ..Default::default()
         };
         execute(
-            self.fd.as_raw_fd(),
+            RegisterRing::RawFd(self.fd.as_raw_fd()),
             sys::IORING_REGISTER_CLONE_BUFFERS,
             cast_ptr::<sys::io_uring_clone_buffers>(&arg).cast(),
             // This opcode takes a single struct; the kernel requires nr_args == 1.
@@ -413,8 +435,7 @@ impl<'a> Submitter<'a> {
             data: 0,
             tags: 0,
         };
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_FILES2,
             cast_ptr::<sys::io_uring_rsrc_register>(&rr).cast(),
             mem::size_of::<sys::io_uring_rsrc_register>() as _,
@@ -431,8 +452,7 @@ impl<'a> Submitter<'a> {
     /// Note that this will wait for the ring to idle; it will only return once all active requests
     /// are complete. Use [`register_files_update`](Self::register_files_update) to avoid this.
     pub fn register_files(&self, fds: &[RawFd]) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_FILES,
             fds.as_ptr().cast(),
             fds.len() as _,
@@ -453,8 +473,7 @@ impl<'a> Submitter<'a> {
             resv: 0,
             fds: fds.as_ptr() as _,
         };
-        let ret = execute(
-            self.fd.as_raw_fd(),
+        let ret = self.execute_register(
             sys::IORING_REGISTER_FILES_UPDATE,
             cast_ptr::<sys::io_uring_files_update>(&fu).cast(),
             fds.len() as _,
@@ -464,8 +483,7 @@ impl<'a> Submitter<'a> {
 
     /// Register an eventfd created by [`eventfd`](libc::eventfd) with the io_uring instance.
     pub fn register_eventfd(&self, eventfd: RawFd) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_EVENTFD,
             cast_ptr::<RawFd>(&eventfd).cast(),
             1,
@@ -477,8 +495,7 @@ impl<'a> Submitter<'a> {
     /// only posted for events that complete in an async manner, so requests that complete
     /// immediately will not cause a notification.
     pub fn register_eventfd_async(&self, eventfd: RawFd) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_EVENTFD_ASYNC,
             cast_ptr::<RawFd>(&eventfd).cast(),
             1,
@@ -506,8 +523,7 @@ impl<'a> Submitter<'a> {
     /// # }
     /// ```
     pub fn register_probe(&self, probe: &mut Probe) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_PROBE,
             probe.as_mut_ptr() as *const _,
             Probe::COUNT as _,
@@ -525,12 +541,7 @@ impl<'a> Submitter<'a> {
     ///
     /// [`Parameters::is_feature_cur_personality`]: crate::Parameters::is_feature_cur_personality
     pub fn register_personality(&self) -> io::Result<u16> {
-        let id = execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_REGISTER_PERSONALITY,
-            ptr::null(),
-            0,
-        )?;
+        let id = self.execute_register(sys::IORING_REGISTER_PERSONALITY, ptr::null(), 0)?;
         Ok(id as u16)
     }
 
@@ -541,13 +552,8 @@ impl<'a> Submitter<'a> {
     ///
     /// Available since Linux 5.1.
     pub fn unregister_buffers(&self) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_UNREGISTER_BUFFERS,
-            ptr::null(),
-            0,
-        )
-        .map(drop)
+        self.execute_register(sys::IORING_UNREGISTER_BUFFERS, ptr::null(), 0)
+            .map(drop)
     }
 
     /// Unregister all previously registered files.
@@ -555,30 +561,19 @@ impl<'a> Submitter<'a> {
     /// You do not need to explicitly call this before dropping the [`IoUring`](crate::IoUring), as
     /// it will be cleaned up by the kernel automatically.
     pub fn unregister_files(&self) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_UNREGISTER_FILES,
-            ptr::null(),
-            0,
-        )
-        .map(drop)
+        self.execute_register(sys::IORING_UNREGISTER_FILES, ptr::null(), 0)
+            .map(drop)
     }
 
     /// Unregister an eventfd file descriptor to stop notifications.
     pub fn unregister_eventfd(&self) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_UNREGISTER_EVENTFD,
-            ptr::null(),
-            0,
-        )
-        .map(drop)
+        self.execute_register(sys::IORING_UNREGISTER_EVENTFD, ptr::null(), 0)
+            .map(drop)
     }
 
     /// Unregister a previously registered personality.
     pub fn unregister_personality(&self, personality: u16) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_UNREGISTER_PERSONALITY,
             ptr::null(),
             personality as _,
@@ -591,8 +586,7 @@ impl<'a> Submitter<'a> {
     ///
     /// This can only be called once, to prevent untrusted code from removing restrictions.
     pub fn register_restrictions(&self, res: &mut [Restriction]) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_RESTRICTIONS,
             res.as_mut_ptr().cast(),
             res.len() as _,
@@ -603,21 +597,15 @@ impl<'a> Submitter<'a> {
     /// Enable the rings of the io_uring instance if they have been disabled with
     /// [`setup_r_disabled`](crate::Builder::setup_r_disabled).
     pub fn register_enable_rings(&self) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_REGISTER_ENABLE_RINGS,
-            ptr::null(),
-            0,
-        )
-        .map(drop)
+        self.execute_register(sys::IORING_REGISTER_ENABLE_RINGS, ptr::null(), 0)
+            .map(drop)
     }
 
     /// Tell io_uring on what CPUs the async workers can run. By default, async workers
     /// created by io_uring will inherit the CPU mask of its parent. This is usually
     /// all the CPUs in the system, unless the parent is being run with a limited set.
     pub fn register_iowq_aff(&self, cpu_set: &libc::cpu_set_t) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_IOWQ_AFF,
             cpu_set as *const _ as *const libc::c_void,
             mem::size_of::<libc::cpu_set_t>() as u32,
@@ -627,13 +615,8 @@ impl<'a> Submitter<'a> {
 
     /// Undoes a CPU mask previously set with register_iowq_aff
     pub fn unregister_iowq_aff(&self) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_UNREGISTER_IOWQ_AFF,
-            ptr::null(),
-            0,
-        )
-        .map(drop)
+        self.execute_register(sys::IORING_UNREGISTER_IOWQ_AFF, ptr::null(), 0)
+            .map(drop)
     }
 
     /// Get and/or set the limit for number of io_uring worker threads per NUMA
@@ -644,13 +627,71 @@ impl<'a> Submitter<'a> {
     /// on sockets. Passing `0` does not change the current limit. Returns
     /// previous limits on success.
     pub fn register_iowq_max_workers(&self, max: &mut [u32; 2]) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_IOWQ_MAX_WORKERS,
             max.as_mut_ptr().cast(),
             max.len() as _,
         )
         .map(drop)
+    }
+
+    /// Register the io_uring instance's own file descriptor with the kernel, so that subsequent
+    /// [`enter`](Self::enter) calls (including [`submit`](Self::submit) and
+    /// [`submit_and_wait`](Self::submit_and_wait)) automatically pass
+    /// [`EnterFlags::REGISTERED_RING`] together with the registered index instead of the raw file
+    /// descriptor. This avoids the per-call file descriptor lookup overhead in the kernel.
+    ///
+    /// The registration is remembered by this [`Submitter`] and used transparently; call
+    /// [`unregister_ring_fd`](Self::unregister_ring_fd) on the same [`Submitter`] to undo it.
+    /// Calling this while a ring fd is already registered on this [`Submitter`] returns an `EEXIST`
+    /// error.
+    ///
+    /// On kernels with `IORING_FEAT_REG_REG_RING`, registration methods on this [`Submitter`] also
+    /// use the registered ring fd internally.
+    ///
+    /// Available since Linux 5.18.
+    pub fn register_ring_fd(&mut self) -> io::Result<()> {
+        if self.enter_ring_fd >= 0 {
+            return Err(io::Error::from_raw_os_error(libc::EEXIST));
+        }
+        let raw_fd = self.fd.as_raw_fd();
+        let mut up = sys::io_uring_rsrc_update {
+            offset: u32::MAX,
+            resv: 0,
+            data: raw_fd as _,
+        };
+        self.execute_register(
+            sys::IORING_REGISTER_RING_FDS,
+            (&mut up as *mut sys::io_uring_rsrc_update).cast(),
+            1,
+        )?;
+        self.enter_ring_fd = up.offset as i32;
+        Ok(())
+    }
+
+    /// Unregister a ring file descriptor previously registered with
+    /// [`register_ring_fd`](Self::register_ring_fd). Subsequent [`enter`](Self::enter) calls revert
+    /// to using the raw file descriptor, as do subsequent registration calls. Returns an `EINVAL`
+    /// error if no ring fd is registered.
+    ///
+    /// Available since Linux 5.18.
+    pub fn unregister_ring_fd(&mut self) -> io::Result<()> {
+        let offset = self.enter_ring_fd;
+        if offset < 0 {
+            return Err(io::Error::from_raw_os_error(libc::EINVAL));
+        }
+        let up = sys::io_uring_rsrc_update {
+            offset: offset as u32,
+            resv: 0,
+            data: 0,
+        };
+        self.execute_register(
+            sys::IORING_UNREGISTER_RING_FDS,
+            cast_ptr::<sys::io_uring_rsrc_update>(&up).cast(),
+            1,
+        )?;
+        self.enter_ring_fd = -1;
+        Ok(())
     }
 
     /// Register NAPI busy-poll settings on this ring.
@@ -661,13 +702,8 @@ impl<'a> Submitter<'a> {
     ///
     /// Available since Linux 6.9.
     pub fn register_napi(&self, napi: &mut Napi) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_REGISTER_NAPI,
-            napi.as_mut_ptr().cast(),
-            1,
-        )
-        .map(drop)
+        self.execute_register(sys::IORING_REGISTER_NAPI, napi.as_mut_ptr().cast(), 1)
+            .map(drop)
     }
 
     /// Unregister NAPI busy-poll from this ring.
@@ -678,13 +714,8 @@ impl<'a> Submitter<'a> {
     ///
     /// Available since Linux 6.9.
     pub fn unregister_napi(&self, napi: &mut Napi) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
-            sys::IORING_UNREGISTER_NAPI,
-            napi.as_mut_ptr().cast(),
-            1,
-        )
-        .map(drop)
+        self.execute_register(sys::IORING_UNREGISTER_NAPI, napi.as_mut_ptr().cast(), 1)
+            .map(drop)
     }
 
     /// Add a NAPI id to this ring's statically tracked busy-poll set.
@@ -721,8 +752,7 @@ impl<'a> Submitter<'a> {
             op_param: napi_id,
             ..Default::default()
         };
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_NAPI,
             (&mut arg as *mut sys::io_uring_napi).cast(),
             1,
@@ -786,8 +816,7 @@ impl<'a> Submitter<'a> {
             flags,
             ..Default::default()
         };
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_PBUF_RING,
             cast_ptr::<sys::io_uring_buf_reg>(&arg).cast(),
             1,
@@ -805,8 +834,7 @@ impl<'a> Submitter<'a> {
             bgid,
             ..Default::default()
         };
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_UNREGISTER_PBUF_RING,
             cast_ptr::<sys::io_uring_buf_reg>(&arg).cast(),
             1,
@@ -860,8 +888,7 @@ impl<'a> Submitter<'a> {
             ..Default::default()
         };
 
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_SYNC_CANCEL,
             cast_ptr::<sys::io_uring_sync_cancel_reg>(&arg).cast(),
             1,
@@ -873,8 +900,7 @@ impl<'a> Submitter<'a> {
     ///
     /// Available since 6.15.
     pub fn register_ifq(&self, reg: &sys::io_uring_zcrx_ifq_reg) -> io::Result<()> {
-        execute(
-            self.fd.as_raw_fd(),
+        self.execute_register(
             sys::IORING_REGISTER_ZCRX_IFQ,
             cast_ptr::<sys::io_uring_zcrx_ifq_reg>(reg) as _,
             1,

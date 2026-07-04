@@ -68,3 +68,136 @@ pub fn test_register_files_sparse<S: squeue::EntryMarker, C: cqueue::EntryMarker
 
     Ok(())
 }
+
+pub fn test_register_ring_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        is_register_ring_fd_supported(ring)?;
+    );
+
+    println!("test register_ring_fd");
+
+    let mut submitter = ring.submitter();
+    match submitter.register_ring_fd() {
+        Ok(()) => {}
+        Err(e) => return Err(anyhow::anyhow!("register_ring_fd failed: {}", e)),
+    }
+
+    match submitter.register_ring_fd() {
+        Err(e) if e.raw_os_error() == Some(libc::EEXIST) => {}
+        Ok(()) => {
+            return Err(anyhow::anyhow!(
+                "register_ring_fd should not have succeeded twice on the same submitter"
+            ));
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "register_ring_fd should have failed with EEXIST on the same submitter: {}",
+                e
+            ));
+        }
+    }
+
+    let mut probe = io_uring::Probe::new();
+    submitter.register_probe(&mut probe)?;
+
+    let mut other_submitter = ring.submitter();
+    match other_submitter.unregister_ring_fd() {
+        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {}
+        Ok(()) => {
+            return Err(anyhow::anyhow!(
+                "unregister_ring_fd should be scoped to the registering submitter"
+            ));
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "unregister_ring_fd should have failed with EINVAL on an unregistered submitter: {}",
+                e
+            ));
+        }
+    }
+    other_submitter.register_ring_fd()?;
+    match other_submitter.register_ring_fd() {
+        Err(e) if e.raw_os_error() == Some(libc::EEXIST) => {}
+        Ok(()) => {
+            return Err(anyhow::anyhow!(
+                "register_ring_fd should not have succeeded twice on another submitter"
+            ));
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "register_ring_fd should have failed with EEXIST on another submitter: {}",
+                e
+            ));
+        }
+    }
+    other_submitter.unregister_ring_fd()?;
+
+    submitter.unregister_ring_fd()?;
+
+    let (mut submitter, mut sq, mut cq) = ring.split();
+    submitter.register_ring_fd()?;
+
+    // Submitting now transparently goes through the registered ring index.
+    let nop = opcode::Nop::new().build().user_data(0x42).into();
+    unsafe {
+        sq.push(&nop).expect("submission queue is full");
+    }
+    sq.sync();
+    submitter.submit_and_wait(1)?;
+    cq.sync();
+    let cqes: Vec<cqueue::Entry> = cq.by_ref().map(Into::into).collect();
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x42);
+    assert_eq!(cqes[0].result(), 0);
+
+    submitter.unregister_ring_fd()?;
+
+    match submitter.unregister_ring_fd() {
+        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {}
+        Ok(()) => {
+            return Err(anyhow::anyhow!(
+                "unregister_ring_fd should not have succeeded twice in a row"
+            ));
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "unregister_ring_fd should have failed with EINVAL after unregistering: {}",
+                e
+            ));
+        }
+    }
+
+    // Submitting still works after unregistering, now via the raw file descriptor.
+    let nop = opcode::Nop::new().build().user_data(0x43).into();
+    unsafe {
+        sq.push(&nop).expect("submission queue is full");
+    }
+    sq.sync();
+    submitter.submit_and_wait(1)?;
+    cq.sync();
+    let cqes: Vec<cqueue::Entry> = cq.map(Into::into).collect();
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x43);
+    assert_eq!(cqes[0].result(), 0);
+
+    Ok(())
+}
+
+fn is_register_ring_fd_supported<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+) -> anyhow::Result<bool> {
+    let mut submitter = ring.submitter();
+
+    match submitter.register_ring_fd() {
+        Ok(()) => {
+            submitter.unregister_ring_fd()?;
+            Ok(true)
+        }
+        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => Ok(false),
+        Err(e) => Err(anyhow::anyhow!("register_ring_fd probe failed: {}", e)),
+    }
+}

@@ -5,12 +5,24 @@ use std::{fmt, io};
 
 use crate::sys;
 
+pub(crate) enum RegisterRing {
+    RawFd(RawFd),
+    RegisteredIndex(i32),
+}
+
 pub(crate) fn execute(
-    fd: RawFd,
+    ring: RegisterRing,
     opcode: libc::c_uint,
     arg: *const libc::c_void,
     len: libc::c_uint,
 ) -> io::Result<i32> {
+    let (fd, opcode) = match ring {
+        RegisterRing::RawFd(fd) => (fd, opcode),
+        RegisterRing::RegisteredIndex(index) => {
+            (index, opcode | sys::IORING_REGISTER_USE_REGISTERED_RING)
+        }
+    };
+
     unsafe { sys::io_uring_register(fd, opcode, arg, len) }
 }
 
