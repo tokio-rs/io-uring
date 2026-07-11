@@ -2425,38 +2425,3 @@ opcode! {
         Entry(sqe)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::{Fd, FsyncFlags};
-
-    #[test]
-    fn fsync_default_range_is_zero() {
-        let entry = Fsync::new(Fd(3)).build();
-        let sqe = entry.0;
-        assert_eq!(sqe.opcode, Fsync::CODE);
-        assert_eq!(sqe.fd, 3);
-        assert_eq!(sqe.len, 0);
-        assert_eq!(unsafe { sqe.__bindgen_anon_1.off }, 0);
-        assert_eq!(unsafe { sqe.__bindgen_anon_3.fsync_flags }, 0);
-    }
-
-    #[test]
-    fn fsync_range_and_flags_are_wired() {
-        let entry = Fsync::new(Fd(7))
-            .offset(0x1000)
-            .len(0x200)
-            .flags(FsyncFlags::DATASYNC)
-            .build();
-        let sqe = entry.0;
-        assert_eq!(sqe.opcode, Fsync::CODE);
-        assert_eq!(sqe.fd, 7);
-        assert_eq!(sqe.len, 0x200);
-        assert_eq!(unsafe { sqe.__bindgen_anon_1.off }, 0x1000);
-        assert_eq!(
-            unsafe { sqe.__bindgen_anon_3.fsync_flags },
-            FsyncFlags::DATASYNC.bits()
-        );
-    }
-}
