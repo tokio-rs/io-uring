@@ -341,3 +341,38 @@ pub fn test_msg_ring_send_fd<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     Ok(())
 }
+
+pub fn test_completion_status<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require! {
+        test;
+    }
+
+    println!("test completion_status");
+
+    // SAFETY: the status is dropped well before `ring` is.
+    let status = unsafe { ring.completion().status() };
+
+    assert!(status.is_empty());
+
+    let nop_e = opcode::Nop::new().build().user_data(0x43).into();
+    unsafe {
+        ring.submission().push(&nop_e).expect("queue is full");
+    }
+    ring.submit_and_wait(1)?;
+
+    // The status observes the kernel's tail directly, so it reports the
+    // completion without the queue having been synchronized.
+    assert!(!status.is_empty());
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].user_data(), 0x43);
+
+    // ... and consuming it moves the head back level with the tail.
+    assert!(status.is_empty());
+
+    Ok(())
+}
