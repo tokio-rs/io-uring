@@ -61,7 +61,7 @@ use std::{cmp, io, mem};
 #[cfg(feature = "io_safety")]
 use std::os::unix::io::{AsFd, BorrowedFd};
 
-pub use cqueue::CompletionQueue;
+pub use cqueue::{CompletionQueue, CompletionStatus};
 pub use register::Probe;
 pub use squeue::SubmissionQueue;
 pub use submit::EnterFlags;

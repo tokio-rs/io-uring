@@ -29,6 +29,52 @@ pub struct CompletionQueue<'a, E: EntryMarker = Entry> {
     queue: &'a Inner<E>,
 }
 
+/// A read-only view of whether the completion queue has entries pending.
+///
+/// Obtained from [`CompletionQueue::status`]. Unlike the queue itself this
+/// borrows nothing, so it can be captured once at startup and consulted from
+/// anywhere afterwards. The check costs two loads, with no system call, no
+/// locking, and no access to the ring — which is what a thread-per-core runtime
+/// needs on its preemption check, where reaching the queue would cost more than
+/// the comparison does.
+///
+/// # Staleness
+///
+/// The answer is stale as soon as it is returned: the kernel may post a
+/// completion immediately after the load. This is inherent — any check that
+/// does not enter the kernel is a snapshot — and it makes this suitable for
+/// hints such as "should I stop what I am doing and poll?", where being one
+/// iteration late costs nothing. It is not a synchronization primitive, and
+/// [`CompletionQueue::is_empty`] carries exactly the same caveat.
+pub struct CompletionStatus {
+    head: *const atomic::AtomicU32,
+    tail: *const atomic::AtomicU32,
+}
+
+impl CompletionStatus {
+    /// Returns `true` if the kernel has posted no completions beyond those
+    /// already consumed.
+    ///
+    /// See the note on staleness in the type documentation.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        // SAFETY: both pointers are valid for the life of the ring, per the
+        // contract on `CompletionQueue::status`, and are only read here. The
+        // head is advanced solely by this library from the owning thread, so a
+        // non-atomic load is sound; the tail is written by the kernel, so it
+        // needs `Acquire` to order against the entries it publishes.
+        unsafe { unsync_load(self.head) == (*self.tail).load(atomic::Ordering::Acquire) }
+    }
+}
+
+impl Debug for CompletionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CompletionStatus")
+            .field("is_empty", &self.is_empty())
+            .finish()
+    }
+}
+
 /// A completion queue entry (CQE), representing a complete I/O operation.
 ///
 /// This is implemented for [`Entry`] and [`Entry32`].
@@ -89,6 +135,21 @@ impl<E: EntryMarker> Inner<E> {
 }
 
 impl<E: EntryMarker> CompletionQueue<'_, E> {
+    /// Returns a [`CompletionStatus`], with which a caller can observe that the
+    /// kernel has posted completions without borrowing this queue.
+    ///
+    /// # Safety
+    ///
+    /// The returned value borrows nothing, and so must not outlive the
+    /// [`IoUring`](crate::IoUring) this queue came from.
+    #[inline]
+    pub unsafe fn status(&self) -> CompletionStatus {
+        CompletionStatus {
+            head: self.queue.head,
+            tail: self.queue.tail,
+        }
+    }
+
     /// Synchronize this type with the real completion queue.
     ///
     /// This will flush any entries consumed in this iterator and will make available new entries
