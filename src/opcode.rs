@@ -195,18 +195,30 @@ opcode! {
 }
 
 opcode! {
-    /// File sync, equivalent to `fsync(2)`.
+    /// File sync. See also `fsync(2)`.
+    ///
+    /// Optionally [`offset`](Self::offset) and [`len`](Self::len) can be used to specify a range
+    /// within the file to be synced rather than syncing the entire file, which is the default
+    /// behavior.
     ///
     /// Note that, while I/O is initiated in the order in which it appears in the submission queue,
     /// completions are unordered. For example, an application which places a write I/O followed by
     /// an fsync in the submission queue cannot expect the fsync to apply to the write. The two
     /// operations execute in parallel, so the fsync may complete before the write is issued to the
     /// storage. The same is also true for previously issued writes that have not completed prior to
-    /// the fsync.
+    /// the fsync. To enforce ordering one may utilize linked SQEs, `IOSQE_IO_DRAIN` or wait for the
+    /// arrival of CQEs of requests which have to be ordered before a given request before
+    /// submitting its SQE.
     #[derive(Debug)]
     pub struct Fsync {
         fd: { impl sealed::UseFixed },
         ;;
+        /// Offset within the file to start the sync range. Together with [`len`](Self::len), this
+        /// selects a byte range; when both are zero (the default), the entire file is synced.
+        offset: u64 = 0,
+        /// Length of the range to sync, in bytes. When zero (the default) with
+        /// [`offset`](Self::offset) also zero, the entire file is synced.
+        len: u32 = 0,
         /// The `flags` bit mask may contain either 0, for a normal file integrity sync,
         /// or [types::FsyncFlags::DATASYNC] to provide data sync only semantics.
         /// See the descriptions of `O_SYNC` and `O_DSYNC` in the `open(2)` manual page for more information.
@@ -216,11 +228,18 @@ opcode! {
     pub const CODE = sys::IORING_OP_FSYNC;
 
     pub fn build(self) -> Entry {
-        let Fsync { fd, flags } = self;
+        let Fsync {
+            fd,
+            offset,
+            len,
+            flags,
+        } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
+        sqe.len = len;
+        sqe.__bindgen_anon_1.off = offset;
         sqe.__bindgen_anon_3.fsync_flags = flags.bits();
         Entry(sqe)
     }
