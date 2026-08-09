@@ -80,6 +80,12 @@ impl Debug for CompletionStatus {
 /// This is implemented for [`Entry`] and [`Entry32`].
 pub trait EntryMarker: Clone + Debug + Into<Entry> + private::Sealed {
     const BUILD_FLAGS: u32;
+
+    /// Get the application-supplied user data.
+    fn user_data(&self) -> u64;
+
+    /// Replace the application-supplied user data.
+    fn set_user_data(&mut self, user_data: u64);
 }
 
 /// A 16-byte completion queue entry (CQE), representing a complete I/O operation.
@@ -95,6 +101,32 @@ pub struct Entry32(pub(crate) Entry, pub(crate) [u64; 2]);
 fn test_entry_sizes() {
     assert_eq!(mem::size_of::<Entry>(), 16);
     assert_eq!(mem::size_of::<Entry32>(), 32);
+}
+
+#[test]
+fn test_user_data() {
+    fn cqe(user_data: u64) -> Entry {
+        Entry(sys::io_uring_cqe {
+            user_data,
+            res: 0,
+            flags: 0,
+            big_cqe: sys::__IncompleteArrayField::new(),
+        })
+    }
+
+    fn replace<E: EntryMarker>(entry: &mut E, user_data: u64) -> u64 {
+        let previous = entry.user_data();
+        entry.set_user_data(user_data);
+        previous
+    }
+
+    let mut entry = cqe(1);
+    assert_eq!(replace(&mut entry, 2), 1);
+    assert_eq!(entry.user_data(), 2);
+
+    let mut entry = Entry32(cqe(3), [0; 2]);
+    assert_eq!(replace(&mut entry, 4), 3);
+    assert_eq!(entry.user_data(), 4);
 }
 
 impl<E: EntryMarker> Inner<E> {
@@ -267,6 +299,12 @@ impl Entry {
         self.0.user_data
     }
 
+    /// Replace the application-supplied user data.
+    #[inline]
+    pub fn set_user_data(&mut self, user_data: u64) {
+        self.0.user_data = user_data;
+    }
+
     /// Metadata related to the operation.
     ///
     /// This is currently used for:
@@ -282,6 +320,16 @@ impl private::Sealed for Entry {}
 
 impl EntryMarker for Entry {
     const BUILD_FLAGS: u32 = 0;
+
+    #[inline]
+    fn user_data(&self) -> u64 {
+        Entry::user_data(self)
+    }
+
+    #[inline]
+    fn set_user_data(&mut self, user_data: u64) {
+        Entry::set_user_data(self, user_data);
+    }
 }
 
 impl Clone for Entry {
@@ -316,6 +364,12 @@ impl Entry32 {
         self.0 .0.user_data
     }
 
+    /// Replace the application-supplied user data.
+    #[inline]
+    pub fn set_user_data(&mut self, user_data: u64) {
+        self.0 .0.user_data = user_data;
+    }
+
     /// Metadata related to the operation.
     ///
     /// This is currently used for:
@@ -337,6 +391,16 @@ impl private::Sealed for Entry32 {}
 
 impl EntryMarker for Entry32 {
     const BUILD_FLAGS: u32 = sys::IORING_SETUP_CQE32;
+
+    #[inline]
+    fn user_data(&self) -> u64 {
+        Entry32::user_data(self)
+    }
+
+    #[inline]
+    fn set_user_data(&mut self, user_data: u64) {
+        Entry32::set_user_data(self, user_data);
+    }
 }
 
 impl From<Entry32> for Entry {

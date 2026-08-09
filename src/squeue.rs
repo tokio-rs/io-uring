@@ -33,6 +33,12 @@ pub struct SubmissionQueue<'a, E: EntryMarker = Entry> {
 /// This is implemented for [`Entry`] and [`Entry128`].
 pub trait EntryMarker: Clone + Debug + From<Entry> + private::Sealed {
     const BUILD_FLAGS: u32;
+
+    /// Set the application-supplied user data.
+    fn set_user_data(&mut self, user_data: u64);
+
+    /// Get the application-supplied user data.
+    fn get_user_data(&self) -> u64;
 }
 
 /// A 64-byte submission queue entry (SQE), representing a request for an I/O operation.
@@ -85,6 +91,23 @@ pub struct Entry128(pub(crate) Entry, pub(crate) [u8; 64]);
 fn test_entry_sizes() {
     assert_eq!(mem::size_of::<Entry>(), 64);
     assert_eq!(mem::size_of::<Entry128>(), 128);
+}
+
+#[test]
+fn test_user_data() {
+    fn replace<E: EntryMarker>(entry: &mut E, user_data: u64) -> u64 {
+        let previous = entry.get_user_data();
+        entry.set_user_data(user_data);
+        previous
+    }
+
+    let mut entry = crate::opcode::Nop::new().build().user_data(1);
+    assert_eq!(replace(&mut entry, 2), 1);
+    assert_eq!(entry.get_user_data(), 2);
+
+    let mut entry = Entry128::from(crate::opcode::Nop::new().build().user_data(3));
+    assert_eq!(replace(&mut entry, 4), 3);
+    assert_eq!(entry.get_user_data(), 4);
 }
 
 bitflags! {
@@ -408,6 +431,16 @@ impl private::Sealed for Entry {}
 
 impl EntryMarker for Entry {
     const BUILD_FLAGS: u32 = 0;
+
+    #[inline]
+    fn set_user_data(&mut self, user_data: u64) {
+        Entry::set_user_data(self, user_data);
+    }
+
+    #[inline]
+    fn get_user_data(&self) -> u64 {
+        Entry::get_user_data(self)
+    }
 }
 
 impl Clone for Entry {
@@ -457,6 +490,12 @@ impl Entry128 {
         self.0 .0.user_data = user_data;
     }
 
+    /// Get the previously application-supplied user data.
+    #[inline]
+    pub fn get_user_data(&self) -> u64 {
+        self.0 .0.user_data
+    }
+
     /// Set the personality of this event. You can obtain a personality using
     /// [`Submitter::register_personality`](crate::Submitter::register_personality).
     #[inline]
@@ -476,6 +515,16 @@ impl private::Sealed for Entry128 {}
 
 impl EntryMarker for Entry128 {
     const BUILD_FLAGS: u32 = sys::IORING_SETUP_SQE128;
+
+    #[inline]
+    fn set_user_data(&mut self, user_data: u64) {
+        Entry128::set_user_data(self, user_data);
+    }
+
+    #[inline]
+    fn get_user_data(&self) -> u64 {
+        Entry128::get_user_data(self)
+    }
 }
 
 impl From<Entry> for Entry128 {
