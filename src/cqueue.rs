@@ -129,6 +129,33 @@ fn test_user_data() {
     assert_eq!(entry.user_data(), 4);
 }
 
+#[test]
+fn test_eventfd_disabled() {
+    let head = atomic::AtomicU32::new(0);
+    let tail = atomic::AtomicU32::new(0);
+    let overflow = atomic::AtomicU32::new(0);
+    let flags = atomic::AtomicU32::new(0);
+
+    let mut inner = Inner::<Entry> {
+        head: &head,
+        tail: &tail,
+        ring_mask: 0,
+        ring_entries: 0,
+        overflow: &overflow,
+        cqes: std::ptr::null(),
+        flags: &flags,
+    };
+
+    let cq = inner.borrow();
+    assert!(!cq.eventfd_disabled());
+
+    cq.disable_eventfd();
+    assert!(cq.eventfd_disabled());
+
+    cq.enable_eventfd();
+    assert!(!cq.eventfd_disabled());
+}
+
 impl<E: EntryMarker> Inner<E> {
     #[rustfmt::skip]
     pub(crate) unsafe fn new(cq_mmap: &Mmap, p: &sys::io_uring_params) -> Self {
