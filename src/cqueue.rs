@@ -200,13 +200,42 @@ impl<E: EntryMarker> CompletionQueue<'_, E> {
         unsafe { (*self.queue.overflow).load(atomic::Ordering::Acquire) }
     }
 
-    /// Whether eventfd notifications are disabled when a request is completed and queued to the CQ
-    /// ring. This library currently does not provide a way to set it, so this will always be
-    /// `false`.
+    /// Whether eventfd notifications are disabled when a request is completed
+    /// and queued to the CQ ring.
+    ///
+    /// Available since Linux 5.8.
     pub fn eventfd_disabled(&self) -> bool {
         unsafe {
             (*self.queue.flags).load(atomic::Ordering::Acquire) & sys::IORING_CQ_EVENTFD_DISABLED
                 != 0
+        }
+    }
+
+    /// Disable eventfd notifications. While disabled, any eventfd registered
+    /// via [`Submitter::register_eventfd`] will not receive updates from the
+    /// kernel when new completion events are available to be processed.
+    ///
+    /// Available since Linux 5.8.
+    ///
+    /// [`Submitter::register_eventfd`]: crate::Submitter::register_eventfd
+    pub fn disable_eventfd(&self) {
+        unsafe {
+            (*self.queue.flags)
+                .fetch_or(sys::IORING_CQ_EVENTFD_DISABLED, atomic::Ordering::Release);
+        }
+    }
+
+    /// Enable eventfd notifications. While enabled, any eventfd registered via
+    /// [`Submitter::register_eventfd`] will receive updates from the kernel
+    /// when new completion events are available to be processed.
+    ///
+    /// Available since Linux 5.8.
+    ///
+    /// [`Submitter::register_eventfd`]: crate::Submitter::register_eventfd
+    pub fn enable_eventfd(&self) {
+        unsafe {
+            (*self.queue.flags)
+                .fetch_and(!sys::IORING_CQ_EVENTFD_DISABLED, atomic::Ordering::Release);
         }
     }
 
