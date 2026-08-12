@@ -51,9 +51,10 @@ use std::os::unix::io::RawFd;
 #[deprecated]
 pub type RwFlags = u32;
 pub use sys::{
-    io_uring_region_desc, io_uring_zcrx_area_reg, io_uring_zcrx_cqe, io_uring_zcrx_ifq_reg,
-    io_uring_zcrx_rqe, IORING_MEM_REGION_TYPE_USER, IORING_ZCRX_AREA_SHIFT, IOU_PBUF_RING_INC,
-    IOU_PBUF_RING_MMAP,
+    io_uring_napi, io_uring_region_desc, io_uring_zcrx_area_reg, io_uring_zcrx_cqe,
+    io_uring_zcrx_ifq_reg, io_uring_zcrx_rqe, IORING_MEM_REGION_TYPE_USER,
+    IORING_ZCRX_AREA_SHIFT, IO_URING_NAPI_REGISTER_OP, IO_URING_NAPI_TRACKING_DYNAMIC,
+    IO_URING_NAPI_TRACKING_STATIC, IOU_PBUF_RING_INC, IOU_PBUF_RING_MMAP,
 };
 
 // From linux/io_uring.h
