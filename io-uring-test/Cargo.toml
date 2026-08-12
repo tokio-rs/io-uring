@@ -17,3 +17,4 @@ socket2 = "0.5"
 [features]
 direct-syscall = [ "io-uring/direct-syscall" ]
 ci = []
+write_stream = ["io-uring/write_stream"]
