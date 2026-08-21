@@ -5,7 +5,7 @@
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/tokio-rs/io-uring/blob/master/LICENSE-APACHE)
 [![docs.rs](https://docs.rs/io-uring/badge.svg)](https://docs.rs/io-uring/)
 
-The low-level [`io_uring`](https://kernel.dk/io_uring.pdf) userspace interface for Rust.
+The low-level [`io_uring`](https://web.archive.org/web/20260624135046/https://kernel.dk/io_uring.pdf) userspace interface for Rust.
 
 ## Usage
 
