@@ -1,5 +1,6 @@
 use crate::Test;
 use io_uring::{cqueue, opcode, squeue, types, IoUring};
+use std::time::{Duration, Instant};
 
 pub fn test_nop<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
@@ -62,6 +63,66 @@ pub fn test_setup_no_sqarray<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     assert_eq!(cqes.len(), 1);
     assert_eq!(cqes[0].user_data(), 0x4242);
     assert_eq!(cqes[0].result(), 0);
+
+    Ok(())
+}
+
+pub fn test_defer_taskrun<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    test: &Test,
+) -> anyhow::Result<()> {
+    require! {
+        test;
+    }
+
+    println!("test defer_taskrun");
+
+    for with_args in [false, true] {
+        let mut builder = IoUring::<S, C>::builder();
+        builder
+            .setup_single_issuer()
+            .setup_defer_taskrun()
+            .setup_taskrun_flag();
+        let mut ring = match builder.build(8) {
+            Ok(ring) => ring,
+            Err(err) => match err.raw_os_error() {
+                Some(libc::EINVAL) | Some(libc::EOPNOTSUPP) => {
+                    println!("IORING_SETUP_DEFER_TASKRUN is not supported by the kernel, skip");
+                    return Ok(());
+                }
+                _ => return Err(err.into()),
+            },
+        };
+
+        let timeout = types::Timespec::new().nsec(1_000_000);
+        let entry = opcode::Timeout::new(&timeout)
+            .build()
+            .user_data(0x42)
+            .into();
+        unsafe {
+            ring.submission().push(&entry).expect("queue is full");
+        }
+        ring.submitter().submit()?;
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !ring.submission().taskrun() {
+            assert!(Instant::now() < deadline, "IORING_SQ_TASKRUN was not set");
+            std::thread::yield_now();
+        }
+
+        if with_args {
+            let zero = types::Timespec::new();
+            let args = types::SubmitArgs::new().timespec(&zero);
+            ring.submitter().submit_with_args(0, &args)?;
+        } else {
+            ring.submitter().submit_and_wait(0)?;
+        }
+
+        assert!(!ring.submission().taskrun());
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 0x42);
+        assert_eq!(cqes[0].result(), -libc::ETIME);
+    }
 
     Ok(())
 }

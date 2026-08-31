@@ -97,11 +97,10 @@ impl<'a> Submitter<'a> {
         }
     }
 
-    /// CQ ring is overflown
-    fn sq_cq_overflow(&self) -> bool {
-        unsafe {
-            (*self.sq_flags).load(atomic::Ordering::Relaxed) & sys::IORING_SQ_CQ_OVERFLOW != 0
-        }
+    /// Load flags published by the kernel in the submission queue ring.
+    #[inline]
+    fn load_sq_flags(&self) -> u32 {
+        unsafe { (*self.sq_flags).load(atomic::Ordering::Acquire) }
     }
 
     #[inline]
@@ -181,7 +180,9 @@ impl<'a> Submitter<'a> {
         // the IORING_ENTER_SQ_WAKEUP bit is required in all paths where sqpoll
         // is setup when consolidating the reads.
 
-        let sq_cq_overflow = self.sq_cq_overflow();
+        let sq_flags = self.load_sq_flags();
+        let sq_cq_overflow = sq_flags & sys::IORING_SQ_CQ_OVERFLOW != 0;
+        let sq_taskrun = sq_flags & sys::IORING_SQ_TASKRUN != 0;
 
         // When IORING_FEAT_NODROP is enabled and CQ overflows, the kernel buffers
         // completion events internally but doesn't automatically flush them when
@@ -190,9 +191,10 @@ impl<'a> Submitter<'a> {
         //
         // Without this, completions remain stuck in kernel's internal buffer
         // after draining CQ, causing missing completion notifications.
-        let need_syscall_for_overflow = sq_cq_overflow && self.params.is_feature_nodrop();
+        let need_syscall = (sq_cq_overflow && self.params.is_feature_nodrop()) || sq_taskrun;
 
-        if want > 0 || self.params.is_setup_iopoll() || sq_cq_overflow {
+        // Deferred task work is only run by an enter carrying GETEVENTS.
+        if want > 0 || self.params.is_setup_iopoll() || sq_cq_overflow || sq_taskrun {
             flags.insert(EnterFlags::GETEVENTS);
         }
 
@@ -201,7 +203,7 @@ impl<'a> Submitter<'a> {
             atomic::fence(atomic::Ordering::SeqCst);
             if self.sq_need_wakeup() {
                 flags.insert(EnterFlags::SQ_WAKEUP);
-            } else if want == 0 && !need_syscall_for_overflow {
+            } else if want == 0 && !need_syscall {
                 // The kernel thread is polling and hasn't fallen asleep, so we don't need to tell
                 // it to process events or wake it up
 
@@ -227,10 +229,13 @@ impl<'a> Submitter<'a> {
         let len = self.sq_len();
         let mut flags = EnterFlags::EXT_ARG;
 
-        let sq_cq_overflow = self.sq_cq_overflow();
-        let need_syscall = sq_cq_overflow & self.params.is_feature_nodrop();
+        let sq_flags = self.load_sq_flags();
+        let sq_cq_overflow = sq_flags & sys::IORING_SQ_CQ_OVERFLOW != 0;
+        let sq_taskrun = sq_flags & sys::IORING_SQ_TASKRUN != 0;
+        let need_syscall = (sq_cq_overflow && self.params.is_feature_nodrop()) || sq_taskrun;
 
-        if want > 0 || self.params.is_setup_iopoll() || sq_cq_overflow {
+        // Deferred task work is only run by an enter carrying GETEVENTS.
+        if want > 0 || self.params.is_setup_iopoll() || sq_cq_overflow || sq_taskrun {
             flags.insert(EnterFlags::GETEVENTS);
         }
 

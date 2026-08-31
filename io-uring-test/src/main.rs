@@ -72,6 +72,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
 
     tests::queue::test_nop(&mut ring, &test)?;
     tests::queue::test_setup_no_sqarray(&mut ring, &test)?;
+    tests::queue::test_defer_taskrun::<S, C>(&test)?;
     tests::queue::test_queue_split(&mut ring, &test)?;
     tests::queue::test_completion_status(&mut ring, &test)?;
     tests::queue::test_debug_print(&mut ring, &test)?;
