@@ -3,7 +3,7 @@
 [![crates](https://img.shields.io/crates/v/io-uring.svg)](https://crates.io/crates/io-uring)
 [![license](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/tokio-rs/io-uring/blob/master/LICENSE-MIT)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/tokio-rs/io-uring/blob/master/LICENSE-APACHE)
-[![docs.rs](https://docs.rs/io-uring/badge.svg)](https://docs.rs/io-uring/)
+[![docs.rs](https://docs.rs/io-uring/badge.svg)](https://docs.rs/io-uring)
 
 The low-level [`io_uring`](https://kernel.dk/io_uring.pdf) userspace interface for Rust.
 
@@ -71,9 +71,9 @@ $ cargo bench --package io-uring-bench
 This project is licensed under either of
 
  * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
-   http://www.apache.org/licenses/LICENSE-2.0)
+   https://www.apache.org/licenses/LICENSE-2.0)
  * MIT license ([LICENSE-MIT](LICENSE-MIT) or
-   http://opensource.org/licenses/MIT)
+   https://opensource.org/license/mit)
 
 at your option.
 
