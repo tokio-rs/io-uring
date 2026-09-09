@@ -1071,6 +1071,7 @@ opcode! {
         ;;
         ioprio: u16 = 0,
         flags: i32 = 0,
+        buf_group: u16 = 0,
 
         /// Set the destination address, for sending from an unconnected socket.
         ///
@@ -1083,7 +1084,7 @@ opcode! {
     pub const CODE = sys::IORING_OP_SEND;
 
     pub fn build(self) -> Entry {
-        let Send { fd, buf, len, ioprio, flags, dest_addr, dest_addr_len } = self;
+        let Send { fd, buf, len, ioprio, flags, buf_group, dest_addr, dest_addr_len } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
@@ -1094,6 +1095,7 @@ opcode! {
         sqe.len = len;
         sqe.ioprio = ioprio;
         sqe.__bindgen_anon_3.msg_flags = flags as _;
+        sqe.__bindgen_anon_4.buf_group = buf_group;
         Entry(sqe)
     }
 }
