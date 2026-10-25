@@ -15,6 +15,7 @@ pub(crate) mod private {
 pub(crate) struct Mmap {
     addr: ptr::NonNull<libc::c_void>,
     len: usize,
+    owned: bool,
 }
 
 impl Mmap {
@@ -33,10 +34,25 @@ impl Mmap {
                 addr => {
                     // here, `mmap` will never return null
                     let addr = ptr::NonNull::new_unchecked(addr);
-                    Ok(Mmap { addr, len })
+                    Ok(Mmap {
+                        addr,
+                        len,
+                        owned: true,
+                    })
                 }
             }
         }
+    }
+
+    /// Memory the caller provided for an `IORING_SETUP_NO_MMAP` ring, which it keeps owning.
+    pub fn user(addr: u64, len: usize) -> io::Result<Mmap> {
+        let addr = ptr::NonNull::new(addr as *mut libc::c_void)
+            .ok_or_else(|| io::Error::from_raw_os_error(libc::EINVAL))?;
+        Ok(Mmap {
+            addr,
+            len,
+            owned: false,
+        })
     }
 
     /// Do not make the stored memory accessible by child processes after a `fork`.
@@ -62,8 +78,10 @@ impl Mmap {
 
 impl Drop for Mmap {
     fn drop(&mut self) {
-        unsafe {
-            libc::munmap(self.addr.as_ptr(), self.len);
+        if self.owned {
+            unsafe {
+                libc::munmap(self.addr.as_ptr(), self.len);
+            }
         }
     }
 }
