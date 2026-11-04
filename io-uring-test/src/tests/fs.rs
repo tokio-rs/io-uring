@@ -334,6 +334,83 @@ pub fn test_pipe_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_pipe_fixed_read_multishot<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Write::CODE);
+        test.probe.is_supported(opcode::ReadMulti::CODE);
+    );
+
+    println!("test pipe_fixed_read_multishot");
+
+    use crate::tests::register_buf_ring;
+
+    // The pipe's read end at a fixed-file index that is not an open fd: if
+    // IOSQE_FIXED_FILE is lost, the kernel reads fd 1000 and fails with EBADF.
+    const INDEX: u32 = 1000;
+    assert_eq!(unsafe { libc::fcntl(INDEX as i32, libc::F_GETFD) }, -1);
+
+    let (rx, tx) = ::std::io::pipe()?;
+    const BYTES: &[u8] = b"read through a fixed file";
+    const REQ_TYPE_READ: u64 = 1;
+    const REQ_TYPE_WRITE: u64 = 2;
+
+    let _ = ring.submitter().unregister_files();
+    ring.submitter().register_files_sparse(INDEX + 1)?;
+    ring.submitter()
+        .register_files_update(INDEX, &[rx.as_raw_fd()])?;
+
+    let buf_ring = register_buf_ring::Builder::new(0xcaff)
+        .ring_entries(2)
+        .buf_len(BYTES.len())
+        .build()?;
+    buf_ring.rc.register(ring)?;
+
+    let sqe_read = opcode::ReadMulti::new(types::Fixed(INDEX), 0, 0xcaff)
+        .build()
+        .user_data(REQ_TYPE_READ)
+        .into();
+    let sqe_write = opcode::Write::new(types::Fd(tx.as_raw_fd()), BYTES.as_ptr(), BYTES.len() as _)
+        .build()
+        .user_data(REQ_TYPE_WRITE)
+        .into();
+    unsafe { ring.submission().push_multiple(&[sqe_read, sqe_write]) }?;
+    ring.submit_and_wait(2)?;
+
+    let mut got_read = false;
+    for cqe in ring.completion().map(Into::<cqueue::Entry>::into) {
+        match cqe.user_data() {
+            REQ_TYPE_WRITE => assert_eq!(cqe.result(), BYTES.len() as i32),
+            REQ_TYPE_READ => {
+                assert_eq!(cqe.result(), BYTES.len() as i32, "read of the fixed file");
+                let len = cqe.result().cast_unsigned();
+                let bufs = buf_ring.rc.get_bufs(&buf_ring, len, cqe.flags());
+                assert_eq!(BYTES, bufs[0].as_slice());
+                assert!(cqueue::more(cqe.flags()));
+                got_read = true;
+            }
+            _ => unreachable!(),
+        }
+    }
+    assert!(got_read);
+
+    // Close the writer: the multishot read ends with 0.
+    drop(tx);
+    ring.submit_and_wait(1)?;
+    let cqe: cqueue::Entry = ring.completion().next().unwrap().into();
+    assert_eq!(cqe.user_data(), REQ_TYPE_READ);
+    assert_eq!(cqe.result(), 0);
+    assert!(!cqueue::more(cqe.flags()));
+
+    buf_ring.rc.unregister(ring)?;
+    ring.submitter().unregister_files()?;
+
+    Ok(())
+}
+
 pub fn test_file_writev_readv<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,

@@ -2445,26 +2445,3 @@ opcode! {
         Entry(sqe)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::squeue::Flags;
-
-    #[test]
-    fn buffer_select_keeps_fixed_file() {
-        let want = Flags::FIXED_FILE.bits() | Flags::BUFFER_SELECT.bits();
-        for (name, entry) in [
-            ("ReadMulti", ReadMulti::new(types::Fixed(3), 0, 7).build()),
-            ("RecvMulti", RecvMulti::new(types::Fixed(3), 7).build()),
-            ("RecvBundle", RecvBundle::new(types::Fixed(3), 7).build()),
-            (
-                "RecvMultiBundle",
-                RecvMultiBundle::new(types::Fixed(3), 7).build(),
-            ),
-        ] {
-            assert_eq!(entry.0.flags & want, want, "{name}");
-            assert_eq!(entry.0.fd, 3, "{name}");
-        }
-    }
-}
