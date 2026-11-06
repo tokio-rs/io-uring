@@ -1968,7 +1968,7 @@ opcode! {
         sqe.__bindgen_anon_1.off = offset;
         sqe.len = len;
         sqe.__bindgen_anon_4.buf_group = buf_group;
-        sqe.flags = crate::squeue::Flags::BUFFER_SELECT.bits();
+        sqe.flags |= crate::squeue::Flags::BUFFER_SELECT.bits();
         Entry(sqe)
     }
 }
