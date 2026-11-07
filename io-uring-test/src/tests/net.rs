@@ -1142,6 +1142,71 @@ pub fn test_tcp_buffer_select_readv<S: squeue::EntryMarker, C: cqueue::EntryMark
     Ok(())
 }
 
+pub fn test_tcp_buffer_select_send<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Send::CODE);
+        ring.params().is_feature_recvsend_bundle(); // requires 6.10
+    );
+
+    println!("test tcp_buffer_select_send");
+
+    let (send_stream, mut recv_stream) = tcp_pair()?;
+    let send_fd = types::Fd(send_stream.as_raw_fd());
+    let text = b"The quick brown fox jumps over the lazy dog.";
+    let mut output = vec![0; text.len()];
+
+    let buf_ring = register_buf_ring::Builder::new(0xdead)
+        .ring_entries(1)
+        .buf_cnt(1)
+        .buf_len(text.len())
+        .build()?;
+    buf_ring.rc.register(ring)?;
+    let ptr = buf_ring.rc.ring_start.as_ptr_mut() as *mut BufRingEntry;
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            text.as_ptr(),
+            ptr.as_mut().unwrap().addr() as *mut u8,
+            text.len(),
+        );
+    }
+
+    let send_e = opcode::Send::new(send_fd, std::ptr::null(), text.len() as _).buf_group(0xdead);
+
+    unsafe {
+        ring.submission()
+            .push(
+                &send_e
+                    .build()
+                    .flags(squeue::Flags::BUFFER_SELECT)
+                    .user_data(0x01)
+                    .into(),
+            )
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x01);
+    assert_eq!(cqe.result(), text.len() as i32);
+    assert_eq!(cqueue::buffer_select(cqe.flags()), Some(0));
+
+    assert_eq!(
+        recv_stream
+            .read(&mut output)
+            .expect("could not read stream"),
+        text.len()
+    );
+    assert_eq!(&output, text);
+    buf_ring.rc.unregister(ring)?;
+
+    Ok(())
+}
+
 pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
