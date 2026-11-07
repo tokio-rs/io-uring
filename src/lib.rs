@@ -660,7 +660,8 @@ impl Parameters {
 
     /// Whether the kernel supports `IORING_ENTER_NO_IOWAIT`.
     ///
-    /// If this flag is set, [`Submitter::enter`] accepts
+    /// If this flag is set, [`Submitter::enter`] and
+    /// [`Submitter::submit_with_args_and_flags`] accept
     /// [`EnterFlags::NO_IOWAIT`](crate::EnterFlags::NO_IOWAIT), which
     /// stops the CQE wait from being accounted as iowait. An always-armed ring
     /// parked on the wait would otherwise inflate per-task iowait and

@@ -226,8 +226,32 @@ impl<'a> Submitter<'a> {
         want: usize,
         args: &types::SubmitArgs<'_, '_>,
     ) -> io::Result<usize> {
+        self.submit_with_args_and_flags(want, args, EnterFlags::empty())
+    }
+
+    /// Like [`submit_with_args`](Self::submit_with_args), with extra `flags` for the wait.
+    ///
+    /// Only these flags are accepted; any other fails with `EINVAL`, without entering the kernel:
+    ///
+    /// - [`EnterFlags::ABS_TIMER`]: the timeout in `args` is an absolute time on the ring's clock
+    ///   (`CLOCK_MONOTONIC` unless registered otherwise), not a duration. Available since kernel
+    ///   6.12.
+    /// - [`EnterFlags::NO_IOWAIT`]: the wait is not accounted as iowait. See
+    ///   [`Parameters::is_feature_no_iowait`](crate::Parameters::is_feature_no_iowait).
+    ///
+    /// A kernel that doesn't know a flag fails with `EINVAL`.
+    pub fn submit_with_args_and_flags(
+        &self,
+        want: usize,
+        args: &types::SubmitArgs<'_, '_>,
+        flags: EnterFlags,
+    ) -> io::Result<usize> {
+        if !(EnterFlags::ABS_TIMER | EnterFlags::NO_IOWAIT).contains(flags) {
+            return Err(io::Error::from_raw_os_error(libc::EINVAL));
+        }
+
         let len = self.sq_len();
-        let mut flags = EnterFlags::EXT_ARG;
+        let mut flags = flags | EnterFlags::EXT_ARG;
 
         let sq_flags = self.load_sq_flags();
         let sq_cq_overflow = sq_flags & sys::IORING_SQ_CQ_OVERFLOW != 0;
