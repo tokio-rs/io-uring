@@ -56,6 +56,7 @@ pub mod types;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::ptr::NonNull;
 use std::{cmp, io, mem};
 
 #[cfg(feature = "io_safety")]
@@ -132,7 +133,10 @@ impl IoUring<squeue::Entry, cqueue::Entry> {
     ///
     /// The caller must uphold that the file descriptor is owned and refers to a uring. The
     /// `params` argument must be equivalent to the those previously filled in by the kernel when
-    /// the provided ring was created.
+    /// the provided ring was created. For a ring built with [`Builder::build_no_mmap`], this
+    /// process must be the one that provided the memory, the memory must meet the requirements
+    /// of [`Builder::build_no_mmap`] until the returned `IoUring` is dropped, and no other
+    /// `IoUring` may use it.
     pub unsafe fn from_fd(fd: RawFd, params: Parameters) -> io::Result<Self> {
         Self::with_fd_and_params(OwnedFd::from_raw_fd(fd), params.0)
     }
@@ -157,8 +161,23 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
         }
     }
 
-    fn with_params(entries: u32, mut p: sys::io_uring_params) -> io::Result<Self> {
+    fn with_params(
+        entries: u32,
+        mut p: sys::io_uring_params,
+        user_memory: Option<(usize, usize)>,
+    ) -> io::Result<Self> {
         let fd: OwnedFd = unsafe { OwnedFd::from_raw_fd(sys::io_uring_setup(entries, &mut p)?) };
+        if let Some((rings_len, sqes_len)) = user_memory {
+            let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
+            let cq_len = p.cq_off.cqes as usize + p.cq_entries as usize * mem::size_of::<C>();
+            let sqe_len = p.sq_entries as usize * mem::size_of::<S>();
+            if cmp::max(sq_len, cq_len) > rings_len || sqe_len > sqes_len {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "the kernel's ring is larger than the memory provided for it",
+                ));
+            }
+        }
         unsafe { Self::with_fd_and_params(fd, p) }
     }
 
@@ -178,11 +197,20 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> IoUring<S, C> {
             let sq_len = p.sq_off.array as usize + p.sq_entries as usize * mem::size_of::<u32>();
             let cq_len = p.cq_off.cqes as usize + p.cq_entries as usize * mem::size_of::<C>();
             let sqe_len = p.sq_entries as usize * mem::size_of::<S>();
-            let sqe_mmap = Mmap::new(fd, sys::IORING_OFF_SQES as _, sqe_len)?;
+            let no_mmap = p.flags & sys::IORING_SETUP_NO_MMAP != 0;
+            let sqe_mmap = if no_mmap {
+                Mmap::user(p.sq_off.user_addr, sqe_len)?
+            } else {
+                Mmap::new(fd, sys::IORING_OFF_SQES as _, sqe_len)?
+            };
 
-            if p.features & sys::IORING_FEAT_SINGLE_MMAP != 0 {
-                let scq_mmap =
-                    Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, cmp::max(sq_len, cq_len))?;
+            if no_mmap || p.features & sys::IORING_FEAT_SINGLE_MMAP != 0 {
+                let scq_len = cmp::max(sq_len, cq_len);
+                let scq_mmap = if no_mmap {
+                    Mmap::user(p.cq_off.user_addr, scq_len)?
+                } else {
+                    Mmap::new(fd, sys::IORING_OFF_SQ_RING as _, scq_len)?
+                };
 
                 let sq = squeue::Inner::new(&scq_mmap, &sqe_mmap, p);
                 let cq = cqueue::Inner::new(&scq_mmap, p);
@@ -471,11 +499,107 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
+    /// Sizes in bytes, in whole pages, of the rings region and the SQE array that suffice for
+    /// [`Builder::build_no_mmap`] with `entries` and the options set so far. They are upper
+    /// bounds: the kernel may use less.
+    pub fn no_mmap_sizes(&self, entries: u32) -> (usize, usize) {
+        // struct io_rings' header: five cache lines of up to 256 bytes, doubled by CQE32, plus
+        // the SQ array's cache-line padding.
+        const RINGS_HEADER_MAX: usize = 4096;
+        let (sq, cq) = self.ring_entries(entries);
+        let page = page_size();
+        let round = |len: usize| (len + page - 1) & !(page - 1);
+        let rings = RINGS_HEADER_MAX + cq * mem::size_of::<C>() + sq * mem::size_of::<u32>();
+        (round(rings), round(sq * mem::size_of::<S>()))
+    }
+
+    /// SQ and CQ entries the kernel would allocate for `entries`. Counts above the kernel's
+    /// limits are clamped as with `IORING_SETUP_CLAMP`, since without it the kernel rejects
+    /// them; this also keeps the sizes derived from them from overflowing a 32-bit `usize`.
+    fn ring_entries(&self, entries: u32) -> (usize, usize) {
+        const MAX_ENTRIES: u32 = 32768;
+        const MAX_CQ_ENTRIES: u32 = 2 * MAX_ENTRIES;
+        let sq = entries.clamp(1, MAX_ENTRIES).next_power_of_two() as usize;
+        let cq = if self.params.flags & sys::IORING_SETUP_CQSIZE != 0 {
+            self.params
+                .cq_entries
+                .clamp(1, MAX_CQ_ENTRIES)
+                .next_power_of_two() as usize
+        } else {
+            2 * sq
+        };
+        (sq, cq)
+    }
+
     /// Build an [IoUring], with the specified number of entries in the submission queue and
     /// completion queue unless [`setup_cqsize`](Self::setup_cqsize) has been called.
     pub fn build(&self, entries: u32) -> io::Result<IoUring<S, C>> {
-        let ring = IoUring::with_params(entries, self.params)?;
+        self.apply_dontfork(IoUring::with_params(entries, self.params, None)?)
+    }
 
+    /// Build an [IoUring] like [`Builder::build`], but with its rings in memory the caller
+    /// provides instead of memory the kernel allocates (`IORING_SETUP_NO_MMAP`). The kernel pins
+    /// the caller's pages, which may be ordinary or huge pages, and needs no allocation of its
+    /// own for the rings, which can fail under memory fragmentation. [`Builder::no_mmap_sizes`]
+    /// gives sizes that suffice.
+    ///
+    /// Available since Linux 6.5, where each region must fit in one page: 6.5 and 6.6 reject
+    /// larger regions with `EFAULT`, and 6.7 to 6.9 accept them only if they are physically
+    /// contiguous (huge pages) and return `EINVAL` otherwise. Since 6.10 any memory works.
+    ///
+    /// Fails with [`io::ErrorKind::InvalidInput`] if a length is not a nonzero multiple of the
+    /// page size, or is smaller than the ring needs. A failed build may have let the kernel pin
+    /// and write the rings header, so the memory must be zero-filled again before it is reused.
+    ///
+    /// # Safety
+    ///
+    /// `rings` and `sqes` must not overlap and must be valid for reads and writes of `rings_len`
+    /// and `sqes_len` bytes. While the returned [`IoUring`] lives, no other ring may use them,
+    /// they must not be accessed other than through it, and they must stay mapped: no `munmap`,
+    /// `mremap`, `mmap` over them or `MADV_DONTNEED`. After it is dropped they may be unmapped
+    /// but not reused, since the kernel can still write completions to them. The [`IoUring`]
+    /// never unmaps them; [`Builder::dontfork`] applies `MADV_DONTFORK` to them, which outlives
+    /// the ring.
+    ///
+    /// They must also be zero-filled, or the ring may start from garbage head and tail values:
+    /// the kernel does not clear the rings header. Their page alignment is checked by the kernel.
+    pub unsafe fn build_no_mmap(
+        &self,
+        entries: u32,
+        rings: NonNull<u8>,
+        rings_len: usize,
+        sqes: NonNull<u8>,
+        sqes_len: usize,
+    ) -> io::Result<IoUring<S, C>> {
+        let (sq, cq) = self.ring_entries(entries);
+        let sq_array = if self.params.flags & sys::IORING_SETUP_NO_SQARRAY != 0 {
+            0
+        } else {
+            sq * mem::size_of::<u32>()
+        };
+        let page = page_size();
+        // Whole pages keep the kernel's setup writes, all in the header's first page, inside them.
+        let valid = |len: usize, min: usize| len != 0 && len % page == 0 && len >= min;
+        if !valid(rings_len, cq * mem::size_of::<C>() + sq_array)
+            || !valid(sqes_len, sq * mem::size_of::<S>())
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "IORING_SETUP_NO_MMAP memory is smaller than the ring or not in whole pages",
+            ));
+        }
+        let mut params = self.params;
+        params.flags |= sys::IORING_SETUP_NO_MMAP;
+        params.cq_off.user_addr = rings.as_ptr() as u64;
+        params.sq_off.user_addr = sqes.as_ptr() as u64;
+        self.apply_dontfork(IoUring::with_params(
+            entries,
+            params,
+            Some((rings_len, sqes_len)),
+        )?)
+    }
+
+    fn apply_dontfork(&self, ring: IoUring<S, C>) -> io::Result<IoUring<S, C>> {
         if self.dontfork {
             ring.memory.sq_mmap.dontfork()?;
             ring.memory.sqe_mmap.dontfork()?;
@@ -489,6 +613,12 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
 }
 
 impl Parameters {
+    /// Whether the rings live in memory the caller provided. Enabled with
+    /// [`Builder::build_no_mmap`].
+    pub fn is_setup_no_mmap(&self) -> bool {
+        self.0.flags & sys::IORING_SETUP_NO_MMAP != 0
+    }
+
     /// Whether a kernel thread is performing queue polling. Enabled with [`Builder::setup_sqpoll`].
     pub fn is_setup_sqpoll(&self) -> bool {
         self.0.flags & sys::IORING_SETUP_SQPOLL != 0
@@ -718,4 +848,8 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> AsFd for IoUring<S, C> {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.fd.as_fd()
     }
+}
+
+fn page_size() -> usize {
+    unsafe { libc::sysconf(libc::_SC_PAGESIZE) as usize }
 }
