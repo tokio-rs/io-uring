@@ -153,6 +153,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::net::test_tcp_send_bundle(&mut ring, &test)?;
     tests::net::test_tcp_zero_copy_send_recv(&mut ring, &test)?;
     tests::net::test_tcp_zero_copy_send_fixed(&mut ring, &test)?;
+    tests::net::test_tcp_zero_copy_sendmsg_fixed(&mut ring, &test)?;
     tests::net::test_tcp_sendmsg_recvmsg(&mut ring, &test)?;
     tests::net::test_tcp_zero_copy_sendmsg_recvmsg(&mut ring, &test)?;
     tests::net::test_tcp_accept(&mut ring, &test)?;

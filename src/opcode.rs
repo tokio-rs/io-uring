@@ -1962,18 +1962,28 @@ opcode! {
         msg: { *const libc::msghdr },
         ;;
         ioprio: u16 = 0,
-        flags: u32 = 0
+        flags: u32 = 0,
+        /// The `buf_index` is an index into an array of fixed buffers, and is only valid if fixed
+        /// buffers were registered.
+        ///
+        /// Every iovec in `msg` must fall within the region specified by `buf_index` in the
+        /// previously registered buffer. Available since kernel 6.15.
+        buf_index: Option<u16> = None
     }
 
     pub const CODE = sys::IORING_OP_SENDMSG_ZC;
 
     pub fn build(self) -> Entry {
-        let SendMsgZc { fd, msg, ioprio, flags } = self;
+        let SendMsgZc { fd, msg, ioprio, flags, buf_index } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.ioprio = ioprio;
+        if let Some(buf_index) = buf_index {
+            sqe.__bindgen_anon_4.buf_index = buf_index;
+            sqe.ioprio |= sys::IORING_RECVSEND_FIXED_BUF as u16;
+        }
         sqe.__bindgen_anon_2.addr = msg as _;
         sqe.len = 1;
         sqe.__bindgen_anon_3.msg_flags = flags;

@@ -332,6 +332,86 @@ pub fn test_tcp_zero_copy_send_fixed<S: squeue::EntryMarker, C: cqueue::EntryMar
     Ok(())
 }
 
+pub fn test_tcp_zero_copy_sendmsg_fixed<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::SendMsgZc::CODE);
+    );
+
+    println!("test tcp_zero_copy_sendmsg_fixed");
+
+    let (send_stream, mut recv_stream) = tcp_pair()?;
+
+    let send_fd = types::Fd(send_stream.as_raw_fd());
+
+    let text = b"The quick brown fox jumps over the lazy dog.";
+
+    // Cleanup all fixed buffers (if any), then register one, with id 0.
+    let _ = ring.submitter().unregister_buffers();
+
+    let mut buf0 = vec![0; 1024];
+    let iovec = libc::iovec {
+        iov_base: buf0.as_ptr() as _,
+        iov_len: buf0.len() as _,
+    };
+    unsafe { ring.submitter().register_buffers(&[iovec]).unwrap() };
+
+    // Send the text in two pieces, from different positions inside the registered buffer.
+    let (head, tail) = text.split_at(10);
+    buf0[7..][..head.len()].copy_from_slice(head);
+    buf0[100..][..tail.len()].copy_from_slice(tail);
+    let bufs = [
+        io::IoSlice::new(&buf0[7..][..head.len()]),
+        io::IoSlice::new(&buf0[100..][..tail.len()]),
+    ];
+
+    let mut msg: libc::msghdr = unsafe { mem::zeroed() };
+    msg.msg_iov = bufs.as_ptr() as *const _ as *mut _;
+    msg.msg_iovlen = bufs.len() as _;
+
+    let sendmsg_e = opcode::SendMsgZc::new(send_fd, &msg).buf_index(Some(0));
+
+    unsafe {
+        ring.submission()
+            .push(&sendmsg_e.build().user_data(0x01).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x01);
+
+    if cqe.result() == -libc::EINVAL {
+        // Fixed buffers with `SendMsgZc` need kernel 6.15.
+        println!("skipping: kernel rejects fixed buffers with SendMsgZc");
+        let _ = ring.submitter().unregister_buffers();
+        return Ok(());
+    }
+
+    assert!(io_uring::cqueue::more(cqe.flags()));
+    assert_eq!(cqe.result(), text.len() as i32);
+
+    // The notification follows once the kernel is done with the buffer.
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x01);
+    assert!(io_uring::cqueue::notif(cqe.flags()));
+    assert!(!io_uring::cqueue::more(cqe.flags()));
+
+    let mut output = vec![0; text.len()];
+    recv_stream.read_exact(&mut output)?;
+    assert_eq!(&output, text);
+
+    let _ = ring.submitter().unregister_buffers();
+
+    Ok(())
+}
+
 pub fn test_tcp_sendmsg_recvmsg<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
