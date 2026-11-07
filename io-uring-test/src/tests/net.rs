@@ -1617,6 +1617,49 @@ pub fn test_socket<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
         assert_eq!(optval, 1);
     }
 
+    // Try a getsockopt, of the value set above.
+    {
+        let mut optval: libc::c_int = 0;
+        let op = io_uring::opcode::GetSockOpt::new(
+            io_uring::types::Fd(io_uring_socket.as_raw_fd()),
+            libc::SOL_SOCKET as u32,
+            libc::SO_REUSEADDR as u32,
+            &mut optval as *mut _ as *mut libc::c_void,
+            std::mem::size_of_val(&optval) as libc::socklen_t,
+        )
+        .build()
+        .user_data(1235);
+        unsafe {
+            ring.submission().push(&op.into()).expect("queue is full");
+        }
+        ring.submit_and_wait(1)?;
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 1235);
+        // The result is the value's length.
+        assert_eq!(cqes[0].result(), std::mem::size_of_val(&optval) as i32);
+        assert_eq!(optval, 1);
+
+        // Levels other than SOL_SOCKET aren't supported.
+        let op = io_uring::opcode::GetSockOpt::new(
+            io_uring::types::Fd(io_uring_socket.as_raw_fd()),
+            libc::IPPROTO_IP as u32,
+            libc::IP_TTL as u32,
+            &mut optval as *mut _ as *mut libc::c_void,
+            std::mem::size_of_val(&optval) as libc::socklen_t,
+        )
+        .build()
+        .user_data(1236);
+        unsafe {
+            ring.submission().push(&op.into()).expect("queue is full");
+        }
+        ring.submit_and_wait(1)?;
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(cqes.len(), 1);
+        assert_eq!(cqes[0].user_data(), 1236);
+        assert_eq!(cqes[0].result(), -libc::EOPNOTSUPP);
+    }
+
     // Close both sockets, to avoid leaking FDs.
     drop(plain_socket);
     drop(io_uring_socket);

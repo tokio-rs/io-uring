@@ -702,6 +702,40 @@ opcode! {
 }
 
 opcode! {
+    /// Get a socket option, equivalent to `getsockopt(2)`.
+    ///
+    /// The value is written to `optval`, which has room for `optlen` bytes; on success the
+    /// completion's result is the value's length. The kernel only supports level `SOL_SOCKET`
+    /// (other levels fail with `EOPNOTSUPP`). Available since kernel 6.7.
+    pub struct GetSockOpt {
+        fd: { impl sealed::UseFixed },
+        level: { u32 },
+        optname: { u32 },
+        optval: { *mut libc::c_void },
+        optlen: { u32 },
+        ;;
+        flags: u32 = 0
+    }
+
+    pub const CODE = sys::IORING_OP_URING_CMD;
+
+    pub fn build(self) -> Entry {
+        let GetSockOpt { fd, level, optname, optval, optlen, flags } = self;
+        let mut sqe = sqe_zeroed();
+        sqe.opcode = Self::CODE;
+        assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_1.__bindgen_anon_1.cmd_op = sys::SOCKET_URING_OP_GETSOCKOPT;
+
+        sqe.__bindgen_anon_2.__bindgen_anon_1.level = level;
+        sqe.__bindgen_anon_2.__bindgen_anon_1.optname = optname;
+        sqe.__bindgen_anon_3.uring_cmd_flags = flags;
+        sqe.__bindgen_anon_5.optlen = optlen;
+        unsafe { *sqe.__bindgen_anon_6.optval.as_mut() = optval as u64 };
+        Entry(sqe)
+    }
+}
+
+opcode! {
     /// Attempt to cancel an already issued request.
     pub struct AsyncCancel {
         user_data: { u64 }
