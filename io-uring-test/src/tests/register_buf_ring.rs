@@ -12,7 +12,6 @@ use std::io;
 use std::os::unix::io::AsRawFd;
 use std::ptr;
 use std::rc::Rc;
-use std::sync::atomic::{self, AtomicU16};
 
 type Bgid = u16; // Buffer group id
 type Bid = u16; // Buffer id
@@ -110,12 +109,6 @@ pub(crate) struct InnerBufRing {
     // buffers to the ring during init but that's not as interesting.
     local_tail: Cell<u16>,
 
-    // `shared_tail` points to the u16 memory inside the rings that the uring interface uses as the
-    // tail field. It is where the application writes new tail values and the kernel reads the tail
-    // value from time to time. The address could be computed from ring_start when needed. This
-    // might be here for no good reason any more.
-    shared_tail: *const AtomicU16,
-
     // Buffer register flags
     flags: RegisterFlags,
 }
@@ -158,10 +151,6 @@ impl InnerBufRing {
             bp
         };
 
-        let shared_tail =
-            unsafe { types::BufRingEntry::tail(ring_start.as_ptr() as *const BufRingEntry) }
-                as *const AtomicU16;
-
         let ring_entries_mask = ring_entries - 1;
         assert!((ring_entries & ring_entries_mask) == 0);
 
@@ -173,7 +162,6 @@ impl InnerBufRing {
             ring_start,
             buf_list,
             local_tail: Cell::new(0),
-            shared_tail,
             flags,
         };
 
@@ -348,7 +336,10 @@ impl InnerBufRing {
     // called to fill in new buffers.
     fn buf_ring_sync(&self) {
         unsafe {
-            (*self.shared_tail).store(self.local_tail.get(), atomic::Ordering::Release);
+            BufRingEntry::publish_tail(
+                self.ring_start.as_ptr() as *const BufRingEntry,
+                self.local_tail.get(),
+            );
         }
     }
 }
