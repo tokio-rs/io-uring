@@ -365,7 +365,7 @@ impl BufRingEntry {
     /// The offset to the ring's tail field given the ring's base address.
     ///
     /// The tail is shared with the kernel, so writes to it must be atomic with
-    /// release ordering. Use [`Self::publish_tail`] to publish a new tail./
+    /// release ordering. Use [`Self::publish_tail`] to publish a new tail.
     ///
     /// The caller should ensure the ring's base address is aligned with the system's page size,
     /// per the uring interface requirements.
