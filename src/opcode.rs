@@ -1185,17 +1185,22 @@ opcode! {
         ;;
         flags: i32 = 0,
         len: u32 = 0,
+        /// Ends the request once this many bytes have been received in total, with a final CQE
+        /// that does not have `IORING_CQE_F_MORE` set. Zero means no limit. Available since
+        /// kernel 6.17; older kernels fail the request with `EINVAL` if it is set.
+        total_len: u32 = 0
     }
 
     pub const CODE = sys::IORING_OP_RECV;
 
     pub fn build(self) -> Entry {
-        let RecvMulti { fd, buf_group, flags, len } = self;
+        let RecvMulti { fd, buf_group, flags, len, total_len } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
         sqe.len = len;
+        sqe.__bindgen_anon_5.optlen = total_len;
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
         sqe.flags |= crate::squeue::Flags::BUFFER_SELECT.bits();
@@ -2280,17 +2285,22 @@ opcode! {
         fd: { impl sealed::UseFixed },
         buf_group: { u16 },
         ;;
-        flags: i32 = 0
+        flags: i32 = 0,
+        /// Ends the request once this many bytes have been received in total, with a final CQE
+        /// that does not have `IORING_CQE_F_MORE` set. Zero means no limit. Available since
+        /// kernel 6.17; older kernels fail the request with `EINVAL` if it is set.
+        total_len: u32 = 0
     }
 
     pub const CODE = sys::IORING_OP_RECV;
 
     pub fn build(self) -> Entry {
-        let RecvMultiBundle { fd, buf_group, flags } = self;
+        let RecvMultiBundle { fd, buf_group, flags, total_len } = self;
 
         let mut sqe = sqe_zeroed();
         sqe.opcode = Self::CODE;
         assign_fd!(sqe.fd = fd);
+        sqe.__bindgen_anon_5.optlen = total_len;
         sqe.__bindgen_anon_3.msg_flags = flags as _;
         sqe.__bindgen_anon_4.buf_group = buf_group;
         sqe.flags |= crate::squeue::Flags::BUFFER_SELECT.bits();
