@@ -47,6 +47,7 @@ use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::os::unix::io::RawFd;
+use std::sync::atomic::{AtomicU16, Ordering};
 
 #[deprecated]
 pub type RwFlags = u32;
@@ -363,6 +364,9 @@ impl BufRingEntry {
 
     /// The offset to the ring's tail field given the ring's base address.
     ///
+    /// The tail is shared with the kernel, so writes to it must be atomic with
+    /// release ordering. Use [`Self::publish_tail`] to publish a new tail.
+    ///
     /// The caller should ensure the ring's base address is aligned with the system's page size,
     /// per the uring interface requirements.
     ///
@@ -375,6 +379,22 @@ impl BufRingEntry {
     /// The entry must also be properly initialized.
     pub unsafe fn tail(ring_base: *const BufRingEntry) -> *const u16 {
         std::ptr::addr_of!((*ring_base).0.resv)
+    }
+
+    /// Publishes `tail` to the kernel, making every entry before it available for
+    /// buffer selection.
+    ///
+    /// The store uses release ordering, so entries written before this call are
+    /// visible to the kernel once it observes the new tail.
+    ///
+    /// # Safety
+    ///
+    /// `ring_base` must be a valid pointer to the first entry of a registered buf_ring,
+    /// and every entry between the previously published tail and `tail` must be fully
+    /// initialized before this is called.
+    pub unsafe fn publish_tail(ring_base: *const BufRingEntry, tail: u16) {
+        let ptr = Self::tail(ring_base).cast::<AtomicU16>();
+        (*ptr).store(tail, Ordering::Release);
     }
 }
 
