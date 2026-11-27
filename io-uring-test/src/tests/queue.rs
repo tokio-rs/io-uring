@@ -67,6 +67,140 @@ pub fn test_setup_no_sqarray<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_setup_no_mmap<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    _ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    require! {
+        test;
+    }
+
+    println!("test setup_no_mmap");
+
+    // 6.5 and 6.6 reject regions larger than one page with EFAULT, 6.7 to 6.9 accept them only
+    // if physically contiguous (else EINVAL), and 6.10 vmaps any memory.
+    let vmaps_user_pages = kernel_version() >= (6, 10);
+    let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
+
+    // 1024 entries need several pages per region, so they are not physically contiguous.
+    let entries = 1024;
+    let mut cqsize = IoUring::<S, C>::builder();
+    cqsize.setup_cqsize(4 * entries);
+    for builder in [IoUring::<S, C>::builder(), cqsize] {
+        let (rings_len, sqes_len) = builder.no_mmap_sizes(entries);
+        let memory = ZeroedMemory::new(rings_len + sqes_len);
+        let (rings, sqes) = memory.split(rings_len);
+
+        let mut ring = match unsafe {
+            builder.build_no_mmap(entries, rings, rings_len, sqes, sqes_len)
+        } {
+            Ok(ring) => ring,
+            Err(err)
+                if !vmaps_user_pages
+                    && matches!(err.raw_os_error(), Some(libc::EINVAL | libc::EFAULT)) =>
+            {
+                println!("IORING_SETUP_NO_MMAP with discontiguous pages is not supported by the kernel, skip");
+                return Ok(());
+            }
+            Err(err) => return Err(err.into()),
+        };
+
+        for i in 0..4u64 {
+            let nop_e = opcode::Nop::new().build().user_data(0x4242 + i).into();
+            unsafe {
+                ring.submission().push(&nop_e).expect("queue is full");
+            }
+        }
+
+        ring.submit_and_wait(4)?;
+
+        // The kernel wrote the completions into the caller's memory, not a ring of its own.
+        let words =
+            unsafe { std::slice::from_raw_parts(rings.as_ptr().cast::<u64>(), rings_len / 8) };
+        for i in 0..4u64 {
+            assert!(words.contains(&(0x4242 + i)));
+        }
+        assert!(ring.params().is_setup_no_mmap());
+
+        let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+        assert_eq!(cqes.len(), 4);
+        for (i, cqe) in cqes.iter().enumerate() {
+            assert_eq!(cqe.user_data(), 0x4242 + i as u64);
+            assert_eq!(cqe.result(), 0);
+        }
+
+        drop(ring);
+        assert!(
+            memory.is_mapped(),
+            "dropping the ring unmapped the caller's memory"
+        );
+
+        // Regions one page smaller than no_mmap_sizes, and a single page, are refused rather
+        // than overrun.
+        for (rings_len, sqes_len) in [
+            (rings_len - page, sqes_len),
+            (rings_len, sqes_len - page),
+            (page, sqes_len),
+        ] {
+            let memory = ZeroedMemory::new(rings_len + sqes_len);
+            let (rings, sqes) = memory.split(rings_len);
+            let err = unsafe { builder.build_no_mmap(entries, rings, rings_len, sqes, sqes_len) }
+                .err()
+                .expect("an undersized region must be refused");
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        }
+    }
+
+    Ok(())
+}
+
+fn kernel_version() -> (u32, u32) {
+    let mut uts = unsafe { std::mem::zeroed::<libc::utsname>() };
+    assert_eq!(unsafe { libc::uname(&mut uts) }, 0);
+    let release = unsafe { std::ffi::CStr::from_ptr(uts.release.as_ptr()) }.to_string_lossy();
+    let mut numbers = release
+        .split(|c: char| !c.is_ascii_digit())
+        .map(|n| n.parse().unwrap_or(0));
+    (numbers.next().unwrap_or(0), numbers.next().unwrap_or(0))
+}
+
+struct ZeroedMemory {
+    addr: std::ptr::NonNull<u8>,
+    len: usize,
+}
+
+impl ZeroedMemory {
+    fn new(len: usize) -> Self {
+        let addr = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                len,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                -1,
+                0,
+            )
+        };
+        assert_ne!(addr, libc::MAP_FAILED);
+        let addr = std::ptr::NonNull::new(addr.cast()).unwrap();
+        ZeroedMemory { addr, len }
+    }
+
+    fn split(&self, at: usize) -> (std::ptr::NonNull<u8>, std::ptr::NonNull<u8>) {
+        (self.addr, unsafe { self.addr.add(at) })
+    }
+
+    fn is_mapped(&self) -> bool {
+        unsafe { libc::msync(self.addr.as_ptr().cast(), self.len, libc::MS_ASYNC) == 0 }
+    }
+}
+
+impl Drop for ZeroedMemory {
+    fn drop(&mut self) {
+        unsafe { libc::munmap(self.addr.as_ptr().cast(), self.len) };
+    }
+}
+
 pub fn test_defer_taskrun<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     test: &Test,
 ) -> anyhow::Result<()> {
