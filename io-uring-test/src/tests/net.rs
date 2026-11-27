@@ -1368,6 +1368,96 @@ pub fn test_tcp_recv_multi<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_tcp_recv_multi_total_len<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    test: &Test,
+) -> anyhow::Result<()> {
+    use std::io::Write;
+
+    require!(
+        test;
+        test.probe.is_supported(opcode::Send::CODE);
+        test.probe.is_supported(opcode::Recv::CODE);
+        test.probe.is_supported(opcode::SendZc::CODE); // also available 6.0, like the multishot for recv
+        test.probe.is_supported(opcode::ProvideBuffers::CODE);
+        test.probe.is_supported(opcode::RemoveBuffers::CODE);
+    );
+
+    println!("test tcp_recv_multi_total_len");
+
+    let (mut send_stream, recv_stream) = tcp_pair()?;
+
+    let recv_fd = types::Fd(recv_stream.as_raw_fd());
+
+    // Four buffers of 1024 and 4096 bytes queued, but a total_len of 1024: the request should
+    // end after the first buffer, with the rest left on the socket.
+    let input = vec![0xbe; 4 * 1024];
+    let mut bufs = vec![0; 4 * 1024];
+
+    let provide_bufs_e = opcode::ProvideBuffers::new(bufs.as_mut_ptr(), 1024, 4, 0xbeef, 0);
+
+    unsafe {
+        ring.submission()
+            .push(&provide_bufs_e.build().user_data(0x23).into())
+            .expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x23);
+    assert_eq!(cqe.result(), 0);
+
+    send_stream.write_all(&input)?;
+
+    let recv_e = opcode::RecvMulti::new(recv_fd, 0xbeef)
+        .total_len(1024)
+        .build()
+        .user_data(0x24)
+        .into();
+
+    unsafe {
+        ring.submission().push(&recv_e).expect("queue is full");
+    }
+
+    ring.submit_and_wait(1)?;
+
+    let cqes: Vec<cqueue::Entry> = ring.completion().map(Into::into).collect();
+    assert_eq!(cqes[0].user_data(), 0x24);
+
+    if cqes[0].result() == -libc::EINVAL {
+        println!("skipping tcp_recv_multi_total_len, needs kernel 6.17");
+        let remove_bufs_e = opcode::RemoveBuffers::new(4, 0xbeef);
+        unsafe {
+            ring.submission()
+                .push(&remove_bufs_e.build().user_data(0x25).into())
+                .expect("queue is full");
+        }
+        ring.submit_and_wait(1)?;
+        ring.completion().for_each(drop);
+        return Ok(());
+    }
+
+    assert_eq!(cqes.len(), 1);
+    assert_eq!(cqes[0].result(), 1024);
+    assert!(!cqueue::more(cqes[0].flags()));
+    assert_eq!(cqueue::buffer_select(cqes[0].flags()), Some(0));
+    assert_eq!(&bufs[..1024], &input[..1024]);
+
+    let remove_bufs_e = opcode::RemoveBuffers::new(3, 0xbeef);
+    unsafe {
+        ring.submission()
+            .push(&remove_bufs_e.build().user_data(0x25).into())
+            .expect("queue is full");
+    }
+    ring.submit_and_wait(1)?;
+    let cqe: cqueue::Entry = ring.completion().next().expect("cqueue is empty").into();
+    assert_eq!(cqe.user_data(), 0x25);
+    assert_eq!(cqe.result(), 3);
+
+    Ok(())
+}
+
 pub fn test_tcp_recv_bundle<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
