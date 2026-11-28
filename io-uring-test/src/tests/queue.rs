@@ -67,6 +67,41 @@ pub fn test_setup_no_sqarray<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+pub fn test_setup_hybrid_iopoll<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    test: &Test,
+) -> anyhow::Result<()> {
+    require! {
+        test;
+    }
+
+    println!("test setup_hybrid_iopoll");
+
+    match IoUring::<S, C>::builder()
+        .setup_iopoll()
+        .setup_hybrid_iopoll()
+        .build(8)
+    {
+        Ok(_) => {}
+        Err(err) => match err.raw_os_error() {
+            Some(libc::EINVAL) | Some(libc::EOPNOTSUPP) => {
+                println!("IORING_SETUP_HYBRID_IOPOLL is not supported by the kernel, skip");
+                return Ok(());
+            }
+            _ => return Err(err.into()),
+        },
+    }
+
+    // Hybrid polling only makes sense on top of polled I/O, the kernel refuses it alone.
+    let err = IoUring::<S, C>::builder()
+        .setup_hybrid_iopoll()
+        .build(8)
+        .err()
+        .expect("hybrid polling without iopoll should be refused");
+    assert_eq!(err.raw_os_error(), Some(libc::EINVAL));
+
+    Ok(())
+}
+
 pub fn test_defer_taskrun<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     test: &Test,
 ) -> anyhow::Result<()> {

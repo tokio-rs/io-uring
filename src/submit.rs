@@ -871,6 +871,73 @@ impl<'a> Submitter<'a> {
         .map(drop)
     }
 
+    /// Query the current head of a registered buffer ring.
+    ///
+    /// The head is the index of the next buffer the kernel will consume from the ring. Compared
+    /// with the tail that the application publishes, it tells how many buffers are still
+    /// available to the kernel. The value is a free running counter, so it wraps at 2^16 rather
+    /// than at the number of ring entries.
+    ///
+    /// Fails with `ENOENT` if no buffer ring is registered for `bgid`.
+    ///
+    /// Available since 6.8.
+    pub fn register_buf_ring_head(&self, bgid: u16) -> io::Result<u32> {
+        let mut arg = sys::io_uring_buf_status {
+            buf_group: bgid as u32,
+            ..Default::default()
+        };
+        self.execute_register(
+            sys::IORING_REGISTER_PBUF_STATUS,
+            (&mut arg as *mut sys::io_uring_buf_status).cast(),
+            1,
+        )?;
+        Ok(arg.head)
+    }
+
+    /// Restrict the direct descriptor slots that are handed out when an opcode asks for an
+    /// automatically allocated slot, see
+    /// [`DestinationSlot::auto_target`](types::DestinationSlot::auto_target).
+    ///
+    /// Only the `len` slots starting at `offset` are used for allocation from now on. Slots
+    /// outside of the range can still be targeted explicitly. The range has to lie inside the
+    /// registered file table, so register one first, for example with
+    /// [`register_files_sparse`](Self::register_files_sparse).
+    ///
+    /// Available since 6.0.
+    pub fn register_file_alloc_range(&self, offset: u32, len: u32) -> io::Result<()> {
+        let arg = sys::io_uring_file_index_range {
+            off: offset,
+            len,
+            resv: 0,
+        };
+        self.execute_register(
+            sys::IORING_REGISTER_FILE_ALLOC_RANGE,
+            cast_ptr::<sys::io_uring_file_index_range>(&arg).cast(),
+            0,
+        )
+        .map(drop)
+    }
+
+    /// Select the clock used for absolute timeouts, which are requested with
+    /// [`EnterFlags::ABS_TIMER`] or [`TimeoutFlags::ABS`](types::TimeoutFlags::ABS).
+    ///
+    /// `clockid` must be `CLOCK_MONOTONIC` or `CLOCK_BOOTTIME`, the kernel rejects anything else
+    /// with `EINVAL`. `CLOCK_MONOTONIC` is the default.
+    ///
+    /// Available since 6.12.
+    pub fn register_clock(&self, clockid: libc::clockid_t) -> io::Result<()> {
+        let arg = sys::io_uring_clock_register {
+            clockid: clockid as u32,
+            ..Default::default()
+        };
+        self.execute_register(
+            sys::IORING_REGISTER_CLOCK,
+            cast_ptr::<sys::io_uring_clock_register>(&arg).cast(),
+            0,
+        )
+        .map(drop)
+    }
+
     /// Performs a synchronous cancellation request, similar to [AsyncCancel](crate::opcode::AsyncCancel),
     /// except that it completes synchronously.
     ///
