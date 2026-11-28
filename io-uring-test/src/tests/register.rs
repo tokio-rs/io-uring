@@ -1,5 +1,5 @@
 use crate::Test;
-use io_uring::{cqueue, opcode, squeue, IoUring};
+use io_uring::{cqueue, opcode, squeue, types, IoUring};
 
 pub fn test_register_files_sparse<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
@@ -200,4 +200,77 @@ fn is_register_ring_fd_supported<S: squeue::EntryMarker, C: cqueue::EntryMarker>
         Err(e) if e.raw_os_error() == Some(libc::EINVAL) => Ok(false),
         Err(e) => Err(anyhow::anyhow!("register_ring_fd probe failed: {}", e)),
     }
+}
+
+pub fn test_register_file_alloc_range(test: &Test) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Socket::CODE);
+    );
+
+    println!("test register_file_alloc_range");
+
+    let mut ring = IoUring::new(8)?;
+    ring.submitter().register_files_sparse(16)?;
+
+    // The range must lie inside the registered table.
+    match ring.submitter().register_file_alloc_range(12, 8) {
+        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {}
+        other => {
+            return Err(anyhow::anyhow!(
+                "an out of range allocation window should be rejected: {:?}",
+                other
+            ));
+        }
+    }
+
+    ring.submitter().register_file_alloc_range(4, 4)?;
+
+    // Five sockets asked for an automatic slot: the first four fill the window, the fifth finds
+    // no free slot even though the rest of the table is empty.
+    for i in 0..5 {
+        let socket = opcode::Socket::new(libc::AF_UNIX, libc::SOCK_STREAM, 0)
+            .file_index(Some(types::DestinationSlot::auto_target()))
+            .build()
+            .user_data(i);
+        unsafe {
+            ring.submission().push(&socket).expect("queue is full");
+        }
+    }
+    assert_eq!(ring.submit_and_wait(5)?, 5);
+
+    let mut results = vec![0; 5];
+    for cqe in ring.completion() {
+        results[cqe.user_data() as usize] = cqe.result();
+    }
+    results.sort_unstable();
+    assert_eq!(results, [-libc::ENFILE, 4, 5, 6, 7]);
+
+    Ok(())
+}
+
+pub fn test_register_clock(test: &Test) -> anyhow::Result<()> {
+    require!(
+        test;
+        test.probe.is_supported(opcode::Timeout::CODE);
+    );
+
+    println!("test register_clock");
+
+    let ring = IoUring::<squeue::Entry, cqueue::Entry>::new(2)?;
+    let submitter = ring.submitter();
+
+    // Kernels before 6.12 do not know the operation at all.
+    match submitter.register_clock(libc::CLOCK_BOOTTIME) {
+        Ok(()) => {}
+        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => return Ok(()),
+        Err(e) => return Err(e.into()),
+    }
+    submitter.register_clock(libc::CLOCK_MONOTONIC)?;
+
+    // Only the monotonic and boottime clocks can drive timeouts.
+    let err = submitter.register_clock(libc::CLOCK_REALTIME).unwrap_err();
+    assert_eq!(err.raw_os_error(), Some(libc::EINVAL));
+
+    Ok(())
 }

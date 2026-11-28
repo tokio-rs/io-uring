@@ -463,6 +463,15 @@ impl<S: squeue::EntryMarker, C: cqueue::EntryMarker> Builder<S, C> {
         self
     }
 
+    /// Request hybrid polling for completions of I/O submitted to a ring with
+    /// [`setup_iopoll`](Self::setup_iopoll). Instead of spinning right away, the kernel sleeps for
+    /// a fraction of the expected latency and only then polls, which lowers the CPU usage of
+    /// polled I/O. Available since 6.13.
+    pub fn setup_hybrid_iopoll(&mut self) -> &mut Self {
+        self.params.flags |= sys::IORING_SETUP_HYBRID_IOPOLL;
+        self
+    }
+
     /// Remove the indirection array between the submission queue tail and the SQEs. Submission
     /// queue entries are consumed in-order, which eliminates a level of indirection and the
     /// corresponding memory read during submission. Available since 6.6.

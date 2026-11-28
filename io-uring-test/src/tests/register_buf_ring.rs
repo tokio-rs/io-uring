@@ -712,6 +712,50 @@ fn buf_ring_play<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     Ok(())
 }
 
+// Verify the head reported by `register_buf_ring_head` follows the buffers the kernel consumes.
+fn buf_ring_head<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
+    ring: &mut IoUring<S, C>,
+    _test: &Test,
+) -> io::Result<()> {
+    let text = b"The quick brown fox jumps over the lazy dog.";
+    let len = text.len() as u32;
+
+    let buf_ring = Builder::new(889)
+        .ring_entries(4)
+        .buf_cnt(4)
+        .buf_len(128)
+        .build()?;
+
+    // A group that was never registered has no head to report.
+    match ring.submitter().register_buf_ring_head(889) {
+        Err(e) if e.raw_os_error() == Some(libc::ENOENT) => {}
+        // Kernels before 6.8 do not know the status query at all.
+        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => return Ok(()),
+        other => panic!("expected ENOENT for an unregistered group, got {:?}", other),
+    }
+
+    buf_ring.rc.register(ring)?;
+    assert_eq!(ring.submitter().register_buf_ring_head(889)?, 0);
+
+    let fd = tempfile::tempfile()?;
+    let fd = types::Fd(fd.as_raw_fd());
+    write_text_to_file(ring, fd, text)?;
+
+    // Each read takes one buffer, which moves the head by one.
+    let buf0 = buf_ring_read(ring, &buf_ring, fd, len)?;
+    assert_eq!(ring.submitter().register_buf_ring_head(889)?, 1);
+    let buf1 = buf_ring_read(ring, &buf_ring, fd, len)?;
+    assert_eq!(ring.submitter().register_buf_ring_head(889)?, 2);
+
+    // Giving the buffers back moves the tail, the head stays where the kernel left it.
+    drop(buf0);
+    drop(buf1);
+    assert_eq!(ring.submitter().register_buf_ring_head(889)?, 2);
+
+    buf_ring.rc.unregister(ring)?;
+    Ok(())
+}
+
 pub fn test_register_buf_ring<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     ring: &mut IoUring<S, C>,
     test: &Test,
@@ -732,6 +776,8 @@ pub fn test_register_buf_ring<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     buf_ring_reg_and_unreg(ring, test)?;
 
     buf_ring_play(ring, test)?;
+
+    buf_ring_head(ring, test)?;
 
     Ok(())
 }

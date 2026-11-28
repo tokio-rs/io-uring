@@ -73,6 +73,7 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     tests::queue::test_nop(&mut ring, &test)?;
     tests::queue::test_setup_no_sqarray(&mut ring, &test)?;
     tests::queue::test_defer_taskrun::<S, C>(&test)?;
+    tests::queue::test_setup_hybrid_iopoll::<S, C>(&test)?;
     tests::queue::test_queue_split(&mut ring, &test)?;
     tests::queue::test_completion_status(&mut ring, &test)?;
     tests::queue::test_debug_print(&mut ring, &test)?;
@@ -84,6 +85,8 @@ fn test<S: squeue::EntryMarker, C: cqueue::EntryMarker>(
     // register
     tests::register::test_register_files_sparse(&mut ring, &test)?;
     tests::register::test_register_ring_fd(&mut ring, &test)?;
+    tests::register::test_register_file_alloc_range(&test)?;
+    tests::register::test_register_clock(&test)?;
     tests::register_buffers::test_register_buffers(&mut ring, &test)?;
     tests::register_buffers::test_register_buffers_update(&mut ring, &test)?;
     tests::register_buffers::test_register_buffers_clone(&test)?;
